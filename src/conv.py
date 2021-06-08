@@ -59,10 +59,10 @@ class CGequivariantEncoder(nn.Module):
         )
 
         self.cgmessage_layers = nn.ModuleList(
-        [ContractiveMessageBlock(feat_dim=128,
+        [ContractiveMessageBlock(feat_dim=n_atom_basis,
                                          activation='swish',
-                                         n_rbf=8,
-                                         cutoff=5.0,
+                                         n_rbf=n_rbf,
+                                         cutoff=cutoff,
                                          learnable_k=False,
                                          dropout=0.0)
          for _ in range(n_conv)])
