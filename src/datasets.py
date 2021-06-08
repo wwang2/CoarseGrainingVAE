@@ -70,7 +70,7 @@ def get_alanine_dipeptide_dataset(cutoff, n_frames=20000,CGgraphcutoff=2.0, n_cg
     traj_reshape = shuffle(traj)[:n_frames].reshape(-1, len(peptide_element),  3) * 10.0 # Change from nanometer to Angstrom 
 
     # The mapping might be 
-    mapping = get_mapping(traj_reshape[:500], CGgraphcutoff, len(peptide_element), n_cg)
+    mapping = get_mapping(traj_reshape[::500], CGgraphcutoff, len(peptide_element), n_cg)
 
     CG_nxyz_data = []
     nxyz_data = []
