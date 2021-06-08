@@ -16,7 +16,7 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True):
         model.train()
         mode = 'train'
     else:
-        model.eval()
+        model.train() # yes, still set to train when reconstructing
         mode = 'val'
     
     tqdm_data = tqdm(loader, position=0,
