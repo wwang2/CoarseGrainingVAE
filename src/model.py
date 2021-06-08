@@ -22,6 +22,8 @@ class CGequiVAE(nn.Module):
         
     def get_inputs(self, batch):
 
+        xyz = batch['nxyz'][:, 1:]
+
         cg_xyz = batch['CG_nxyz'][:, 1:]
         batch['nxyz'][:, 1:]
 
@@ -33,7 +35,9 @@ class CGequiVAE(nn.Module):
         nbr_list = batch['nbr_list']
         CG_nbr_list = batch['CG_nbr_list']
         
-        return z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping 
+        num_CGs = batch['num_CGs']
+        
+        return z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs
         
     def reparametrize(self, mu, sigma):
         if self.training:
@@ -44,12 +48,12 @@ class CGequiVAE(nn.Module):
             
         return S_I
         
-    def decoder(self, cg_xyz, CG_nbr_list, S_I, mapping):
+    def decoder(self, cg_xyz, CG_nbr_list, S_I, mapping, num_CGs):
         
         cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list ,S_I)
 
         pooled_vector = []
-        v_i_splits = torch.split(cg_v, batch['num_CGs'].tolist()) 
+        v_i_splits = torch.split(cg_v, num_CGs.tolist()) 
 
         for vec in v_i_splits:
             pooled_vector.append(vec)
@@ -61,7 +65,7 @@ class CGequiVAE(nn.Module):
         
     def forward(self, batch):
 
-        z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping = self.get_inputs(batch)
+        z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
         
         S_I = self.encoder(z, xyz, cg_xyz, mapping, nbr_list)
         
@@ -70,7 +74,7 @@ class CGequiVAE(nn.Module):
         S_sigma = torch.exp(S_logvar / 2)
         S_I = self.reparametrize(S_mu, S_sigma)
         
-        xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping)
+        xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
         
-        return S_mu, S_sigma, xyz_recon
+        return S_mu, S_sigma, xyz, xyz_recon
     
