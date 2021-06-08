@@ -69,3 +69,42 @@ def CG_collate(dicts):
             )
 
     return batch
+
+def split_train_test(dataset,
+                     test_size=0.2,
+                     binary=False,
+                     targ_name=None):
+
+    if binary:
+        idx_train, idx_test = binary_split(dataset=dataset,
+                                           targ_name=targ_name,
+                                           test_size=test_size)
+    else:
+        idx = list(range(len(dataset)))
+        idx_train, idx_test = train_test_split(idx, test_size=test_size)
+
+    train = CGDataset(
+        props={key: [val[i] for i in idx_train]
+               for key, val in dataset.props.items()},
+    )
+    test = CGDataset(
+        props={key: [val[i] for i in idx_test]
+               for key, val in dataset.props.items()},
+    )
+
+    return train, test
+
+
+def split_train_validation_test(dataset,
+                                val_size=0.2,
+                                test_size=0.2,
+                                **kwargs):
+
+    train, validation = split_train_test(dataset,
+                                         test_size=val_size,
+                                         **kwargs)
+    train, test = split_train_test(train,
+                                   test_size=test_size / (1 - val_size),
+                                   **kwargs)
+
+    return train, validation, test
