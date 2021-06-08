@@ -79,9 +79,10 @@ def get_alanine_dipeptide_dataset(cutoff, n_frames=20000,CGgraphcutoff=2.0, n_cg
     num_CGs_list = []
     CG_mapping_list = []
 
+    atomic_nums = np.array( [atomic_num_dict[el] for el in peptide_element] )
+
     for xyz in traj_reshape:   
-        atomic_nums = np.array( [atomic_num_dict[el] for el in peptide_element] )[..., None]
-        nxyz = torch.cat((torch.Tensor(atomic_nums), torch.Tensor(xyz) ), dim=-1)
+        nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)
         nxyz_data.append(nxyz)
         num_atoms_list.append(torch.LongTensor( [len(nxyz)]))
 
@@ -105,4 +106,4 @@ def get_alanine_dipeptide_dataset(cutoff, n_frames=20000,CGgraphcutoff=2.0, n_cg
     dataset = CGDataset(props.copy())
     dataset.generate_neighbor_list(cutoff=cutoff)
 
-    return dataset
+    return atomic_nums, dataset
