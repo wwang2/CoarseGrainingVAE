@@ -12,7 +12,7 @@ import matplotlib
 def ramachandran_plot(xyzs, atomic_nums):
 
     traj = []
-    for xyz in recon_xyzs:
+    for xyz in xyzs:
         traj.append( Atoms(positions=xyz, numbers=atomic_nums.ravel()) )
 
     io.write('tmp.xyz', traj)
