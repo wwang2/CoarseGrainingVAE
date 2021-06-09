@@ -53,14 +53,16 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True):
     
     return mean_kl, mean_recon, xyz, xyz_recon 
 
-def get_all_true_reconstructed_structures(loader, device, model, atomic_nums):
+def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg):
 
     model = model.to(device)
 
     true_xyzs = []
     recon_xyzs = []
+    mus = []
+    sigmas = []
 
-    tqdm_data = tqdm(trainloader, position=0, leave=True)    
+    tqdm_data = tqdm(loader, position=0, leave=True)    
 
     for batch in tqdm_data:
         batch = batch_to(batch, device)
@@ -68,8 +70,14 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums):
 
         true_xyzs.append(xyz.detach().cpu())
         recon_xyzs.append(xyz_recon.detach().cpu())
+        
+        mus.append(S_mu.detach().cpu())
+        sigmas.append(S_sigma.detach().cpu())
 
     true_xyzs = torch.cat(true_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     recon_xyzs = torch.cat(recon_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     
-    return true_xyzs, recon_xyzs
+    mu = torch.cat(mus).reshape(-1, n_cg, S_mu.shape[-1]).mean(0)
+    sigma = torch.cat(sigmas).reshape(-1, n_cg, S_mu.shape[-1]).mean(0)
+    
+    return true_xyzs, recon_xyzs, mu, sigma
