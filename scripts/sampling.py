@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import mdshare
 import pyemma
+from tqdm import tqdm
 
 def sample_single(batch, mu, sigma, model, n_batch, device):
 

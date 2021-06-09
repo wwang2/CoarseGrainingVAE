@@ -1,4 +1,5 @@
 from ase import io
+from ase import Atoms
 from scipy.stats import gaussian_kde
 import numpy as np
 import torch
