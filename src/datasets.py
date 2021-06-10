@@ -12,6 +12,15 @@ from sklearn.utils import shuffle
 
 atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7}
 
+DATALABELS = {'dipeptide': 
+                            {'pdb': 'alanine-dipeptide-nowater.pdb', 
+                            'xtc': 'alanine-dipeptide-*-250ns-nowater.xtc'
+                             },
+              'pentapeptide': 
+                            {'pdb': 'pentapeptide-impl-solv.pdb',
+                             'xtc': 'pentapeptide-*-500ns-impl-solv.xtc'
+                            }
+              }
 
 def compute_nbr_list(frame, cutoff):
     
@@ -56,22 +65,22 @@ def get_mapping(traj, cutoff, n_nodes, n_partitions):
     
     return mappings.long()
 
-def get_alanine_dipeptide_top():
+def get_alanine_dipeptide_top(label):
 
-    pdb = mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='data')
-    peptide = md.load("data/alanine-dipeptide-nowater.pdb")
+    pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
+    peptide = md.load("data/{}".format(DATALABELS[label]['pdb']))
 
     return peptide
 
-def get_alanine_dipeptide_dataset(cutoff, n_frames=20000,CGgraphcutoff=2.0, n_cg=6):
+def get_alanine_dipeptide_dataset(cutoff, label, n_frames=20000,CGgraphcutoff=2.0, n_cg=6):
     
-    pdb = mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='data')
-    files = mdshare.fetch('alanine-dipeptide-*-250ns-nowater.xtc', working_directory='data')
+    pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
+    files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
     feat = pyemma.coordinates.featurizer(pdb)
     traj = pyemma.coordinates.load(files, features=feat)
     traj = np.concatenate(traj)
 
-    peptide = get_alanine_dipeptide_top()
+    peptide = get_alanine_dipeptide_top(label)
 
     peptide_top = peptide.top.to_dataframe()[0]
     peptide_element = peptide_top['element'].values.tolist()
