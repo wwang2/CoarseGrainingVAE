@@ -45,4 +45,4 @@ def ramachandran_plot(xyzs, atomic_nums):
 
     cbar = plt.colorbar()
     cbar.ax.tick_params(labelsize=20)
-    cbar.set_label(label='density', size=20)
+    cbar.set_label(label='kT', size=20)
