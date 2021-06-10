@@ -1,4 +1,4 @@
-from ase import io
+from ase import io, Atoms
 import numpy as np
 import torch
 import mdshare
