@@ -5,6 +5,14 @@ import mdshare
 import pyemma
 from tqdm import tqdm
 
+from nff.train import batch_to
+
+def batch_to(batch, device):
+    gpu_batch = dict()
+    for key, val in batch.items():
+        gpu_batch[key] = val.to(device) if hasattr(val, 'to') else val
+    return gpu_batch
+
 def sample_single(batch, mu, sigma, model, n_batch, device):
 
     model = model.to(device)
