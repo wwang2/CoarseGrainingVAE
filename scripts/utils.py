@@ -17,7 +17,7 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True):
         mode = 'train'
     else:
         model.train() # yes, still set to train when reconstructing
-        mode = 'val'
+        mode = 'valid'
     
     tqdm_data = tqdm(loader, position=0,
                      leave=True, desc='({} epoch #{})'.format(mode, epoch))
@@ -45,8 +45,8 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True):
         mean_kl = np.array(kl_loss).mean()
         mean_recon = np.array(recon_loss).mean()
         
-        postfix = ['avg. KL loss={:.3f}'.format(mean_kl) , 
-                   'avg. recon loss={:.3f}'.format(mean_recon)]
+        postfix = ['avg. KL loss={:.4f}'.format(mean_kl) , 
+                   'avg. recon loss={:.4f}'.format(mean_recon)]
         
         tqdm_data.set_postfix_str(' '.join(postfix))    
     
