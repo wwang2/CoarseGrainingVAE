@@ -1,24 +1,28 @@
-
+import os 
 from nff.train import batch_to
 from tqdm import tqdm 
 import torch
 import numpy as np
 from ase import Atoms, io 
 
+def create_dir(name):
+    if not os.path.isdir(name):
+        os.mkdir(name)   
+
 def KL(mu, std):
      return -0.5 * torch.sum(1 + torch.log(std.pow(2)) - mu.pow(2) - std.pow(2), dim=-1).mean()
 
-def loop(loader, optimizer, device, model, beta, epoch, train=True):
+def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext=''):
     
     recon_loss = []
     kl_loss = []
     
     if train:
         model.train()
-        mode = 'train'
+        mode = '{} train'.format(looptext)
     else:
         model.train() # yes, still set to train when reconstructing
-        mode = 'valid'
+        mode = '{} valid'.format(looptext)
     
     tqdm_data = tqdm(loader, position=0,
                      leave=True, desc='({} epoch #{})'.format(mode, epoch))

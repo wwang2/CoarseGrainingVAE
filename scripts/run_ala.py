@@ -73,19 +73,16 @@ atomic_nums, dataset = get_alanine_dipeptide_dataset(cutoff,
                                                      n_cg=n_cgs)
 
 # create subdirectory 
-if not os.path.isdir(working_dir):
-    os.mkdir(working_dir)
+create_dir(working_dir)
     
 kf = KFold(n_splits=nsplits)
 cv_rmsd = []
+split_iter = kf.split(list(range(len(dataset))))\
 
-for i, (train_index, test_index) in enumerate(kf.split(list(range(len(dataset))))):
-
-    # parse fold id into tqdm
+for i, (train_index, test_index) in enumerate(split_iter):
 
     split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
-    if not os.path.isdir(split_dir):
-        os.mkdir(split_dir)
+    create_dir(split_dir)
 
     trainset = get_subset_by_indices(train_index, dataset)
     testset = get_subset_by_indices(test_index, dataset)
@@ -109,14 +106,12 @@ for i, (train_index, test_index) in enumerate(kf.split(list(range(len(dataset)))
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=5, factor=0.5)
     
     model.train()
-
     for epoch in range(nepochs):
         # train
         mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
-                                                   model, beta, epoch, train=True)
+                                                   model, beta, epoch, train=True, looptext='Ncg {} Fold {}'.format(n_cgs, i))
         scheduler.step(mean_recon)
         
-
     # save sampled geometries 
     trainloader = DataLoader(trainset, batch_size=128, collate_fn=CG_collate, shuffle=True)
     train_true_xyzs, train_recon_xyzs, mu, sigma = get_all_true_reconstructed_structures(trainloader, 
@@ -146,7 +141,6 @@ for i, (train_index, test_index) in enumerate(kf.split(list(range(len(dataset)))
     dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
     dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
     dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
-
 
     # compute loss and metrics 
     test_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
