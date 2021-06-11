@@ -85,4 +85,3 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 def dump_numpy2xyz(xyzs, atomic_nums, path):
     trajs = [Atoms(positions=xyz, numbers=atomic_nums.ravel()) for xyz in xyzs]
     io.write(path, trajs)
-    return trajs 
