@@ -2,6 +2,7 @@
 from ase import Atoms 
 import torch
 import numpy as np 
+from copy import copy, deepcopy
 
 def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_size):
     
@@ -31,3 +32,21 @@ def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_size):
     atoms = Atoms(positions=allxyzs, numbers=allzs)
     
     return atoms 
+
+def rotate_grid(allatoms, nsamples, axis='x'):
+
+    rotate_trajs = []
+
+    for deg in np.linspace(0, 360, 360):
+        rotate_frames = []
+
+        for geom in allatoms.positions.reshape(nsamples, -1, 3):
+            atoms = Atoms(positions=geom, numbers=atomic_nums)
+            atoms.rotate(deg, axis, center='COM')    
+            rotate_frames.append(atoms.positions)
+
+        newallatoms =deepcopy(allatoms)
+        newallatoms.positions = np.concatenate(rotate_frames)
+        rotate_trajs.append(newallatoms)
+    
+    return rotate_trajs
