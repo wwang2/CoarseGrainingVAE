@@ -27,7 +27,6 @@ from sklearn.model_selection import KFold
 parser = argparse.ArgumentParser()
 parser.add_argument("-logdir", type=str)
 parser.add_argument("-device", type=int)
-parser.add_argument("-n_atoms", type=int)
 parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-n_basis", type=int, default=256)
 parser.add_argument("-n_rbf", type=int, default=10)
@@ -45,7 +44,6 @@ params = vars(parser.parse_args())
 
 working_dir = params['logdir']
 device  = params['device']
-n_atoms = params['n_atoms']
 n_cgs  = params['n_cgs']
 n_basis  = params['n_basis']
 n_rbf  = params['n_rbf']
@@ -71,6 +69,7 @@ atomic_nums, dataset = get_alanine_dipeptide_dataset(cutoff,
                                                      mapping=mapping,
                                                      n_frames=ndata, 
                                                      n_cg=n_cgs)
+n_atoms = len(atomic_nums)
 
 # create subdirectory 
 create_dir(working_dir)
