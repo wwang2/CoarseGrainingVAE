@@ -109,7 +109,12 @@ for i, (train_index, test_index) in enumerate(split_iter):
     for epoch in range(nepochs):
         # train
         mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
-                                                   model, beta, epoch, train=True, looptext='Ncg {} Fold {}'.format(n_cgs, i))
+                                                   model, beta, epoch, train=True,
+                                                    looptext='Ncg {} Fold {}'.format(n_cgs, i))
+        # check NaN
+        if np.isnan(mean_recon):
+            break 
+
         scheduler.step(mean_recon)
         
     # save sampled geometries 
