@@ -51,13 +51,34 @@ def get_partition(nbr_list, n_partitions):
         
     return partitions 
 
-def get_mapping(traj, cutoff, n_nodes, n_partitions):
+def get_traj(label):
+
+    pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
+    files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
+    feat = pyemma.coordinates.featurizer(pdb)
+    traj = pyemma.coordinates.load(files, features=feat)
+    traj = np.concatenate(traj)
+
+    return traj, pdb
+
+def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
+
+    traj, pdb = get_traj(label)
+    peptide = get_peptide_top(label)
+
+    peptide_top = peptide.top.to_dataframe()[0]
+    peptide_element = peptide_top['element'].values.tolist()
+
+    if len(traj) < skip:
+        skip = len(traj)
+
+    traj_reshape = shuffle(traj)[::skip].reshape(-1, len(peptide_element),  3) * 10.0
 
     mappings = []
-    for frame in traj:
+    for frame in traj_reshape:
         nbr_list = compute_nbr_list(torch.Tensor(frame), cutoff)
-        paritions = get_partition(nbr_list, n_partitions)     
-        mapping = parition2mapping(paritions, n_nodes)
+        paritions = get_partition(nbr_list, n_cgs)     
+        mapping = parition2mapping(paritions, n_atoms)
         mappings.append(mapping)
 
     mappings = torch.Tensor( np.stack(mappings) )
@@ -65,14 +86,20 @@ def get_mapping(traj, cutoff, n_nodes, n_partitions):
     
     return mappings.long()
 
-def get_alanine_dipeptide_top(label):
+def get_random_mapping(n_cg, n_atoms):
+    
+    # todo: need to check generate mapping covers all types 
+
+    return torch.LongTensor(n_atoms).random_(0, n_cg) 
+
+def get_peptide_top(label):
 
     pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
     peptide = md.load("data/{}".format(DATALABELS[label]['pdb']))
 
     return peptide
 
-def get_alanine_dipeptide_dataset(cutoff, label, n_frames=20000,CGgraphcutoff=2.0, n_cg=6):
+def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
     
     pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
     files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
@@ -80,15 +107,12 @@ def get_alanine_dipeptide_dataset(cutoff, label, n_frames=20000,CGgraphcutoff=2.
     traj = pyemma.coordinates.load(files, features=feat)
     traj = np.concatenate(traj)
 
-    peptide = get_alanine_dipeptide_top(label)
+    peptide = get_peptide_top(label)
 
     peptide_top = peptide.top.to_dataframe()[0]
     peptide_element = peptide_top['element'].values.tolist()
 
     traj_reshape = shuffle(traj)[:n_frames].reshape(-1, len(peptide_element),  3) * 10.0 # Change from nanometer to Angstrom 
-
-    # The mapping might be 
-    mapping = get_mapping(traj_reshape[::500], CGgraphcutoff, len(peptide_element), n_cg)
 
     CG_nxyz_data = []
     nxyz_data = []

@@ -41,6 +41,7 @@ parser.add_argument("-enc_nconv", type=int, default=4)
 parser.add_argument("-dec_nconv", type=int, default=4 )
 parser.add_argument("-batch_size", type=int, default=64 )
 parser.add_argument("-beta", type=float, default=0.001)
+parser.add_argument("--randommap", action='store_true', default=False)
 params = vars(parser.parse_args())
 
 
@@ -56,22 +57,28 @@ dec_nconv  = params['dec_nconv']
 batch_size  = params['batch_size']
 beta  = params['beta']
 
+# generate mapping 
+if params['randommap']:
+    mapping = get_random_mapping()
+else:
+    mapping = get_mapping('dipeptide', 2.0, n_atoms, n_cgs)
+
 # combine directory 
 atomic_nums, dataset = get_alanine_dipeptide_dataset(cutoff,
                                                      label='dipeptide',
+                                                     mapping=mapping,
                                                      n_frames=50, 
-                                                     CGgraphcutoff=2.0, 
                                                      n_cg=n_cgs)
 
 # create subdirectory 
-
 if not os.path.isdir(working_dir):
     os.mkdir(working_dir)
-     
+    
 kf = KFold(n_splits=5)
 
 for i, (train_index, test_index) in enumerate(kf.split(list(range(len(dataset))))):
 
+    # parse fold id into tqdm
 
     split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
     if not os.path.isdir(split_dir):
