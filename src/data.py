@@ -71,28 +71,25 @@ def CG_collate(dicts):
     return batch
 
 def split_train_test(dataset,
-                     test_size=0.2,
-                     binary=False,
-                     targ_name=None):
+                     test_size=0.2):
 
-    if binary:
-        idx_train, idx_test = binary_split(dataset=dataset,
-                                           targ_name=targ_name,
-                                           test_size=test_size)
-    else:
-        idx = list(range(len(dataset)))
-        idx_train, idx_test = train_test_split(idx, test_size=test_size, shuffle=True)
+    idx = list(range(len(dataset)))
+    idx_train, idx_test = train_test_split(idx, test_size=test_size, shuffle=True)
 
-    train = CGDataset(
-        props={key: [val[i] for i in idx_train]
-               for key, val in dataset.props.items()},
-    )
-    test = CGDataset(
-        props={key: [val[i] for i in idx_test]
-               for key, val in dataset.props.items()},
-    )
+    train = get_subset_by_indices(idx_train, dataset)
+    test = get_subset_by_indices(idx_test, dataset)
 
     return train, test
+
+
+def get_subset_by_indices(indices, dataset):
+    
+    subset = CGDataset(
+        props={key: [val[i] for i in indices]
+               for key, val in dataset.props.items()},
+    )
+    
+    return subset 
 
 
 def split_train_validation_test(dataset,
