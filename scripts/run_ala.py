@@ -56,6 +56,7 @@ nsplits = params['nsplits']
 ndata = params['ndata']
 nsamples = params['nsamples']
 nepochs = params['nepochs']
+n_atoms = DATALABELS['dipeptide']['n_atoms']
 
 # generate mapping 
 if params['randommap']:
@@ -69,14 +70,13 @@ atomic_nums, dataset = get_alanine_dipeptide_dataset(cutoff,
                                                      mapping=mapping,
                                                      n_frames=ndata, 
                                                      n_cg=n_cgs)
-n_atoms = len(atomic_nums)
 
 # create subdirectory 
 create_dir(working_dir)
     
 kf = KFold(n_splits=nsplits)
 cv_rmsd = []
-split_iter = kf.split(list(range(len(dataset))))\
+split_iter = kf.split(list(range(len(dataset))))
 
 for i, (train_index, test_index) in enumerate(split_iter):
 
