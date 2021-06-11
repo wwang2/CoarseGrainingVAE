@@ -119,7 +119,7 @@ for i, (train_index, test_index) in enumerate(split_iter):
         
     # save sampled geometries 
     trainloader = DataLoader(trainset, batch_size=128, collate_fn=CG_collate, shuffle=True)
-    train_true_xyzs, train_recon_xyzs, mu, sigma = get_all_true_reconstructed_structures(trainloader, 
+    train_true_xyzs, train_recon_xyzs, train_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(trainloader, 
                                                                                          device,
                                                                                          model,
                                                                                          atomic_nums,
@@ -127,14 +127,16 @@ for i, (train_index, test_index) in enumerate(split_iter):
 
     # sample geometries 
     train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs)
+    cg_types = np.array([1] * n_cgs)
 
     dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
     dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
     dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
+    dump_numpy2xyz(cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
 
 
     testloader = DataLoader(testset, batch_size=128, collate_fn=CG_collate, shuffle=True)
-    test_true_xyzs, test_recon_xyzs, mu, sigma = get_all_true_reconstructed_structures(testloader, 
+    test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(testloader, 
                                                                                          device,
                                                                                          model,
                                                                                          atomic_nums,
@@ -146,6 +148,7 @@ for i, (train_index, test_index) in enumerate(split_iter):
     dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
     dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
     dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
+    dump_numpy2xyz(test_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'test_cg.xyz'))
 
     # compute loss and metrics 
     test_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)

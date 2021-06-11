@@ -64,6 +64,7 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
     true_xyzs = []
     recon_xyzs = []
+    cg_xyzs = []
     mus = []
     sigmas = []
 
@@ -75,17 +76,19 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
         true_xyzs.append(xyz.detach().cpu())
         recon_xyzs.append(xyz_recon.detach().cpu())
+        cg_xyzs.append(batch[:, 1:].detach().cpu())
         
         mus.append(S_mu.detach().cpu())
         sigmas.append(S_sigma.detach().cpu())
 
     true_xyzs = torch.cat(true_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     recon_xyzs = torch.cat(recon_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
+    cg_xyzs = torch.cat(cg_xyzs).reshape(-1, n_cg, 3).numpy()
     
     mu = torch.cat(mus).reshape(-1, n_cg, S_mu.shape[-1]).mean(0)
     sigma = torch.cat(sigmas).reshape(-1, n_cg, S_mu.shape[-1]).mean(0)
     
-    return true_xyzs, recon_xyzs, mu, sigma
+    return true_xyzs, recon_xyzs, cg_xyzs, mu, sigma
 
 def dump_numpy2xyz(xyzs, atomic_nums, path):
     trajs = [Atoms(positions=xyz, numbers=atomic_nums.ravel()) for xyz in xyzs]
