@@ -40,6 +40,7 @@ parser.add_argument("-nsamples", type=int, default=200)
 parser.add_argument("-beta", type=float, default=0.001)
 parser.add_argument("-nsplits", type=int, default=5)
 parser.add_argument("--randommap", action='store_true', default=False)
+parser.add_argument("--shuffle", action='store_true', default=False)
 params = vars(parser.parse_args())
 
 working_dir = params['logdir']
@@ -86,8 +87,8 @@ for i, (train_index, test_index) in enumerate(split_iter):
     trainset = get_subset_by_indices(train_index, dataset)
     testset = get_subset_by_indices(test_index, dataset)
 
-    trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
-    testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
+    trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=params['shuffle'])
+    testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=params['shuffle'])
     
     # initialize model 
     atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
