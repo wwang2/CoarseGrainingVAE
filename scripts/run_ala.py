@@ -106,6 +106,9 @@ for i, (train_index, test_index) in enumerate(split_iter):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=5, factor=0.5)
     
     model.train()
+
+    recon_hist = []
+
     for epoch in range(nepochs):
         # train
         mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
@@ -116,6 +119,12 @@ for i, (train_index, test_index) in enumerate(split_iter):
             break 
 
         scheduler.step(mean_recon)
+
+        recon_hist.append(xyz_train_recon.reshape(-1, n_atoms, 3))
+
+    # dump learning trajectory 
+    recon_hist = np.concatnate(recon_hist)
+    dump_numpy2xyz(recon_hist, atomic_nums, os.path.join(split_dir, 'recon_hist.xyz'))
         
     # save sampled geometries 
     trainloader = DataLoader(trainset, batch_size=128, collate_fn=CG_collate, shuffle=True)
