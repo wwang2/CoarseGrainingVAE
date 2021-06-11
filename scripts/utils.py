@@ -76,7 +76,7 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
         true_xyzs.append(xyz.detach().cpu())
         recon_xyzs.append(xyz_recon.detach().cpu())
-        cg_xyzs.append(batch[:, 1:].detach().cpu())
+        cg_xyzs.append(batch['CG_nxyz'][:, 1:].detach().cpu())
         
         mus.append(S_mu.detach().cpu())
         sigmas.append(S_sigma.detach().cpu())

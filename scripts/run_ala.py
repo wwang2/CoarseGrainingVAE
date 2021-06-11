@@ -132,7 +132,7 @@ for i, (train_index, test_index) in enumerate(split_iter):
     dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
     dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
     dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
-    dump_numpy2xyz(cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
+    dump_numpy2xyz(train_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
 
 
     testloader = DataLoader(testset, batch_size=128, collate_fn=CG_collate, shuffle=True)
