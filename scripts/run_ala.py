@@ -33,10 +33,11 @@ parser.add_argument("-n_basis", type=int, default=256)
 parser.add_argument("-n_rbf", type=int, default=10)
 parser.add_argument("-cutoff", type=float, default=4.0)
 parser.add_argument("-enc_nconv", type=int, default=4)
-parser.add_argument("-dec_nconv", type=int, default=4 )
+parser.add_argument("-dec_nconv", type=int, default=4)
 parser.add_argument("-batch_size", type=int, default=64)
 parser.add_argument("-nepochs", type=int, default=2)
 parser.add_argument("-ndata", type=int, default=200)
+parser.add_argument("-nsamples", type=int, default=200)
 parser.add_argument("-beta", type=float, default=0.001)
 parser.add_argument("-nsplits", type=int, default=5)
 parser.add_argument("--randommap", action='store_true', default=False)
@@ -55,6 +56,8 @@ batch_size  = params['batch_size']
 beta  = params['beta']
 nsplits = params['nsplits']
 ndata = params['ndata']
+nsamples = params['nsamples']
+nepochs = params['nepochs']
 
 # generate mapping 
 if params['randommap']:
@@ -107,7 +110,7 @@ for i, (train_index, test_index) in enumerate(kf.split(list(range(len(dataset)))
     
     model.train()
 
-    for epoch in range(nsplits):
+    for epoch in range(nepochs):
         # train
         mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                    model, beta, epoch, train=True)
@@ -125,9 +128,9 @@ for i, (train_index, test_index) in enumerate(kf.split(list(range(len(dataset)))
     # sample geometries 
     train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs)
 
-    dump_numpy2xyz(train_samples, atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
-    dump_numpy2xyz(train_true_xyzs, atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
-    dump_numpy2xyz(train_recon_xyzs, atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
+    dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
+    dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
+    dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
 
 
     testloader = DataLoader(testset, batch_size=128, collate_fn=CG_collate, shuffle=True)
@@ -140,9 +143,9 @@ for i, (train_index, test_index) in enumerate(kf.split(list(range(len(dataset)))
     # sample geometries 
     test_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs)
 
-    dump_numpy2xyz(test_samples, atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
-    dump_numpy2xyz(test_true_xyzs, atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
-    dump_numpy2xyz(test_recon_xyzs, atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
+    dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
+    dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
+    dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
 
 
     # compute loss and metrics 
