@@ -81,3 +81,8 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     sigma = torch.cat(sigmas).reshape(-1, n_cg, S_mu.shape[-1]).mean(0)
     
     return true_xyzs, recon_xyzs, mu, sigma
+
+def dump_numpy2xyz(xyzs, atomic_nums, path):
+    trajs = [Atoms(positions=xyz, numbers=atomic_nums.ravel()) for xyz in xyzs]
+    io.write(path, trajs)
+    return trajs 
