@@ -120,10 +120,10 @@ for i, (train_index, test_index) in enumerate(split_iter):
 
         scheduler.step(mean_recon)
 
-        recon_hist.append(xyz_train_recon.reshape(-1, n_atoms, 3))
+        recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
 
     # dump learning trajectory 
-    recon_hist = np.concatnate(recon_hist)
+    recon_hist = np.concatenate(recon_hist)
     dump_numpy2xyz(recon_hist, atomic_nums, os.path.join(split_dir, 'recon_hist.xyz'))
         
     # save sampled geometries 
@@ -161,7 +161,7 @@ for i, (train_index, test_index) in enumerate(split_iter):
 
     # compute loss and metrics 
     test_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
-    unaligned_test_rmsd = np.sqrt(np.power(test_recon_xyzs, 2)).mean()
+    unaligned_test_rmsd = np.sqrt(np.power(test_recon_xyzs, 2).mean())
 
     # reconsturction loss 
     cv_rmsd.append(unaligned_test_rmsd)
