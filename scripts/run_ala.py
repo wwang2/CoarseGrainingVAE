@@ -161,7 +161,7 @@ for i, (train_index, test_index) in enumerate(split_iter):
 
     # compute loss and metrics 
     test_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
-    unaligned_test_rmsd = np.sqrt(np.power(test_recon_xyzs, 2).mean())
+    unaligned_test_rmsd = np.sqrt(np.power(test_dxyz, 2).mean())
 
     # reconsturction loss 
     cv_rmsd.append(unaligned_test_rmsd)
