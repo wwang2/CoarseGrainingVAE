@@ -14,11 +14,13 @@ atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7}
 
 DATALABELS = {'dipeptide': 
                             {'pdb': 'alanine-dipeptide-nowater.pdb', 
-                            'xtc': 'alanine-dipeptide-*-250ns-nowater.xtc'
+                            'xtc': 'alanine-dipeptide-*-250ns-nowater.xtc',
+                            'n_atoms': 22
                              },
               'pentapeptide': 
                             {'pdb': 'pentapeptide-impl-solv.pdb',
-                             'xtc': 'pentapeptide-*-500ns-impl-solv.xtc'
+                             'xtc': 'pentapeptide-*-500ns-impl-solv.xtc',
+                             'n_atoms': 94
                             }
               }
 
@@ -107,12 +109,12 @@ def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6
     traj = pyemma.coordinates.load(files, features=feat)
     traj = np.concatenate(traj)
 
-    peptide = get_peptide_top(label)
-
-    peptide_top = peptide.top.to_dataframe()[0]
+    peptide_top = pdb.top.to_dataframe()[0]
     peptide_element = peptide_top['element'].values.tolist()
 
     traj_reshape = shuffle(traj)[:n_frames].reshape(-1, len(peptide_element),  3) * 10.0 # Change from nanometer to Angstrom 
+
+    atomic_nums = np.array( [atomic_num_dict[el] for el in peptide_element] )
 
     CG_nxyz_data = []
     nxyz_data = []
@@ -120,8 +122,6 @@ def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6
     num_atoms_list = []
     num_CGs_list = []
     CG_mapping_list = []
-
-    atomic_nums = np.array( [atomic_num_dict[el] for el in peptide_element] )
 
     for xyz in traj_reshape:   
         nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)
