@@ -1,0 +1,584 @@
+# VMD for LINUXAMD64, version 1.9.3 (November 30, 2016)
+# Log file '/home/wwj/Documents/fock_repo/projects/CoarseGrainingVAE/scripts/visual.vmd', created by user wwj
+axes location Off
+menu color off
+menu color on
+color Display Background white
+menu color off
+menu graphics off
+menu graphics on
+mol modstyle 0 0 Licorice 0.300000 12.000000 12.000000
+scale by 1.200000
+scale by 1.200000
+mol modmaterial 0 0 AOChalky
+mol modstyle 0 0 Polyhedra 1.600000
+mol modstyle 0 0 Trace 0.300000 12.000000
+mol modstyle 0 0 Ribbons 0.300000 12.000000 2.000000
+mol modstyle 0 0 Cartoon 2.100000 24.000000 5.000000
+mol modstyle 0 0 Surf 1.400000 0.000000
+mol modstyle 0 0 VolumeSlice
+mol modstyle 0 0 Isosurface
+mol modstyle 0 0 FieldLines
+mol modstyle 0 0 HBonds 3.000000 20.000000 1.000000
+mol modstyle 0 0 DynamicBonds 1.600000 0.300000 12.000000
+mol modstyle 0 0 Bonds 0.300000 12.000000
+mol modstyle 0 0 Lines 1.000000
+mol modstyle 0 0 Licorice 0.300000 12.000000 12.000000
+animate forward
+animate pause
+mol modstyle 0 0 CPK 1.000000 0.300000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.400000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.500000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.600000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.700000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.800000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.900000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 1.000000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.900000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.800000 12.000000 12.000000
+mol modstyle 0 0 CPK 1.000000 0.700000 12.000000 12.000000
+mol modmaterial 0 0 AOEdgy
+mol modmaterial 0 0 AOChalky
+menu color off
+menu color on
+color change rgb 10 cyan 0.250000 0.740000 0.750000
+color change rgb 10 cyan 0.250000 0.740000 0.750000
+color change rgb 10 cyan 0.250000 0.730000 0.750000
+color change rgb 10 cyan 0.250000 0.730000 0.750000
+color change rgb 10 cyan 0.250000 0.720000 0.750000
+color change rgb 10 cyan 0.250000 0.720000 0.750000
+color change rgb 10 cyan 0.250000 0.720000 0.750000
+color change rgb 10 cyan 0.250000 0.710000 0.750000
+color change rgb 10 cyan 0.250000 0.700000 0.750000
+color change rgb 10 cyan 0.250000 0.690000 0.750000
+color change rgb 10 cyan 0.250000 0.690000 0.750000
+color change rgb 10 cyan 0.250000 0.680000 0.750000
+color change rgb 10 cyan 0.250000 0.680000 0.750000
+color change rgb 10 cyan 0.250000 0.670000 0.750000
+color change rgb 10 cyan 0.250000 0.670000 0.750000
+color change rgb 10 cyan 0.250000 0.660000 0.750000
+color change rgb 10 cyan 0.250000 0.660000 0.750000
+color change rgb 10 cyan 0.250000 0.650000 0.750000
+color change rgb 10 cyan 0.250000 0.650000 0.750000
+color change rgb 10 cyan 0.250000 0.640000 0.750000
+color change rgb 10 cyan 0.250000 0.640000 0.750000
+color change rgb 10 cyan 0.250000 0.630000 0.750000
+color change rgb 10 cyan 0.250000 0.630000 0.750000
+color change rgb 10 cyan 0.250000 0.590000 0.750000
+color change rgb 10 cyan 0.250000 0.550000 0.750000
+color change rgb 10 cyan 0.250000 0.530000 0.750000
+color change rgb 10 cyan 0.250000 0.520000 0.750000
+color change rgb 10 cyan 0.250000 0.500000 0.750000
+color change rgb 10 cyan 0.250000 0.490000 0.750000
+color change rgb 10 cyan 0.250000 0.470000 0.750000
+color change rgb 10 cyan 0.250000 0.460000 0.750000
+color change rgb 10 cyan 0.250000 0.450000 0.750000
+color change rgb 10 cyan 0.250000 0.440000 0.750000
+color change rgb 10 cyan 0.250000 0.440000 0.750000
+color change rgb 10 cyan 0.250000 0.430000 0.750000
+color change rgb 10 cyan 0.250000 0.420000 0.750000
+color change rgb 10 cyan 0.250000 0.420000 0.750000
+color change rgb 10 cyan 0.250000 0.420000 0.750000
+color change rgb 10 cyan 0.250000 0.420000 0.750000
+color change rgb 10 cyan 0.250000 0.420000 0.750000
+color change rgb 10 cyan 0.250000 0.430000 0.750000
+color change rgb 10 cyan 0.250000 0.430000 0.750000
+color change rgb 10 cyan 0.250000 0.440000 0.750000
+color change rgb 10 cyan 0.250000 0.450000 0.750000
+color change rgb 10 cyan 0.250000 0.460000 0.750000
+color change rgb 10 cyan 0.250000 0.460000 0.750000
+color change rgb 10 cyan 0.250000 0.480000 0.750000
+color change rgb 10 cyan 0.250000 0.500000 0.750000
+color change rgb 10 cyan 0.250000 0.520000 0.750000
+color change rgb 10 cyan 0.250000 0.540000 0.750000
+color change rgb 10 cyan 0.250000 0.550000 0.750000
+color change rgb 10 cyan 0.250000 0.550000 0.750000
+color change rgb 10 cyan 0.250000 0.560000 0.750000
+color change rgb 10 cyan 0.250000 0.560000 0.750000
+color change rgb 10 cyan 0.250000 0.580000 0.750000
+color change rgb 10 cyan 0.250000 0.590000 0.750000
+color change rgb 10 cyan 0.250000 0.590000 0.750000
+color change rgb 10 cyan 0.250000 0.600000 0.750000
+color change rgb 10 cyan 0.250000 0.600000 0.750000
+color change rgb 10 cyan 0.250000 0.610000 0.750000
+color change rgb 10 cyan 0.250000 0.600000 0.750000
+color change rgb 10 cyan 0.250000 0.600000 0.750000
+color change rgb 10 cyan 0.250000 0.590000 0.750000
+color change rgb 10 cyan 0.250000 0.570000 0.750000
+color change rgb 10 cyan 0.250000 0.560000 0.750000
+color change rgb 10 cyan 0.250000 0.550000 0.750000
+color change rgb 10 cyan 0.250000 0.550000 0.750000
+color change rgb 10 cyan 0.250000 0.540000 0.750000
+color change rgb 10 cyan 0.250000 0.540000 0.750000
+color change rgb 10 cyan 0.250000 0.530000 0.750000
+color change rgb 10 cyan 0.250000 0.530000 0.750000
+color change rgb 10 cyan 0.250000 0.540000 0.750000
+color change rgb 10 cyan 0.250000 0.540000 0.750000
+color change rgb 10 cyan 0.250000 0.550000 0.750000
+color change rgb 10 cyan 0.250000 0.550000 0.750000
+color change rgb 10 cyan 0.250000 0.560000 0.750000
+color change rgb 10 cyan 0.250000 0.580000 0.750000
+color change rgb 10 cyan 0.250000 0.590000 0.750000
+color change rgb 10 cyan 0.250000 0.610000 0.750000
+color change rgb 10 cyan 0.250000 0.620000 0.750000
+color change rgb 10 cyan 0.250000 0.630000 0.750000
+color change rgb 10 cyan 0.250000 0.640000 0.750000
+color change rgb 10 cyan 0.250000 0.640000 0.750000
+color change rgb 10 cyan 0.250000 0.650000 0.750000
+color change rgb 10 cyan 0.250000 0.660000 0.750000
+color change rgb 10 cyan 0.250000 0.670000 0.750000
+color change rgb 10 cyan 0.250000 0.670000 0.750000
+color change rgb 10 cyan 0.250000 0.680000 0.750000
+color change rgb 10 cyan 0.250000 0.680000 0.750000
+color change rgb 10 cyan 0.250000 0.680000 0.750000
+color change rgb 10 cyan 0.250000 0.690000 0.750000
+color change rgb 10 cyan 0.250000 0.710000 0.750000
+color change rgb 10 cyan 0.250000 0.720000 0.750000
+color change rgb 10 cyan 0.250000 0.720000 0.750000
+color change rgb 10 cyan 0.250000 0.720000 0.750000
+color change rgb 10 cyan 0.250000 0.710000 0.750000
+color change rgb 10 cyan 0.250000 0.690000 0.750000
+color change rgb 10 cyan 0.250000 0.670000 0.750000
+color change rgb 10 cyan 0.250000 0.640000 0.750000
+color change rgb 10 cyan 0.250000 0.630000 0.750000
+color change rgb 10 cyan 0.250000 0.620000 0.750000
+color change rgb 10 cyan 0.250000 0.620000 0.750000
+color change rgb 10 cyan 0.250000 0.620000 0.740000
+color change rgb 10 cyan 0.250000 0.620000 0.740000
+color change rgb 10 cyan 0.250000 0.620000 0.730000
+color change rgb 10 cyan 0.250000 0.620000 0.730000
+color change rgb 10 cyan 0.250000 0.620000 0.720000
+color change rgb 10 cyan 0.250000 0.620000 0.690000
+color change rgb 10 cyan 0.250000 0.620000 0.680000
+color change rgb 10 cyan 0.250000 0.620000 0.660000
+color change rgb 10 cyan 0.250000 0.620000 0.650000
+color change rgb 10 cyan 0.250000 0.620000 0.640000
+color change rgb 10 cyan 0.250000 0.620000 0.630000
+color change rgb 10 cyan 0.250000 0.620000 0.630000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.620000
+color change rgb 10 cyan 0.250000 0.620000 0.630000
+color change rgb 10 cyan 0.250000 0.620000 0.630000
+color change rgb 10 cyan 0.250000 0.620000 0.630000
+color change rgb 10 cyan 0.250000 0.620000 0.630000
+color change rgb 10 cyan 0.250000 0.620000 0.630000
+color change rgb 10 cyan 0.250000 0.620000 0.640000
+color change rgb 10 cyan 0.250000 0.620000 0.640000
+color change rgb 10 cyan 0.250000 0.620000 0.640000
+color change rgb 10 cyan 0.250000 0.620000 0.640000
+color change rgb 10 cyan 0.250000 0.620000 0.640000
+color change rgb 10 cyan 0.250000 0.620000 0.640000
+color change rgb 10 cyan 0.250000 0.620000 0.650000
+color change rgb 10 cyan 0.250000 0.620000 0.650000
+color change rgb 10 cyan 0.250000 0.620000 0.660000
+color change rgb 10 cyan 0.250000 0.750000 0.750000
+color Name C purple
+color Name C white
+color Name C green
+color Name C silver
+color Name C tan
+color Name C orange
+color Name C gray
+color Name C orange
+color Name C yellow
+color Name C tan
+color Name C silver
+color Name C green
+color Name C white
+color Name C pink
+color Name C cyan
+color Name C purple
+color Name C lime
+color Name C mauve
+color Name C ochre
+color Name C iceblue
+color Name C silver
+color Name C cyan
+color Name C purple
+color Name C lime
+color Name C mauve
+color Name C ochre
+color Name C iceblue
+color Name C black
+animate forward
+animate pause
+color Name N pink
+color Name N cyan
+color Name N cyan2
+color Name N cyan3
+color Name N blue3
+color Name N violet
+color Name N blue3
+color Name N blue2
+color Name C green
+color Name C white
+color Name C orange3
+color Name C orange2
+color Name C red2
+color Name C magenta2
+color Name C magenta
+color Name C violet2
+color Name C violet
+color Name C blue3
+color Name C blue2
+color Name C cyan3
+color Name C tan
+color Name C gray
+color scale method BGryR
+color scale method RWB
+color scale midpoint 0.500000
+color scale min 0.090000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.090000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.090000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.080000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.080000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.060000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.060000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.060000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.050000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.050000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.030000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.030000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.020000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.020000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.000000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.020000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.030000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.050000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.050000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.060000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.060000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.080000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.090000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.110000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.110000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.120000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.120000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.140000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.150000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.170000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.180000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.200000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.210000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.230000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.240000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.260000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.260000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.270000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.290000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.300000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.320000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.330000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.350000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.330000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.320000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.320000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.300000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.290000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.270000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.260000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.240000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.230000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.210000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.200000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.200000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.180000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.170000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.150000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.140000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.120000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.120000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.110000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.090000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.080000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.060000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.050000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.030000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min -0.020000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.000000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.020000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.030000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.050000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.060000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.080000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.080000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.090000
+color scale max 1.000000
+
+color scale midpoint 0.500000
+color scale min 0.110000
+color scale max 1.000000
+
+animate forward
+animate pause
+animate forward
+animate pause
+animate forward
+animate pause
+animate forward
+animate pause
+animate goto 305
+animate goto 304
+animate goto 303
+animate goto 299
+animate goto 291
+animate goto 281
+animate goto 279
+animate goto 269
+animate goto 257
+animate goto 245
+animate goto 233
+animate goto 222
+animate goto 212
+animate goto 202
+animate goto 191
+animate goto 182
+animate goto 181
+animate goto 171
+animate goto 162
+animate goto 150
+animate goto 149
+animate goto 136
+animate goto 134
+animate goto 117
+animate goto 95
+animate goto 66
+animate goto 64
+animate goto 35
+animate goto 9
+animate goto 0
+animate goto 0
+# VMD for LINUXAMD64, version 1.9.3 (November 30, 2016)
+# end of log file.
