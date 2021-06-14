@@ -11,19 +11,7 @@ import mdtraj as md
 import matplotlib.pyplot as plt 
 import matplotlib
 
-def ramachandran_plot(xyzs, atomic_nums):
-
-    traj = []
-    for xyz in xyzs:
-        traj.append( Atoms(positions=xyz, numbers=atomic_nums.ravel()) )
-
-    io.write('tmp.xyz', traj)
-
-    pdb = mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='data')
-    feat = pyemma.coordinates.featurizer(pdb)
-    feat.add_backbone_torsions() 
-    data = pyemma.coordinates.load('tmp.xyz', features=feat)
-
+def kernel_density_plot(data, xlabel, ylabel, label='kT'):
     k = gaussian_kde(np.vstack([data[:,0], data[:,1]]))
 
     density, x_edge, y_edge = np.histogram2d(data[:,0], data[:,1], 
@@ -41,12 +29,27 @@ def ramachandran_plot(xyzs, atomic_nums):
 
     plt.yticks(fontsize=25)
     plt.xticks(fontsize=25)
-    plt.ylabel('$\Psi$', fontsize=25)
-    plt.xlabel('$\Phi$', fontsize=25)
+    plt.ylabel(xlabel, fontsize=25)
+    plt.xlabel(ylabel, fontsize=25)
 
     cbar = plt.colorbar()
     cbar.ax.tick_params(labelsize=20)
-    cbar.set_label(label='kT', size=20)
+    cbar.set_label(label=label, size=20)
+
+def ramachandran_plot(xyzs, atomic_nums):
+
+    traj = []
+    for xyz in xyzs:
+        traj.append( Atoms(positions=xyz, numbers=atomic_nums.ravel()) )
+
+    io.write('tmp.xyz', traj)
+
+    pdb = mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='data')
+    feat = pyemma.coordinates.featurizer(pdb)
+    feat.add_backbone_torsions() 
+    data = pyemma.coordinates.load('tmp.xyz', features=feat)
+
+    kernel_density_plot(data, '$\Phi$', '$\Psi$', label='kT')
 
 def get_bond_name(bond):
     atom1_res = bond.atom1.residue.name
