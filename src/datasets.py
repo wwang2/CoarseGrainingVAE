@@ -101,10 +101,7 @@ def get_peptide_top(label):
 
     return peptide
 
-def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
-    
-    pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
-    files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
+def get_traj(pdb, files, n_frames, shuffle=False):
     feat = pyemma.coordinates.featurizer(pdb)
     traj = pyemma.coordinates.load(files, features=feat)
     traj = np.concatenate(traj)
@@ -112,10 +109,17 @@ def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6
     peptide_top = pdb.top.to_dataframe()[0]
     peptide_element = peptide_top['element'].values.tolist()
 
-    traj_reshape = shuffle(traj)[:n_frames].reshape(-1, len(peptide_element),  3) * 10.0 # Change from nanometer to Angstrom 
+    if shuffle: 
+        traj = shuffle(traj)
+        
+    traj_reshape = traj.reshape(-1, len(peptide_element),  3)[:n_frames] * 10.0 # Change from nanometer to Angstrom 
+    atomic_nums = np.array([atomic_num_dict[el] for el in peptide_element] )
+    
+    return atomic_nums, traj_reshape
 
-    atomic_nums = np.array( [atomic_num_dict[el] for el in peptide_element] )
 
+def build_dataset(mapping, traj, atomic_nums):
+    
     CG_nxyz_data = []
     nxyz_data = []
 
@@ -123,7 +127,7 @@ def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6
     num_CGs_list = []
     CG_mapping_list = []
 
-    for xyz in traj_reshape:   
+    for xyz in traj:   
         nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)
         nxyz_data.append(nxyz)
         num_atoms_list.append(torch.LongTensor( [len(nxyz)]))
@@ -147,5 +151,33 @@ def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6
 
     dataset = CGDataset(props.copy())
     dataset.generate_neighbor_list(cutoff=cutoff)
+    
+    return dataset
+
+def get_traj(pdb, files, n_frames, shuffle=False):
+    feat = pyemma.coordinates.featurizer(pdb)
+    traj = pyemma.coordinates.load(files, features=feat)
+    traj = np.concatenate(traj)
+
+    peptide_top = pdb.top.to_dataframe()[0]
+    peptide_element = peptide_top['element'].values.tolist()
+
+    if shuffle: 
+        traj = shuffle(traj)
+        
+    traj_reshape = traj.reshape(-1, len(peptide_element),  3)[:n_frames] * 10.0 # Change from nanometer to Angstrom 
+    atomic_nums = np.array([atomic_num_dict[el] for el in peptide_element] )
+    
+    return atomic_nums, traj_reshape
+
+def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
+
+    pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
+    files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
+    pdb = md.load("data/{}".format(DATALABELS[label]['pdb']))
+    
+    atomic_nums, traj_reshape = get_traj(pdb, files, n_frames)
+
+    dataset = build_dataset(mapping, traj_reshape, atomic_nums)
 
     return atomic_nums, dataset
