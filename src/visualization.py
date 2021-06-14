@@ -36,8 +36,8 @@ def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_size):
 def rotate_grid(allatoms, nsamples, axis='x'):
 
     rotate_trajs = []
-    start_frame = allatoms.positions.reshape(nsamples, -1, 3):
-    atomic_nums = allatoms.get_atomic_numbers(start_frame.shape[1])
+    start_frame = allatoms.positions.reshape(nsamples, -1, 3)
+    atomic_nums = allatoms.get_atomic_numbers()[:start_frame.shape[1]]
 
     for deg in np.linspace(0, 360, 360):
         rotate_frames = []
