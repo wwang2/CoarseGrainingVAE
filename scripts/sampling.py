@@ -13,7 +13,7 @@ def batch_to(batch, device):
         gpu_batch[key] = val.to(device) if hasattr(val, 'to') else val
     return gpu_batch
 
-def sample_single(batch, mu, sigma, model, n_batch, device):
+def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
 
     model = model.to(device)
 
@@ -53,6 +53,7 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cg):
 
     true_xyzs = []
     recon_xyzs = []
+    ensemble_atoms = []
     mus = []
     sigmas = []
 
@@ -72,7 +73,7 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cg):
         xyz_recon = model.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
             
         recon_xyzs.append(xyz_recon.detach().cpu())
-        
+
     recon_xyzs = torch.cat(recon_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     
     return recon_xyzs
