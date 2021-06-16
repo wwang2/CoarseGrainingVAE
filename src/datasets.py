@@ -170,7 +170,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
     
     return atomic_nums, traj_reshape
 
-def get_alanine_dipeptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
+def get_peptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
 
     pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
     files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')

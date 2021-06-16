@@ -28,6 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-logdir", type=str)
 parser.add_argument("-device", type=int)
 parser.add_argument("-n_cgs", type=int)
+parser.add_argument("-dataset", type=str, default='dipeptide')
 parser.add_argument("-n_basis", type=int, default=256)
 parser.add_argument("-n_rbf", type=int, default=10)
 parser.add_argument("-cutoff", type=float, default=4.0)
@@ -43,6 +44,9 @@ parser.add_argument("--randommap", action='store_true', default=False)
 parser.add_argument("--shuffle", action='store_true', default=False)
 params = vars(parser.parse_args())
 
+if params['dataset'] not in ['dipeptide', 'pentapeptide']:
+    raise ValueError("{} dataset does not exists".format(params['dataset']))
+
 working_dir = params['logdir']
 device  = params['device']
 n_cgs  = params['n_cgs']
@@ -57,17 +61,18 @@ nsplits = params['nsplits']
 ndata = params['ndata']
 nsamples = params['nsamples']
 nepochs = params['nepochs']
-n_atoms = DATALABELS['dipeptide']['n_atoms']
+n_atoms = DATALABELS[params['dataset']]['n_atoms']
+
 
 # generate mapping 
 if params['randommap']:
     mapping = get_random_mapping(n_cgs, n_atoms)
 else:
-    mapping = get_mapping('dipeptide', 2.0, n_atoms, n_cgs)
+    mapping = get_mapping(params['dataset'], 2.0, n_atoms, n_cgs)
 
 # combine directory 
-atomic_nums, dataset = get_alanine_dipeptide_dataset(cutoff,
-                                                     label='dipeptide',
+atomic_nums, dataset = get_peptide_dataset(cutoff,
+                                                     label=params['dataset'],
                                                      mapping=mapping,
                                                      n_frames=ndata, 
                                                      n_cg=n_cgs)
@@ -102,8 +107,8 @@ for i, (train_index, test_index) in enumerate(split_iter):
 
     model = CGequiVAE(encoder, cgconv, atom_mu, atom_sigma, n_atoms, n_cgs).to(device)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=5, factor=0.5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=3, factor=0.5)
     
     model.train()
 
