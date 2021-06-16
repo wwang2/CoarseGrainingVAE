@@ -49,24 +49,27 @@ def get_partition(nbr_list, n_partitions):
 
     comp = nx.community.girvan_newman(G)
     for communities in itertools.islice(comp, n_partitions-1):
-        partitions = tuple(sorted(c) for c in communities)
+            partitions = tuple(sorted(c) for c in communities)
         
     return partitions 
 
-def get_traj(label):
+# def get_traj(label):
 
-    pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
-    files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
-    feat = pyemma.coordinates.featurizer(pdb)
-    traj = pyemma.coordinates.load(files, features=feat)
-    traj = np.concatenate(traj)
+#     pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
+#     files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
+#     feat = pyemma.coordinates.featurizer(pdb)
+#     traj = pyemma.coordinates.load(files, features=feat)
+#     traj = np.concatenate(traj)
 
-    return traj, pdb
+#     return traj, pdb
 
 def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
 
-    traj, pdb = get_traj(label)
     peptide = get_peptide_top(label)
+
+    files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
+
+    atomic_nums, traj = get_traj(peptide, files, n_frames=20000)
 
     peptide_top = peptide.top.to_dataframe()[0]
     peptide_element = peptide_top['element'].values.tolist()
@@ -74,7 +77,7 @@ def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
     if len(traj) < skip:
         skip = len(traj)
 
-    traj_reshape = shuffle(traj)[::skip].reshape(-1, len(peptide_element),  3) * 10.0
+    traj_reshape = shuffle(traj)[::skip].reshape(-1, len(peptide_element),  3)
 
     mappings = []
     for frame in traj_reshape:
@@ -118,7 +121,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
     return atomic_nums, traj_reshape
 
 
-def build_dataset(mapping, traj, atomic_nums):
+def build_dataset(mapping, traj, cutoff, atomic_nums):
     
     CG_nxyz_data = []
     nxyz_data = []
@@ -154,22 +157,6 @@ def build_dataset(mapping, traj, atomic_nums):
     
     return dataset
 
-def get_traj(pdb, files, n_frames, shuffle=False):
-    feat = pyemma.coordinates.featurizer(pdb)
-    traj = pyemma.coordinates.load(files, features=feat)
-    traj = np.concatenate(traj)
-
-    peptide_top = pdb.top.to_dataframe()[0]
-    peptide_element = peptide_top['element'].values.tolist()
-
-    if shuffle: 
-        traj = shuffle(traj)
-        
-    traj_reshape = traj.reshape(-1, len(peptide_element),  3)[:n_frames] * 10.0 # Change from nanometer to Angstrom 
-    atomic_nums = np.array([atomic_num_dict[el] for el in peptide_element] )
-    
-    return atomic_nums, traj_reshape
-
 def get_peptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
 
     pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
@@ -178,6 +165,6 @@ def get_peptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
     
     atomic_nums, traj_reshape = get_traj(pdb, files, n_frames)
 
-    dataset = build_dataset(mapping, traj_reshape, atomic_nums)
+    dataset = build_dataset(mapping, traj_reshape, cutoff, atomic_nums)
 
     return atomic_nums, dataset
