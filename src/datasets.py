@@ -129,7 +129,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
     return atomic_nums, traj_reshape
 
 
-def build_dataset(mapping, traj, cutoff, atomic_nums):
+def build_dataset(mapping, traj, cutoff, atomic_nums, cg_traj=None):
     
     CG_nxyz_data = []
     nxyz_data = []
@@ -144,9 +144,13 @@ def build_dataset(mapping, traj, cutoff, atomic_nums):
         num_atoms_list.append(torch.LongTensor( [len(nxyz)]))
 
     # Aggregate CG coorinates 
-    for nxyz in nxyz_data:
+    for i, nxyz in enumerate(nxyz_data):
         xyz = torch.Tensor(nxyz[:, 1:]) 
-        CG_xyz = scatter_mean(xyz, mapping, dim=0)
+        if cg_traj == None:
+            CG_xyz = scatter_mean(xyz, mapping, dim=0)
+        else:
+            CG_xyz = cg_traj[i]
+
         CG_nxyz = torch.cat((torch.LongTensor(list(range(len(CG_xyz))))[..., None], CG_xyz), dim=-1)
         CG_nxyz_data.append(CG_nxyz)
 
