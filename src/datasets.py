@@ -10,7 +10,7 @@ import mdshare
 import pyemma
 from sklearn.utils import shuffle
 
-atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7}
+atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7, 'S':16, 'Se': 34}
 
 DATALABELS = {'dipeptide': 
                             {'pdb': 'alanine-dipeptide-nowater.pdb', 
@@ -53,15 +53,21 @@ def get_partition(nbr_list, n_partitions):
         
     return partitions 
 
-# def get_traj(label):
+def compute_mapping(atomic_nums, traj, cutoff, n_atoms, n_cgs, skip):
 
-#     pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
-#     files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
-#     feat = pyemma.coordinates.featurizer(pdb)
-#     traj = pyemma.coordinates.load(files, features=feat)
-#     traj = np.concatenate(traj)
+    traj = shuffle(traj)[::skip].reshape(-1, len(atomic_nums),  3)
+    mappings = []
+    for frame in traj:
+        nbr_list = compute_nbr_list(torch.Tensor(frame), cutoff)
+        paritions = get_partition(nbr_list, n_cgs)     
+        mapping = parition2mapping(paritions, n_atoms)
+        mappings.append(mapping)
 
-#     return traj, pdb
+    mappings = torch.Tensor( np.stack(mappings) )
+    mappings = mappings.mode(0)[0]
+
+
+    return mappings
 
 def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
 
@@ -77,17 +83,19 @@ def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
     if len(traj) < skip:
         skip = len(traj)
 
-    traj_reshape = shuffle(traj)[::skip].reshape(-1, len(peptide_element),  3)
+    mappings = compute_mapping(atomic_nums, traj,  cutoff,  n_atoms, n_cgs, skip)
 
-    mappings = []
-    for frame in traj_reshape:
-        nbr_list = compute_nbr_list(torch.Tensor(frame), cutoff)
-        paritions = get_partition(nbr_list, n_cgs)     
-        mapping = parition2mapping(paritions, n_atoms)
-        mappings.append(mapping)
+    # traj_reshape = shuffle(traj)[::skip].reshape(-1, len(peptide_element),  3)
 
-    mappings = torch.Tensor( np.stack(mappings) )
-    mappings = mappings.mode(0)[0]
+    # mappings = []
+    # for frame in traj_reshape:
+    #     nbr_list = compute_nbr_list(torch.Tensor(frame), cutoff)
+    #     paritions = get_partition(nbr_list, n_cgs)     
+    #     mapping = parition2mapping(paritions, n_atoms)
+    #     mappings.append(mapping)
+
+    # mappings = torch.Tensor( np.stack(mappings) )
+    # mappings = mappings.mode(0)[0]
     
     return mappings.long()
 
