@@ -15,6 +15,10 @@ from nff.utils.tools import make_directed
 from torch_scatter import scatter_mean, scatter_add
 from torch import nn
 
+from nff.nn.modules.painn import (DistanceEmbed, MessageBlock, UpdateBlock,
+                                  EmbeddingBlock, ReadoutBlock, 
+                                  to_module, norm, InvariantMessage, preprocess_r, InvariantDense)
+
 
 def to_module(activation):
     return layer_types[activation]()
@@ -256,7 +260,7 @@ class ContractiveEquivariantMPlayer(nn.Module):
                                             ) # todo: use an MLP instead 
         
     def forward(self, h_i, v_i, d_iI, unit_r_iI, mapping):
-        
+
         phi = self.layers(h_i)
         edge_inv = h_i * self.dist_embed(d_iI.unsqueeze(-1))
         
@@ -304,6 +308,8 @@ class CGEquivariantEncoder(nn.Module):
     
     def init_embed(self, z, xyz, cg_xyz, mapping, nbr_list):
     
+        nbr_list, _ = make_directed(nbr_list)
+
         r_ij = xyz[nbr_list[:, 1]] - xyz[nbr_list[:, 0]]
         d_ij = ((r_ij ** 2).sum(-1)) ** 0.5
 
@@ -319,11 +325,11 @@ class CGEquivariantEncoder(nn.Module):
         d_iI, unit_r_iI = preprocess_r(r_iI)
         d_ij, unit_r_ij = preprocess_r(r_ij)
         
-        return h_i, v_i, H_I, V_I, r_ij, d_ij, d_iI, unit_r_ij, unit_r_iI
+        return h_i, v_i, H_I, V_I, r_ij, d_ij, d_iI, unit_r_ij, unit_r_iI, nbr_list
     
     def forward(self, z, xyz, cg_xyz, mapping, nbr_list):
         
-        h_i, v_i, H_I, V_I, r_ij, d_ij, d_iI, unit_r_ij, unit_r_iI = self.init_embed(z, xyz, 
+        h_i, v_i, H_I, V_I, r_ij, d_ij, d_iI, unit_r_ij, unit_r_iI, nbr_list = self.init_embed(z, xyz, 
                                                                                      cg_xyz, 
                                                                                      mapping, 
                                                                                      nbr_list)
@@ -360,6 +366,8 @@ class CGEquivariantDecoder(nn.Module):
         self.n_conv = n_conv
     
     def init_embed(self, cg_xyz, cg_nbr_list, H_I):
+
+        cg_nbr_list, _ = make_directed(cg_nbr_list)
         
         r_ij = cg_xyz[cg_nbr_list[:, 1]] - cg_xyz[cg_nbr_list[:, 0]]
         
@@ -367,12 +375,12 @@ class CGEquivariantDecoder(nn.Module):
         
         d_ij, unit_r_ij = preprocess_r(r_ij)
         
-        return V_i, d_ij, unit_r_ij
+        return V_i, d_ij, unit_r_ij, cg_nbr_list
 
     
     def forward(self, cg_xyz, CG_nbr_list, H_I):
         
-        V_I, d_IJ, unit_r_IJ = self.init_embed(cg_xyz, CG_nbr_list, H_I)
+        V_I, d_IJ, unit_r_IJ, CG_nbr_list = self.init_embed(cg_xyz, CG_nbr_list, H_I)
 
         for i in range(self.n_conv):
             
@@ -387,3 +395,68 @@ class CGEquivariantDecoder(nn.Module):
             V_I = V_I + dV_I 
             
         return H_I, V_I 
+
+
+class EquivariantConv(nn.Module):
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv ):   
+        
+        nn.Module.__init__(self)
+        # embedding layers
+        self.embed_block = EmbeddingBlock(feat_dim=n_atom_basis)
+        # distance transform
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                  cutoff=cutoff,
+                                  feat_dim=n_atom_basis,
+                                  learnable_k=False,
+                                  dropout=0.0)
+
+        self.message_blocks = nn.ModuleList(
+            [MessageBlock(feat_dim=n_atom_basis,
+                          activation="swish",
+                          n_rbf=n_rbf,
+                          cutoff=cutoff,
+                          learnable_k=False,
+                          dropout=0.0)
+             for _ in range(num_conv)]
+        )
+
+        self.update_blocks = nn.ModuleList(
+            [UpdateBlock(feat_dim=n_atom_basis,
+                         activation="swish",
+                         dropout=0.0)
+             for _ in range(num_conv)]
+        )
+    
+    
+    def forward(self, cg_xyz, CG_nbr_list, cg_s):
+    
+        CG_nbr_list, _ = make_directed(CG_nbr_list)
+        r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
+        
+        v_i = torch.zeros(cg_s.shape[0], cg_s.shape[1], 3 ).to(cg_s.device)
+        s_i = cg_s
+
+        dis_vec = r_ij
+        dis = norm(r_ij)
+        e_ij = self.dist_embed(dis)
+
+        # inputs need to come from atomwise feature toulene_dft
+        for i, message_block in enumerate(self.message_blocks):
+            
+            # message block
+            ds_message, dv_message = message_block(s_j=s_i,
+                                                   v_j=v_i,
+                                                   r_ij=r_ij,
+                                                   nbrs=CG_nbr_list,
+                                                   e_ij=None)
+            s_i = s_i + ds_message
+            v_i = v_i + dv_message
+
+            # update block
+            update_block = self.update_blocks[i]
+            ds_update, dv_update = update_block(s_i=s_i,
+                                                v_i=v_i)
+            s_i = s_i + ds_update
+            v_i = v_i + dv_update
+            
+        return s_i, v_i 
