@@ -205,12 +205,17 @@ class EquivariantMPlayer(nn.Module):
                                                   bias=True,
                                                   dropout_rate=dropout))
         
-        self.inv2equi_filters = nn.ModuleList([Dense(in_features=feat_dim,
-                                                      out_features=feat_dim,
-                                                      bias=True,
-                                                      dropout_rate=dropout)
-                                                 for _ in range(3)]
-                                            )
+        self.inv2equi_filters = nn.ModuleList([nn.Sequential(
+                                            Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout,
+                                                  activation=to_module(activation)),
+                                            Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout)) for _ in range(3)]
+                                            ) # todo: use an MLP instead 
         
     def forward(self, h_i, v_i, d_ij, unit_r_ij, nbrs):
         
@@ -220,7 +225,7 @@ class EquivariantMPlayer(nn.Module):
         dv = self.inv2equi_filters[0](edge_inv).unsqueeze(-1) * unit_r_ij.unsqueeze(1) + \
             self.inv2equi_filters[1](edge_inv).unsqueeze(-1) * v_i[nbrs[:, 1]]
 
-        dh = self.inv2equi_filters[1](edge_inv)
+        dh = self.inv2equi_filters[2](edge_inv)
            
         # perform aggregation 
         h_i = h_i + scatter_add(dh, nbrs[:,0], dim=0, dim_size=len(h_i))
@@ -252,11 +257,16 @@ class ContractiveEquivariantMPlayer(nn.Module):
                                                   bias=True,
                                                   dropout_rate=dropout))
         
-        self.inv2equi_filters = nn.ModuleList([Dense(in_features=feat_dim,
-                                                      out_features=feat_dim,
-                                                      bias=True,
-                                                      dropout_rate=dropout)
-                                                 for _ in range(3)]
+        self.inv2equi_filters = nn.ModuleList([nn.Sequential(
+                                            Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout,
+                                                  activation=to_module(activation)),
+                                            Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout)) for _ in range(3)]
                                             ) # todo: use an MLP instead 
         
     def forward(self, h_i, v_i, d_iI, unit_r_iI, mapping):
@@ -267,7 +277,7 @@ class ContractiveEquivariantMPlayer(nn.Module):
         dv = self.inv2equi_filters[0](edge_inv).unsqueeze(-1) * unit_r_iI.unsqueeze(1) + \
             self.inv2equi_filters[1](edge_inv).unsqueeze(-1) * v_i
 
-        dh = self.inv2equi_filters[1](edge_inv)
+        dh = self.inv2equi_filters[2](edge_inv)
            
         # perform aggregation 
         dh_i = scatter_mean(dh, mapping, dim=0)
