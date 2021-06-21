@@ -26,14 +26,18 @@ class CGDataset(TorchDataset):
         return {key: val[idx] for key, val in self.props.items()}
     
 
-    def generate_neighbor_list(self, cutoff, undirected=True):
+    def generate_neighbor_list(self, atom_cutoff, cg_cutoff=None,  undirected=True):
+        
+        if cg_cutoff == None:
+            cg_cutoff = atom_cutoff
+
         self.props['nbr_list'] = [
-            get_neighbor_list(nxyz[:, 1:4], cutoff, undirected)
+            get_neighbor_list(nxyz[:, 1:4], atom_cutoff, undirected)
             for nxyz in self.props['nxyz']
         ]
         
         self.props['CG_nbr_list'] = [
-            get_neighbor_list(nxyz[:, 1:4], cutoff, undirected)
+            get_neighbor_list(nxyz[:, 1:4], cg_cutoff, undirected)
             for nxyz in self.props['CG_nxyz']
         ]
 
