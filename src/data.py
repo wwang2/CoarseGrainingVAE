@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from ase import Atoms
 from ase.neighborlist import neighbor_list
 from torch.utils.data import Dataset as TorchDataset
+from tqdm import tqdm 
 
 
 def get_neighbor_list(xyz, device='cpu', cutoff=5, undirected=True):
@@ -50,15 +51,18 @@ class CGDataset(TorchDataset):
         if cg_cutoff == None:
             cg_cutoff = atom_cutoff
 
-        self.props['nbr_list'] = [
-            get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu")
-            for nxyz in self.props['nxyz']
-        ]
-        
-        self.props['CG_nbr_list'] = [
-            get_neighbor_list(nxyz[:, 1:4], device, cg_cutoff, undirected).to("cpu")
-            for nxyz in self.props['CG_nxyz']
-        ]
+        # todo : create progress bar
+        nbr_list = []
+        cg_nbr_list = []
+
+        for nxyz in tqdm(self.props['nxyz'], desc='building nbr list'):
+            nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu"))
+
+        for nxyz in tqdm(self.props['CG_nxyz'], desc='building CG nbr list'):
+            cg_nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu"))
+
+        self.props['nbr_list'] = nbr_list
+        self.props['CG_nbr_list'] = cg_nbr_list
 
 
 def CG_collate(dicts):
