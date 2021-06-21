@@ -80,6 +80,8 @@ atomic_nums, dataset = get_peptide_dataset(atom_cutoff=atom_cutoff,
                                              n_frames=ndata, 
                                              n_cg=n_cgs)
 
+dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff, device=device)
+
 # create subdirectory 
 create_dir(working_dir)
     
@@ -102,13 +104,17 @@ for i, (train_index, test_index) in enumerate(split_iter):
     atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
     atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
 
-    cgconv = EquivariantConv(n_atom_basis=n_basis, n_rbf = n_rbf, 
-                             cutoff=atom_cutoff, num_conv = dec_nconv)
+    # decoder = EquivariantConv(n_atom_basis=n_basis, n_rbf = n_rbf, 
+    #                          cutoff=atom_cutoff, num_conv = dec_nconv)
 
-    encoder = CGequivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                   n_rbf=n_rbf, cutoff=cg_cutoff)
+    # encoder = CGequivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
+    #                                n_rbf=n_rbf, cutoff=cg_cutoff)
 
-    model = CGequiVAE(encoder, cgconv, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis).to(device)
+    encoder = CGEquivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, n_rbf=n_rbf, cutoff=atom_cutoff)
+    decoder = CGEquivariantDecoder(n_basis, n_rbf, cg_cutoff, n_conv=dec_nconv)
+
+
+    model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis).to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=3, factor=0.5)
