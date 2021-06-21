@@ -8,24 +8,20 @@ from nff.nn.modules import (
 
 from torch import nn 
 
-from nff.nn.modules.painn import (DistanceEmbed, MessageBlock, UpdateBlock,
-                                  EmbeddingBlock, 
-                                  to_module, norm, InvariantMessage, InvariantDense)
+from modules import * 
 
-from nff.nn.layers import Dense
 from nff.utils.tools import make_directed
 
-from torch_scatter import scatter_mean
-from nff.utils.scatter import scatter_add
-
-
+from torch_scatter import scatter_mean, scatter_add
 from torch import nn
 
 
+def to_module(activation):
+    return layer_types[activation]()
 
 def preprocess_r(r_ij):
 
-    dist = ((vec ** 2 + EPS).sum(-1)) ** 0.5
+    dist = ((r_ij ** 2 + 1e-8).sum(-1)) ** 0.5
     unit = r_ij / dist.reshape(-1, 1)
 
     return dist, unit
@@ -181,3 +177,213 @@ class ContractiveMessageBlock(nn.Module):
                                 dim=0)
 
         return delta_s_I, delta_v_I
+
+
+class EquivariantMPlayer(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+        self.dist_embed = SchNetEdgeFilter(n_gaussians=n_rbf,
+                                        cutoff=cutoff,
+                                        n_filters=feat_dim)
+
+        self.layers = nn.Sequential(Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout,
+                                                  activation=to_module(activation)),
+                                            Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout))
+        
+        self.inv2equi_filters = nn.ModuleList([Dense(in_features=feat_dim,
+                                                      out_features=feat_dim,
+                                                      bias=True,
+                                                      dropout_rate=dropout)
+                                                 for _ in range(3)]
+                                            )
+        
+    def forward(self, h_i, v_i, d_ij, unit_r_ij, nbrs):
+        
+        phi = self.layers(h_i)
+        edge_inv = phi[nbrs[:, 0]] * self.dist_embed(d_ij.unsqueeze(-1))
+        
+        dv = self.inv2equi_filters[0](edge_inv).unsqueeze(-1) * unit_r_ij.unsqueeze(1) + \
+            self.inv2equi_filters[1](edge_inv).unsqueeze(-1) * v_i[nbrs[:, 1]]
+
+        dh = self.inv2equi_filters[1](edge_inv)
+           
+        # perform aggregation 
+        h_i = h_i + scatter_add(dh, nbrs[:,0], dim=0, dim_size=len(h_i))
+        v_i = v_i + scatter_add(dv, nbrs[:,0], dim=0, dim_size=len(h_i))
+        
+        return h_i, v_i 
+
+
+class ContractiveEquivariantMPlayer(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+
+        self.dist_embed = SchNetEdgeFilter(n_gaussians=n_rbf,
+                                        cutoff=cutoff,
+                                        n_filters=feat_dim)
+
+        self.layers = nn.Sequential(Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout,
+                                                  activation=to_module(activation)),
+                                            Dense(in_features=feat_dim,
+                                                  out_features=feat_dim,
+                                                  bias=True,
+                                                  dropout_rate=dropout))
+        
+        self.inv2equi_filters = nn.ModuleList([Dense(in_features=feat_dim,
+                                                      out_features=feat_dim,
+                                                      bias=True,
+                                                      dropout_rate=dropout)
+                                                 for _ in range(3)]
+                                            ) # todo: use an MLP instead 
+        
+    def forward(self, h_i, v_i, d_iI, unit_r_iI, mapping):
+        
+        phi = self.layers(h_i)
+        edge_inv = h_i * self.dist_embed(d_iI.unsqueeze(-1))
+        
+        dv = self.inv2equi_filters[0](edge_inv).unsqueeze(-1) * unit_r_iI.unsqueeze(1) + \
+            self.inv2equi_filters[1](edge_inv).unsqueeze(-1) * v_i
+
+        dh = self.inv2equi_filters[1](edge_inv)
+           
+        # perform aggregation 
+        dh_i = scatter_mean(dh, mapping, dim=0)
+        dv_i = scatter_mean(dv, mapping, dim=0)
+        
+        return dh_i, dv_i 
+    
+    
+class CGEquivariantEncoder(nn.Module):
+    
+    def __init__(self,
+             n_conv,
+             n_atom_basis,
+             n_rbf,
+             cutoff):
+        super().__init__()
+
+        self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
+
+        self.atom_mpnns = nn.ModuleList(
+                            [EquivariantMPlayer(feat_dim=n_atom_basis,
+                                                n_rbf=n_rbf, 
+                                                activation='swish',
+                                                cutoff=cutoff, 
+                                                dropout=0.0)
+                             for _ in range(n_conv)]
+        )
+
+        self.cg_mpnns = nn.ModuleList(
+        [ContractiveEquivariantMPlayer(feat_dim=n_atom_basis,
+                                         activation='swish',
+                                         n_rbf=n_rbf,
+                                         cutoff=cutoff,
+                                         dropout=0.0)
+         for _ in range(n_conv)])
+        
+        self.n_conv = n_conv
+    
+    def init_embed(self, z, xyz, cg_xyz, mapping, nbr_list):
+    
+        r_ij = xyz[nbr_list[:, 1]] - xyz[nbr_list[:, 0]]
+        d_ij = ((r_ij ** 2).sum(-1)) ** 0.5
+
+        # intialize embeddings 
+        h_i = self.atom_embed(z.to(torch.long))
+        v_i = torch.zeros(len(h_i), h_i.shape[1],  3).to(cg_xyz.device)
+
+        H_I = torch.zeros(len(cg_xyz), h_i.shape[1]).to(cg_xyz.device)
+        V_I = torch.zeros(len(cg_xyz), h_i.shape[1], 3).to(cg_xyz.device)
+
+        r_iI = (xyz - cg_xyz[mapping])
+        
+        d_iI, unit_r_iI = preprocess_r(r_iI)
+        d_ij, unit_r_ij = preprocess_r(r_ij)
+        
+        return h_i, v_i, H_I, V_I, r_ij, d_ij, d_iI, unit_r_ij, unit_r_iI
+    
+    def forward(self, z, xyz, cg_xyz, mapping, nbr_list):
+        
+        h_i, v_i, H_I, V_I, r_ij, d_ij, d_iI, unit_r_ij, unit_r_iI = self.init_embed(z, xyz, 
+                                                                                     cg_xyz, 
+                                                                                     mapping, 
+                                                                                     nbr_list)
+
+        for i in range(self.n_conv):
+            dh_i, dv_i = self.atom_mpnns[i](h_i=h_i,
+                                            v_i=v_i,
+                                            d_ij=d_ij,
+                                            unit_r_ij=unit_r_ij,
+                                            nbrs=nbr_list)
+            
+            h_i = h_i + dh_i
+            v_i = v_i + dv_i
+
+            dH_I, dV_I = self.cg_mpnns[i](h_i, v_i, d_iI, unit_r_iI, mapping)
+
+            H_I = H_I + dH_I
+            V_I = V_I + dV_I
+        
+        return H_I
+    
+class CGEquivariantDecoder(nn.Module):
+    def __init__(self, n_atom_basis, n_rbf, cutoff, n_conv ):   
+        nn.Module.__init__(self)
+        
+        self.decode_mpnns = nn.ModuleList(
+                            [EquivariantMPlayer(feat_dim=n_atom_basis,
+                                                n_rbf=n_rbf, 
+                                                activation='swish',
+                                                cutoff=cutoff, 
+                                                dropout=0.0)
+                             for _ in range(n_conv)]
+        )
+        self.n_conv = n_conv
+    
+    def init_embed(self, cg_xyz, cg_nbr_list, H_I):
+        
+        r_ij = cg_xyz[cg_nbr_list[:, 1]] - cg_xyz[cg_nbr_list[:, 0]]
+        
+        V_i = torch.zeros(H_I.shape[0], H_I.shape[1], 3 ).to(H_I.device)
+        
+        d_ij, unit_r_ij = preprocess_r(r_ij)
+        
+        return V_i, d_ij, unit_r_ij
+
+    
+    def forward(self, cg_xyz, CG_nbr_list, H_I):
+        
+        V_I, d_IJ, unit_r_IJ = self.init_embed(cg_xyz, CG_nbr_list, H_I)
+
+        for i in range(self.n_conv):
+            
+            dH_I, dV_I = self.decode_mpnns[i](h_i=H_I,
+                                            v_i=V_I,
+                                            d_ij=d_IJ,
+                                            unit_r_ij=unit_r_IJ,
+                                            nbrs=CG_nbr_list)
+            
+            
+            H_I = H_I + dH_I 
+            V_I = V_I + dV_I 
+            
+        return H_I, V_I 
