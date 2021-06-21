@@ -9,8 +9,27 @@ from sklearn.model_selection import train_test_split
 from ase import Atoms
 from ase.neighborlist import neighbor_list
 from torch.utils.data import Dataset as TorchDataset
-from nff.data.graphs import (reconstruct_atoms, get_neighbor_list,
-                             DISTANCETHRESHOLDICT_Z)
+
+
+def get_neighbor_list(xyz, device='cpu', cutoff=5, undirected=True):
+
+    xyz = torch.Tensor(xyz).to(device)
+    n = xyz.size(0)
+
+    # calculating distances
+    dist = (xyz.expand(n, n, 3) - xyz.expand(n, n, 3).transpose(0, 1)
+            ).pow(2).sum(dim=2).sqrt()
+
+    # neighbor list
+    mask = (dist <= cutoff)
+    mask[np.diag_indices(n)] = 0
+    nbr_list = torch.nonzero(mask)
+
+    if undirected:
+        nbr_list = nbr_list[nbr_list[:, 1] > nbr_list[:, 0]]
+
+    return nbr_list
+
 
 class CGDataset(TorchDataset):
     
@@ -26,18 +45,18 @@ class CGDataset(TorchDataset):
         return {key: val[idx] for key, val in self.props.items()}
     
 
-    def generate_neighbor_list(self, atom_cutoff, cg_cutoff=None,  undirected=True):
+    def generate_neighbor_list(self, atom_cutoff, cg_cutoff,  device='cpu',  undirected=True):
         
         if cg_cutoff == None:
             cg_cutoff = atom_cutoff
 
         self.props['nbr_list'] = [
-            get_neighbor_list(nxyz[:, 1:4], atom_cutoff, undirected)
+            get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu")
             for nxyz in self.props['nxyz']
         ]
         
         self.props['CG_nbr_list'] = [
-            get_neighbor_list(nxyz[:, 1:4], cg_cutoff, undirected)
+            get_neighbor_list(nxyz[:, 1:4], device, cg_cutoff, undirected).to("cpu")
             for nxyz in self.props['CG_nxyz']
         ]
 

@@ -165,7 +165,7 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, cg_traj=No
             }
 
     dataset = CGDataset(props.copy())
-    dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=None)
+    #dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff)
     
     return dataset
 
