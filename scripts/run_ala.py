@@ -31,7 +31,8 @@ parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-dataset", type=str, default='dipeptide')
 parser.add_argument("-n_basis", type=int, default=256)
 parser.add_argument("-n_rbf", type=int, default=10)
-parser.add_argument("-cutoff", type=float, default=4.0)
+parser.add_argument("-atom_cutoff", type=float, default=4.0)
+parser.add_argument("-cg_cutoff", type=float, default=4.0)
 parser.add_argument("-enc_nconv", type=int, default=4)
 parser.add_argument("-dec_nconv", type=int, default=4)
 parser.add_argument("-batch_size", type=int, default=64)
@@ -52,7 +53,8 @@ device  = params['device']
 n_cgs  = params['n_cgs']
 n_basis  = params['n_basis']
 n_rbf  = params['n_rbf']
-cutoff = params['cutoff']
+atom_cutoff = params['atom_cutoff']
+cg_cutoff = params['cg_cutoff']
 enc_nconv  = params['enc_nconv']
 dec_nconv  = params['dec_nconv']
 batch_size  = params['batch_size']
@@ -71,11 +73,12 @@ else:
     mapping = get_mapping(params['dataset'], 2.0, n_atoms, n_cgs)
 
 # combine directory 
-atomic_nums, dataset = get_peptide_dataset(cutoff,
-                                                     label=params['dataset'],
-                                                     mapping=mapping,
-                                                     n_frames=ndata, 
-                                                     n_cg=n_cgs)
+atomic_nums, dataset = get_peptide_dataset(atom_cutoff=atom_cutoff,
+                                            cg_cutoff=cg_cutoff, 
+                                             label=params['dataset'],
+                                             mapping=mapping,
+                                             n_frames=ndata, 
+                                             n_cg=n_cgs)
 
 # create subdirectory 
 create_dir(working_dir)
@@ -100,12 +103,12 @@ for i, (train_index, test_index) in enumerate(split_iter):
     atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
 
     cgconv = EquivariantConv(n_atom_basis=n_basis, n_rbf = n_rbf, 
-                             cutoff=cutoff, num_conv = dec_nconv)
+                             cutoff=atom_cutoff, num_conv = dec_nconv)
 
     encoder = CGequivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                   n_rbf=n_rbf, cutoff=cutoff)
+                                   n_rbf=n_rbf, cutoff=cg_cutoff)
 
-    model = CGequiVAE(encoder, cgconv, atom_mu, atom_sigma, n_atoms, n_cgs).to(device)
+    model = CGequiVAE(encoder, cgconv, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis).to(device)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=3, factor=0.5)

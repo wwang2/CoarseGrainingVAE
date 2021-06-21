@@ -129,7 +129,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
     return atomic_nums, traj_reshape
 
 
-def build_dataset(mapping, traj, cutoff, atomic_nums, cg_traj=None):
+def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, cg_traj=None):
     
     CG_nxyz_data = []
     nxyz_data = []
@@ -165,11 +165,11 @@ def build_dataset(mapping, traj, cutoff, atomic_nums, cg_traj=None):
             }
 
     dataset = CGDataset(props.copy())
-    dataset.generate_neighbor_list(cutoff=cutoff)
+    dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=None)
     
     return dataset
 
-def get_peptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
+def get_peptide_dataset(atom_cutoff,  cg_cutoff, label, mapping, n_frames=20000, n_cg=6):
 
     pdb = mdshare.fetch(DATALABELS[label]['pdb'], working_directory='data')
     files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
@@ -177,6 +177,6 @@ def get_peptide_dataset(cutoff, label, mapping, n_frames=20000, n_cg=6):
     
     atomic_nums, traj_reshape = get_traj(pdb, files, n_frames)
 
-    dataset = build_dataset(mapping, traj_reshape, cutoff, atomic_nums)
+    dataset = build_dataset(mapping, traj_reshape, atom_cutoff, cg_cutoff, atomic_nums)
 
     return atomic_nums, dataset
