@@ -7,13 +7,12 @@ from nff.nn.modules import (
 )
 
 from torch import nn 
+
 from nff.nn.modules.painn import (DistanceEmbed, MessageBlock, UpdateBlock,
-                                  EmbeddingBlock, ReadoutBlock, 
-                                  to_module, norm, InvariantMessage, preprocess_r, InvariantDense)
+                                  EmbeddingBlock, 
+                                  to_module, norm, InvariantMessage, InvariantDense)
 
 from nff.nn.layers import Dense
-
-from nff.nn.modules.schnet import (AttentionPool, SumPool)
 from nff.utils.tools import make_directed
 
 from torch_scatter import scatter_mean
@@ -21,6 +20,16 @@ from nff.utils.scatter import scatter_add
 
 
 from torch import nn
+
+
+
+def preprocess_r(r_ij):
+
+    dist = ((vec ** 2 + EPS).sum(-1)) ** 0.5
+    unit = r_ij / dist.reshape(-1, 1)
+
+    return dist, unit
+
 
 class CGequivariantEncoder(nn.Module):
     
@@ -172,154 +181,3 @@ class ContractiveMessageBlock(nn.Module):
                                 dim=0)
 
         return delta_s_I, delta_v_I
-
-class CgAtomEncoder(nn.Module):
-    def __init__(self, n_atom_basis, n_filters, n_gaussians, n_convolutions, cutoff):
-        nn.Module.__init__(self)
-        
-        self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
-        self.atom_convolutions = nn.ModuleList(
-            [SchNetConv(
-                    n_atom_basis=n_atom_basis,
-                    n_filters=n_filters,
-                    n_gaussians=n_gaussians,
-                    cutoff=cutoff,
-                    trainable_gauss=False,
-                    dropout_rate=0.0,
-                )
-                for _ in range(n_convolutions)
-            ]
-        )
-        
-        self.cg_convolutions = nn.ModuleList(
-            [SchNetConv(
-                    n_atom_basis=n_atom_basis,
-                    n_filters=n_filters,
-                    n_gaussians=n_gaussians,
-                    cutoff=cutoff,
-                    trainable_gauss=False,
-                    dropout_rate=0.0,
-                )
-                for _ in range(n_convolutions)
-            ]
-        )
-        
-    def forward(self, z, xyz, cg_xyz, mapping, nbr_list, CG_nbr_list):
-        
-        e_ij = (xyz[nbr_list[:, 0]] - xyz[nbr_list[:, 1]]).pow(2).sum(1).sqrt()[:, None]
-        e_IJ = (cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]).pow(2).sum(1).sqrt()[:, None]
-
-        s_i = self.atom_embed(z.long()).squeeze()
-
-        for i, conv in enumerate(self.atom_convolutions):
-            ds = conv(r=s_i, e=e_ij, a=nbr_list)
-            s_i = s_i + ds
-
-            if i == 0:
-                S_I = scatter_mean(s_i, mapping, dim=0) # initial CG embeddings 
-
-            # contraction, potentially replace with something more complicated 
-            S_input = scatter_mean(s_i, mapping, dim=0)
-
-            dS = self.cg_convolutions[i](S_input, e_IJ, CG_nbr_list)
-            S_I = S_I + dS # CG embedding contains geometrical information from atomistic embeddings 
-
-            # upsampling 
-            s_i += S_I[mapping]
-            
-        return S_I
-        
-
-class AtomConv(nn.Module):
-    def __init__(self, n_atom_basis, n_filters, n_gaussians, n_convolutions, cutoff):
-        nn.Module.__init__(self)
-        
-        self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
-        self.convolutions = nn.ModuleList(
-            [SchNetConv(
-                    n_atom_basis=n_atom_basis,
-                    n_filters=n_filters,
-                    n_gaussians=n_gaussians,
-                    cutoff=cutoff,
-                    trainable_gauss=False,
-                    dropout_rate=0.0,
-                )
-                for _ in range(n_convolutions)
-            ]
-        )
-        
-    def forward(self, z, xyz, nbr_list):
-        
-        e = (xyz[nbr_list[:, 0]] - xyz[nbr_list[:, 1]]).pow(2).sum(1).sqrt()[:, None]
-        s_i = self.atom_embed(z.long()).squeeze()
-
-        for i, conv in enumerate(self.convolutions):
-            ds = conv(r=s_i, e=e, a=nbr_list)
-            s_i = s_i + ds
-            
-        return s_i 
-    
-    
-class EquivariantConv(nn.Module):
-    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv ):   
-        
-        nn.Module.__init__(self)
-        # embedding layers
-        self.embed_block = EmbeddingBlock(feat_dim=n_atom_basis)
-        # distance transform
-        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
-                                  cutoff=cutoff,
-                                  feat_dim=n_atom_basis,
-                                  learnable_k=False,
-                                  dropout=0.0)
-
-        self.message_blocks = nn.ModuleList(
-            [MessageBlock(feat_dim=n_atom_basis,
-                          activation="swish",
-                          n_rbf=n_rbf,
-                          cutoff=cutoff,
-                          learnable_k=False,
-                          dropout=0.0)
-             for _ in range(num_conv)]
-        )
-
-        self.update_blocks = nn.ModuleList(
-            [UpdateBlock(feat_dim=n_atom_basis,
-                         activation="swish",
-                         dropout=0.0)
-             for _ in range(num_conv)]
-        )
-    
-    
-    def forward(self, cg_xyz, CG_nbr_list, cg_s):
-    
-        CG_nbr_list, _ = make_directed(CG_nbr_list)
-        r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
-        
-        v_i = torch.zeros(cg_s.shape[0], cg_s.shape[1], 3 ).to(cg_s.device)
-        s_i = cg_s
-
-        dis_vec = r_ij
-        dis = norm(r_ij)
-        e_ij = self.dist_embed(dis)
-
-        # inputs need to come from atomwise feature toulene_dft
-        for i, message_block in enumerate(self.message_blocks):
-            
-            # message block
-            ds_message, dv_message = message_block(s_j=s_i,
-                                                   v_j=v_i,
-                                                   r_ij=r_ij,
-                                                   nbrs=CG_nbr_list,
-                                                   e_ij=None)
-            s_i = s_i + ds_message
-            v_i = v_i + dv_message
-
-            # update block
-            update_block = self.update_blocks[i]
-            ds_update, dv_update = update_block(s_i=s_i,
-                                                v_i=v_i)
-            s_i = s_i + ds_update
-            v_i = v_i + dv_update
-            
-        return s_i, v_i 
