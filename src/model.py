@@ -6,11 +6,10 @@ from conv import *
 from nff.utils.scatter import scatter_add
 from torch_scatter import scatter_mean
 
-
 class CGequiVAE(nn.Module):
     def __init__(self, encoder, equivaraintconv, 
                      atom_munet, atom_sigmanet,
-                    n_atoms, n_cgs):
+                    n_atoms, n_cgs, feature_dim):
         nn.Module.__init__(self)
         self.encoder = encoder
         self.equivaraintconv = equivaraintconv
@@ -19,6 +18,7 @@ class CGequiVAE(nn.Module):
         
         self.n_atoms = n_atoms
         self.n_cgs = n_cgs
+        self.atomdense = nn.Linear(feature_dim, n_atoms)
         
     def get_inputs(self, batch):
 
@@ -59,7 +59,9 @@ class CGequiVAE(nn.Module):
             pooled_vector.append(vec)
 
         pooled_vector = torch.stack(pooled_vector)
-        xyz_recon = pooled_vector.mean(1)[:, :self.n_atoms, :].reshape(-1, 3) + cg_xyz[mapping]
+        xyz_rel = torch.einsum("ji,kin->kjn", self.atomdense.weight, pooled_vector.mean(1)).reshape(-1, 3)
+        #xyz_recon = pooled_vector.mean(1)[:, :self.n_atoms, :].reshape(-1, 3) + cg_xyz[mapping]
+        xyz_recon = xyz_rel + cg_xyz[mapping]
         
         return xyz_recon
         
@@ -77,4 +79,5 @@ class CGequiVAE(nn.Module):
         xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
         
         return S_mu, S_sigma, xyz, xyz_recon
+    
     
