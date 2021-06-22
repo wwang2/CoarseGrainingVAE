@@ -148,11 +148,11 @@ class CGEquivariantDecoder(nn.Module):
             H_I = H_I + dH_I 
             V_I = V_I + dV_I 
 
-            update_block = self.update_blocks[i]
-            dH_I, dV_I = update_block(s_i=H_I, v_i=V_I)
+            # update_block = self.update_blocks[i]
+            # dH_I, dV_I = update_block(s_i=H_I, v_i=V_I)
 
-            H_I = H_I + dH_I 
-            V_I = V_I + dV_I
+            # H_I = H_I + dH_I 
+            # V_I = V_I + dV_I
             
         return H_I, V_I 
 
@@ -297,6 +297,10 @@ class CGEncoder(nn.Module):
 
             S_I += delta_S_I
             V_I += delta_V_I
+
+            # CG broad casting
+            s_i = s_i + S_I[mapping]
+            v_i = v_i + V_I[mapping]
         
         return S_I
 
