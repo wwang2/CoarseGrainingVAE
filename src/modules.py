@@ -41,6 +41,22 @@ layer_types = {
     "swish": Swish
 }
 
+
+class CosineEnvelope(nn.Module):
+    # Behler, J. Chem. Phys. 134, 074106 (2011)
+    def __init__(self, cutoff):
+        super().__init__()
+
+        self.cutoff = cutoff
+
+    def forward(self, d):
+
+        output = 0.5 * (torch.cos((np.pi * d / self.cutoff)) + 1)
+        exclude = d >= self.cutoff
+        output[exclude] = 0
+
+        return output
+
 def gaussian_smearing(distances, offset, widths, centered=False):
 
     if not centered:
@@ -133,6 +149,74 @@ class GaussianSmearing(nn.Module):
         )
 
         return result
+
+
+class PainnRadialBasis(nn.Module):
+    def __init__(self,
+                 n_rbf,
+                 cutoff,
+                 learnable_k):
+        super().__init__()
+
+        self.n = torch.arange(1, n_rbf + 1).float()
+        if learnable_k:
+            self.n = nn.Parameter(self.n)
+
+        self.cutoff = cutoff
+
+    def forward(self, dist):
+        """
+        Args:
+            d (torch.Tensor): tensor of distances
+        """
+
+        shape_d = dist.unsqueeze(-1)
+        n = self.n.to(dist.device)
+        coef = n * np.pi / self.cutoff
+        device = shape_d.device
+
+        # replace divide by 0 with limit of sinc function
+
+        denom = torch.where(shape_d == 0,
+                            torch.tensor(1.0, device=device),
+                            shape_d)
+        num = torch.where(shape_d == 0,
+                          coef,
+                          torch.sin(coef * shape_d))
+
+        output = torch.where(shape_d >= self.cutoff,
+                             torch.tensor(0.0, device=device),
+                             num / denom)
+
+        return output
+
+
+class DistanceEmbed(nn.Module):
+    def __init__(self,
+                 n_rbf,
+                 cutoff,
+                 feat_dim,
+                 learnable_k,
+                 dropout):
+
+        super().__init__()
+        rbf = PainnRadialBasis(n_rbf=n_rbf,
+                               cutoff=cutoff,
+                               learnable_k=learnable_k)
+        dense = Dense(in_features=n_rbf,
+                      out_features=3 * feat_dim,
+                      bias=True,
+                      dropout_rate=dropout)
+        self.block = nn.Sequential(rbf, dense)
+        self.f_cut = CosineEnvelope(cutoff=cutoff)
+
+    def forward(self, dist):
+        rbf_feats = self.block(dist)
+        envelope = self.f_cut(dist).reshape(-1, 1)
+        output = rbf_feats * envelope
+
+        return output
+
 
 class SchNetEdgeFilter(nn.Module):
     def __init__(self,
