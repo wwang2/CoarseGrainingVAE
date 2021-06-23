@@ -1,23 +1,24 @@
 import torch
-
-from nff.nn.modules import (
-    SchNetConv,
-    SchNetEdgeUpdate,
-    NodeMultiTaskReadOut
-)
-
 from torch import nn 
 
 from modules import * 
-
-from nff.utils.tools import make_directed
 
 from torch_scatter import scatter_mean, scatter_add
 from torch import nn
 
 #from nff.nn.modules.painn import (MessageBlock, UpdateBlock,InvariantMessage, preprocess_r, InvariantDense)
                                   
+def make_directed(nbr_list):
 
+    gtr_ij = (nbr_list[:, 0] > nbr_list[:, 1]).any().item()
+    gtr_ji = (nbr_list[:, 1] > nbr_list[:, 0]).any().item()
+    directed = gtr_ij and gtr_ji
+
+    if directed:
+        return nbr_list, directed
+
+    new_nbrs = torch.cat([nbr_list, nbr_list.flip(1)], dim=0)
+    return new_nbrs, directed
 
 def to_module(activation):
     return layer_types[activation]()
