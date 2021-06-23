@@ -4,6 +4,49 @@ from torch import nn
 from conv import * 
 from torch_scatter import scatter_mean, scatter_add
 
+
+class ENDecoder(nn.Module):
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation ):   
+        
+        nn.Module.__init__(self)
+        # distance transform
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                  cutoff=cutoff,
+                                  feat_dim=n_atom_basis,
+                                  dropout=0.0)
+
+        self.message_blocks = nn.ModuleList(
+            [ENMessageBlock(feat_dim=n_atom_basis,
+                          activation=activation,
+                          n_rbf=n_rbf,
+                          cutoff=cutoff,
+                          dropout=0.0)
+             for _ in range(num_conv)]
+        )
+
+    
+    def forward(self, cg_xyz, CG_nbr_list, cg_s):
+    
+        CG_nbr_list, _ = make_directed(CG_nbr_list)
+        r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
+        
+        v_i = torch.zeros(cg_s.shape[0], cg_s.shape[1], 3 ).to(cg_s.device)
+        s_i = cg_s
+
+        # inputs need to come from atomwise feature toulene_dft
+        for i, message_block in enumerate(self.message_blocks):
+            
+            # message block
+            ds_message, dv_message = message_block(s_j=s_i,
+                                                   v_j=v_i,
+                                                   r_ij=r_ij,
+                                                   nbrs=CG_nbr_list,
+                                                   )
+            s_i = s_i + ds_message
+            v_i = v_i + dv_message
+            
+        return s_i, v_i 
+
 class EquivariantDecoder(nn.Module):
     def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation ):   
         
@@ -12,7 +55,6 @@ class EquivariantDecoder(nn.Module):
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                   cutoff=cutoff,
                                   feat_dim=n_atom_basis,
-                                  learnable_k=False,
                                   dropout=0.0)
 
         self.message_blocks = nn.ModuleList(
@@ -20,7 +62,6 @@ class EquivariantDecoder(nn.Module):
                           activation=activation,
                           n_rbf=n_rbf,
                           cutoff=cutoff,
-                          learnable_k=False,
                           dropout=0.0)
              for _ in range(num_conv)]
         )
@@ -79,7 +120,6 @@ class CGEncoder(nn.Module):
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                   cutoff=cutoff,
                                   feat_dim=n_atom_basis,
-                                  learnable_k=False,
                                   dropout=0.0)
 
         self.message_blocks = nn.ModuleList(
@@ -87,7 +127,6 @@ class CGEncoder(nn.Module):
                           activation=activation,
                           n_rbf=n_rbf,
                           cutoff=cutoff,
-                          learnable_k=False,
                           dropout=0.0)
              for _ in range(n_conv)]
         )
@@ -104,7 +143,6 @@ class CGEncoder(nn.Module):
                           activation=activation,
                           n_rbf=n_rbf,
                           cutoff=cutoff,
-                          learnable_k=False,
                           dropout=0.0)
              for _ in range(n_conv)]
         )
@@ -121,7 +159,6 @@ class CGEncoder(nn.Module):
                                          activation=activation,
                                          n_rbf=n_rbf,
                                          cutoff=cutoff,
-                                         learnable_k=False,
                                          dropout=0.0)
          for _ in range(n_conv)])
         
