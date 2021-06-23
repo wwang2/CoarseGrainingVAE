@@ -73,16 +73,6 @@ def gaussian_smearing(distances, offset, widths, centered=False):
 
 
 class Dense(nn.Linear):
-    """ Applies a dense layer with activation: :math:`y = activation(Wx + b)`
-    Args:
-        in_features (int): number of input feature
-        out_features (int): number of output features
-        bias (bool): If set to False, the layer will not adapt the bias. (default: True)
-        activation (callable): activation function (default: None)
-        weight_init (callable): function that takes weight tensor and initializes (default: xavier)
-        bias_init (callable): function that takes bias tensor and initializes (default: zeros initializer)
-    """
-
     def __init__(
         self,
         in_features,
@@ -111,12 +101,7 @@ class Dense(nn.Linear):
             self.bias_init(self.bias)
 
     def forward(self, inputs):
-        """
-        Args:
-            inputs (dict of torch.Tensor): SchNetPack format dictionary of input tensors.
-        Returns:
-            torch.Tensor: Output of the dense layer.
-        """
+        
         y = super().forward(inputs)
 
         # kept for compatibility with earlier versions of nff

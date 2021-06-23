@@ -62,9 +62,57 @@ class InvariantMessage(nn.Module):
         output = phi * w_s
         # split into three components, so the tensor now has
         # shape n_atoms x 3 x feat_dim
-        out_reshape = output.reshape(output.shape[0], 3, -1)
+        #out_reshape = output.reshape(output.shape[0], 3, -1)
 
-        return out_reshape
+        return output
+
+class ENMessageBlock(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+        self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
+                                            out_feat_dim=2 * feat_dim, 
+                                            activation=activation,
+                                            n_rbf=n_rbf,
+                                            cutoff=cutoff,
+                                            dropout=dropout)
+
+    def forward(self,
+                s_j,
+                v_j,
+                r_ij,
+                nbrs):
+
+        dist, unit = preprocess_r(r_ij)
+        inv_out = self.inv_message(s_j=s_j,
+                                   dist=dist,
+                                   nbrs=nbrs)
+
+        inv_out = inv_out.reshape(inv_out.shape[0], 2, -1)
+        equi_filter = inv_out[:, 0, :].unsqueeze(-1)
+        inv_filter = inv_out[:, 1, :]
+
+        delta_v_ij = equi_filter * unit.unsqueeze(1)
+        delta_s_ij = inv_filter
+
+        # add results from neighbors of each node
+
+        graph_size = s_j.shape[0]
+        delta_v_i = scatter_add(src=delta_v_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+
+        delta_s_i = scatter_add(src=delta_s_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+
+        return delta_s_i, delta_v_i
 
 
 
@@ -93,6 +141,8 @@ class MessageBlock(nn.Module):
         inv_out = self.inv_message(s_j=s_j,
                                    dist=dist,
                                    nbrs=nbrs)
+
+        inv_out = inv_out.reshape(inv_out.shape[0], 3, -1)
 
         split_0 = inv_out[:, 0, :].unsqueeze(-1)
         split_1 = inv_out[:, 1, :]
