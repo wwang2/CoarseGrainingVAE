@@ -49,6 +49,7 @@ def run_cv(params):
     optim = optim_dict[params['optimizer']]
     dataset_label = params['dataset']
     shuffle_flag = params['shuffle']
+    dir_mp_flag = params['dir_mp']
 
 
     # generate mapping 
@@ -93,7 +94,7 @@ def run_cv(params):
                                  cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation)
 
         encoder = CGEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation)
+                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation, dir_mp=dir_mp_flag)
 
         # encoder = CGEquivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, n_rbf=n_rbf, cutoff=atom_cutoff)
         # decoder = CGEquivariantDecoder(n_basis, n_rbf, cg_cutoff, n_conv=dec_nconv)
@@ -193,6 +194,7 @@ if __name__ == '__main__':
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("--randommap", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
+    parser.add_argument("--dir_mp", action='store_true', default=False)
     params = vars(parser.parse_args())
 
     if params['dataset'] not in ['dipeptide', 'pentapeptide']:

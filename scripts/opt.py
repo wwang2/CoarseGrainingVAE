@@ -18,7 +18,7 @@ if params['dry_run']:
     n_obs = 2
 else:
     token = 'JGTKFUYDJMOKBMDFXICMGNEFBXOOSIPAVSGUWPSMJCVDWYMA'
-    n_epochs = 30 
+    n_epochs = 50 
     n_obs = 1000
 
 create_dir(params['logdir'])
@@ -40,28 +40,39 @@ if params['id'] == None:
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=5)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.01), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.001), transformation="log"),
+            dict(name='dir_mp', type='categorical', categorical_values=["True", "False"]),
         ],
         observation_budget=n_obs, # how many iterations to run for the optimization
         parallel_bandwidth=10,
     )
+    
+elif type(params['id']) == int:
+    experiment = conn.experiments(params['id']).fetch()
 
 i = 0
 while experiment.progress.observation_count < experiment.observation_budget:
 
     suggestion = conn.experiments(experiment.id).suggestions().create()
     trial =  suggestion.assignments
+
+    if trial['dir_mp'] == 'True':
+        dir_mp_flag = True 
+    else:
+        dir_mp_flag = True
+
     trial['logdir'] = os.path.join(params['logdir'], suggestion.id)
     trial['device'] = params['device']
     trial['dataset'] = 'dipeptide'
     trial['batch_size'] = 64
     trial['nepochs'] = n_epochs
-    trial['ndata'] = 5000
+    trial['ndata'] = 10000
     trial['nsamples'] = 200
     trial['n_cgs'] = 7
     trial['nsplits'] = 3
     trial['randommap'] = False
     trial['shuffle'] = False
     trial['optimizer'] = 'adam'
+    trial['dir_mp'] = dir_mp_flag
 
     cv_score = run_cv(trial)
 
