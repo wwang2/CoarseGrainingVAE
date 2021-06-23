@@ -51,7 +51,7 @@ class InvariantMessage(nn.Module):
 
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
-                                        feat_dim=feat_dim,
+                                        feat_dim=3 * feat_dim,
                                         learnable_k=learnable_k,
                                         dropout=dropout)
         self.edge_embed = Dense(in_features=feat_dim,
@@ -213,14 +213,9 @@ class ContractiveMessageBlock(nn.Module):
 
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
-                                        feat_dim=feat_dim,
+                                        feat_dim=3 * feat_dim,
                                         learnable_k=learnable_k,
                                         dropout=dropout)
-        self.edge_embed = Dense(in_features=feat_dim,
-                                out_features=3 * feat_dim,
-                                bias=True,
-                                dropout_rate=dropout)
-
 
     def forward(self,
                 s_i,
@@ -296,7 +291,7 @@ class EquivariantMPlayer(nn.Module):
 
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
-                                        feat_dim=feat_dim,
+                                        feat_dim=3 * feat_dim,
                                         learnable_k=False,
                                         dropout=dropout)
 
@@ -359,7 +354,7 @@ class ContractiveEquivariantMPlayer(nn.Module):
 
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
-                                        feat_dim=feat_dim,
+                                        feat_dim=3 * feat_dim,
                                         learnable_k=False,
                                         dropout=dropout)
 

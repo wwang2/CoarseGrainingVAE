@@ -204,7 +204,7 @@ class DistanceEmbed(nn.Module):
                                cutoff=cutoff,
                                learnable_k=learnable_k)
         dense = Dense(in_features=n_rbf,
-                      out_features=3 * feat_dim,
+                      out_features=feat_dim,
                       bias=True,
                       dropout_rate=dropout)
         self.block = nn.Sequential(rbf, dense)
