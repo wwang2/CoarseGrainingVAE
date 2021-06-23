@@ -31,7 +31,8 @@ def preprocess_r(r_ij):
 
 class InvariantMessage(nn.Module):
     def __init__(self,
-                 feat_dim,
+                 in_feat_dim,
+                 out_feat_dim,
                  activation,
                  n_rbf,
                  cutoff,
@@ -39,25 +40,21 @@ class InvariantMessage(nn.Module):
                  dropout):
         super().__init__()
 
-        self.inv_dense = nn.Sequential(Dense(in_features=feat_dim,
-                                          out_features=feat_dim,
+        self.inv_dense = nn.Sequential(Dense(in_features=in_feat_dim,
+                                          out_features=in_feat_dim,
                                           bias=True,
                                           dropout_rate=dropout,
                                           activation=to_module(activation)),
-                                    Dense(in_features=feat_dim,
-                                          out_features=3 * feat_dim,
+                                    Dense(in_features=in_feat_dim,
+                                          out_features=out_feat_dim,
                                           bias=True,
                                           dropout_rate=dropout))
 
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
-                                        feat_dim=3 * feat_dim,
+                                        feat_dim=out_feat_dim,
                                         learnable_k=learnable_k,
                                         dropout=dropout)
-        self.edge_embed = Dense(in_features=feat_dim,
-                                out_features=3 * feat_dim,
-                                bias=True,
-                                dropout_rate=dropout)
 
     def forward(self,
                 s_j,
@@ -83,7 +80,8 @@ class MessageBlock(nn.Module):
                  learnable_k,
                  dropout):
         super().__init__()
-        self.inv_message = InvariantMessage(feat_dim=feat_dim,
+        self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
+                                            out_feat_dim=feat_dim * 3, 
                                             activation=activation,
                                             n_rbf=n_rbf,
                                             cutoff=cutoff,
