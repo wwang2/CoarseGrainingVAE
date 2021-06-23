@@ -2,9 +2,7 @@
 import torch
 from torch import nn
 from conv import * 
-
-from nff.utils.scatter import scatter_add
-from torch_scatter import scatter_mean
+from torch_scatter import scatter_mean, scatter_add
 
 class EquivariantDecoder(nn.Module):
     def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation ):   

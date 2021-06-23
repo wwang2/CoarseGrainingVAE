@@ -5,8 +5,6 @@ from modules import *
 
 from torch_scatter import scatter_mean, scatter_add
 from torch import nn
-
-#from nff.nn.modules.painn import (MessageBlock, UpdateBlock,InvariantMessage, preprocess_r, InvariantDense)
                                   
 def make_directed(nbr_list):
 
