@@ -24,7 +24,7 @@ zeros_initializer = partial(constant_, val=0.0)
 
 def preprocess_r(r_ij):
 
-    dist = ((r_ij ** 2 + 1e-6).sum(-1)) ** 0.5
+    dist = ((r_ij ** 2 + 1e-9).sum(-1)) ** 0.5
     unit = r_ij / dist.reshape(-1, 1)
 
     return dist, unit
