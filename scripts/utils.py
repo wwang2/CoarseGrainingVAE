@@ -1,5 +1,4 @@
 import os 
-from nff.train import batch_to
 from tqdm import tqdm 
 import torch
 import numpy as np
@@ -11,6 +10,12 @@ def create_dir(name):
 
 def KL(mu, std):
      return -0.5 * torch.sum(1 + torch.log(std.pow(2)) - mu.pow(2) - std.pow(2), dim=-1).mean()
+
+def batch_to(batch, device):
+    gpu_batch = dict()
+    for key, val in batch.items():
+        gpu_batch[key] = val.to(device) if hasattr(val, 'to') else val
+    return gpu_batch
 
 def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext=''):
     
