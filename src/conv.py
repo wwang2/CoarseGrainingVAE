@@ -34,7 +34,6 @@ class InvariantMessage(nn.Module):
                  activation,
                  n_rbf,
                  cutoff,
-                 learnable_k,
                  dropout):
         super().__init__()
 
@@ -51,7 +50,6 @@ class InvariantMessage(nn.Module):
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
                                         feat_dim=out_feat_dim,
-                                        learnable_k=learnable_k,
                                         dropout=dropout)
 
     def forward(self,
@@ -69,13 +67,13 @@ class InvariantMessage(nn.Module):
         return out_reshape
 
 
+
 class MessageBlock(nn.Module):
     def __init__(self,
                  feat_dim,
                  activation,
                  n_rbf,
                  cutoff,
-                 learnable_k,
                  dropout):
         super().__init__()
         self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
@@ -83,7 +81,6 @@ class MessageBlock(nn.Module):
                                             activation=activation,
                                             n_rbf=n_rbf,
                                             cutoff=cutoff,
-                                            learnable_k=learnable_k,
                                             dropout=dropout)
 
     def forward(self,
@@ -192,7 +189,6 @@ class ContractiveMessageBlock(nn.Module):
                  activation,
                  n_rbf,
                  cutoff,
-                 learnable_k,
                  dropout):
         super().__init__()
 
@@ -210,7 +206,6 @@ class ContractiveMessageBlock(nn.Module):
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
                                         feat_dim=3 * feat_dim,
-                                        learnable_k=learnable_k,
                                         dropout=dropout)
 
     def forward(self,
@@ -288,7 +283,6 @@ class EquivariantMPlayer(nn.Module):
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
                                         feat_dim=3 * feat_dim,
-                                        learnable_k=False,
                                         dropout=dropout)
 
         self.layers = nn.Sequential(Dense(in_features=feat_dim,
@@ -351,7 +345,6 @@ class ContractiveEquivariantMPlayer(nn.Module):
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
                                         feat_dim=3 * feat_dim,
-                                        learnable_k=False,
                                         dropout=dropout)
 
         self.layers = nn.Sequential(Dense(in_features=feat_dim,

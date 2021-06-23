@@ -154,14 +154,10 @@ class GaussianSmearing(nn.Module):
 class PainnRadialBasis(nn.Module):
     def __init__(self,
                  n_rbf,
-                 cutoff,
-                 learnable_k):
+                 cutoff):
         super().__init__()
 
         self.n = torch.arange(1, n_rbf + 1).float()
-        if learnable_k:
-            self.n = nn.Parameter(self.n)
-
         self.cutoff = cutoff
 
     def forward(self, dist):
@@ -196,13 +192,11 @@ class DistanceEmbed(nn.Module):
                  n_rbf,
                  cutoff,
                  feat_dim,
-                 learnable_k,
                  dropout):
 
         super().__init__()
         rbf = PainnRadialBasis(n_rbf=n_rbf,
-                               cutoff=cutoff,
-                               learnable_k=learnable_k)
+                               cutoff=cutoff)
         dense = Dense(in_features=n_rbf,
                       out_features=feat_dim,
                       bias=True,
