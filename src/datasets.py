@@ -78,7 +78,7 @@ def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
     atomic_nums, traj = get_traj(peptide, files, n_frames=20000)
 
     #peptide_top = peptide.top.to_dataframe()[0]
-    peptide_element = [atom.element.atomic_number for atom in peptide.top.atoms]
+    peptide_element = [atom.element.symbol for atom in peptide.top.atoms]
 
     if len(traj) < skip:
         skip = len(traj)
@@ -117,7 +117,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
     traj = pyemma.coordinates.load(files, features=feat)
     traj = np.concatenate(traj)
 
-    peptide_element = [atom.element.atomic_number for atom in pdb.top.atoms]
+    peptide_element = [atom.element.symbol for atom in pdb.top.atoms]
 
     if shuffle: 
         traj = shuffle(traj)
