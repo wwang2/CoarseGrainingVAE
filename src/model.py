@@ -58,7 +58,7 @@ class EquivariantDecoder(nn.Module):
                                   dropout=0.0)
 
         self.message_blocks = nn.ModuleList(
-            [MessageBlock(feat_dim=n_atom_basis,
+            [EquiMessageBlock(feat_dim=n_atom_basis,
                           activation=activation,
                           n_rbf=n_rbf,
                           cutoff=cutoff,
@@ -104,7 +104,7 @@ class EquivariantDecoder(nn.Module):
         return s_i, v_i 
 
 
-class CGEncoder(nn.Module):
+class EquiEncoder(nn.Module):
     
     def __init__(self,
              n_conv,
@@ -112,7 +112,8 @@ class CGEncoder(nn.Module):
              n_rbf,
              activation,
              cutoff,
-             dir_mp=False):
+             dir_mp=False,
+             cg_mp=False):
         super().__init__()
 
         self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
@@ -123,7 +124,7 @@ class CGEncoder(nn.Module):
                                   dropout=0.0)
 
         self.message_blocks = nn.ModuleList(
-            [MessageBlock(feat_dim=n_atom_basis,
+            [EquiMessageBlock(feat_dim=n_atom_basis,
                           activation=activation,
                           n_rbf=n_rbf,
                           cutoff=cutoff,
@@ -139,7 +140,7 @@ class CGEncoder(nn.Module):
         )
 
         self.cg_message_blocks = nn.ModuleList(
-            [MessageBlock(feat_dim=n_atom_basis,
+            [EquiMessageBlock(feat_dim=n_atom_basis,
                           activation=activation,
                           n_rbf=n_rbf,
                           cutoff=cutoff,
@@ -164,20 +165,18 @@ class CGEncoder(nn.Module):
         
         self.n_conv = n_conv
         self.dir_mp = dir_mp
+        self.cg_mp = cg_mp
     
     def forward(self, z, xyz, cg_xyz, mapping, nbr_list, cg_nbr_list):
         
         # atomic embedding
-        if not self.dir_mp:
-            nbr_list, _ = make_directed(nbr_list)
-        else:
-            pass
+        nbr_list, _ = make_directed(nbr_list)
 
         s_i = self.atom_embed(z.long())
         v_i = torch.zeros(s_i.shape[0], s_i.shape[1], 3).to(s_i.device)
 
         r_ij = xyz[nbr_list[:, 1]] - xyz[nbr_list[:, 0]]
-        #r_IJ = cg_xyz[cg_nbr_list[:, 1]] - xyz[cg_nbr_list[:, 0]]
+        r_IJ = cg_xyz[cg_nbr_list[:, 1]] - xyz[cg_nbr_list[:, 0]]
 
         # edge features
         r_iI = (xyz - cg_xyz[mapping])
@@ -206,17 +205,18 @@ class CGEncoder(nn.Module):
             S_I = S_I + delta_S_I
             V_I = V_I + delta_V_I
 
-            # dS_message, dV_message = self.cg_message_blocks[i](s_j=S_I,
-            #                                        v_j=V_I,
-            #                                        r_ij=r_IJ,
-            #                                        nbrs=cg_nbr_list)
-            # S_I = S_I + dS_message
-            # V_I = V_I + dV_message
+            if self.cg_mp:
+                dS_message, dV_message = self.cg_message_blocks[i](s_j=S_I,
+                                                       v_j=V_I,
+                                                       r_ij=r_IJ,
+                                                       nbrs=cg_nbr_list)
+                S_I = S_I + dS_message
+                V_I = V_I + dV_message
 
-            # dS_update, dV_update = self.cg_update_blocks[i](s_i=S_I, v_i=V_I)
-            # S_I = S_I + dS_update # atom message 
-            # V_I = V_I + dV_update
-        
+                dS_update, dV_update = self.cg_update_blocks[i](s_i=S_I, v_i=V_I)
+                S_I = S_I + dS_update # atom message 
+                V_I = V_I + dV_update
+          
         return S_I
 
 
