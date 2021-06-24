@@ -17,9 +17,7 @@ from torch import nn
 from torch.nn import Sequential 
 import numpy as np
 import copy
-from nff.utils.scatter import scatter_add
 from torch_scatter import scatter_mean
-from nff.train import batch_to
 from tqdm import tqdm 
 from torch.utils.data import DataLoader
 from sklearn.model_selection import KFold
@@ -49,8 +47,9 @@ def run_cv(params):
     optim = optim_dict[params['optimizer']]
     dataset_label = params['dataset']
     shuffle_flag = params['shuffle']
-    dir_mp_flag = params['dir_mp']
-
+    #dir_mp_flag = params['dir_mp']
+    dec_type = params['dec_type']
+    cg_mp_flag = params['cg_mp']
 
     # generate mapping 
     if params['randommap']:
@@ -90,11 +89,18 @@ def run_cv(params):
         atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
         atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
 
-        decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
-                                 cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation)
+        # register encoder 
+        if dec_type == 'EquivariantDecoder':
+            decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
+                                      cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation)
+        elif dec_type == 'ENDecoder':
+            decoder = ENDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
+                                    cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation)
+        else:
+            raise ValueError("Decoder type {} is not valid, please choose EquivariantDecoder or ENDecoder".format(dec_type))
 
-        encoder = CGEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation, dir_mp=dir_mp_flag)
+        encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
+                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation, cg_mp=cg_mp_flag)
 
         # encoder = CGEquivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, n_rbf=n_rbf, cutoff=atom_cutoff)
         # decoder = CGEquivariantDecoder(n_basis, n_rbf, cg_cutoff, n_conv=dec_nconv)
@@ -113,13 +119,14 @@ def run_cv(params):
             mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                        model, beta, epoch, train=True,
                                                         looptext='Ncg {} Fold {}'.format(n_cgs, i))
-            # check NaN
-            if np.isnan(mean_recon):
-                break 
-
+            
             scheduler.step(mean_recon)
 
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
+            
+            # check NaN
+            if np.isnan(mean_recon):
+                break 
 
         # dump learning trajectory 
         recon_hist = np.concatenate(recon_hist)
@@ -168,7 +175,7 @@ def run_cv(params):
     # save CV score 
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
 
-    return np.array(cv_rmsd).mean()
+    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std()
 
 if __name__ == '__main__':
 
