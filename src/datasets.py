@@ -24,6 +24,72 @@ DATALABELS = {'dipeptide':
                             }
               }
 
+PROTEINFILES = {'chignolin': {'traj_paths': "../data/filtered/e1*/*.xtc", 
+                              'pdb_path': '../data/filtered/filtered.pdb', 
+                              'file_type': 'xtc'}}
+
+def load_protein_traj(label): 
+    
+    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])
+    pdb_file = PROTEINFILES[label]['pdb_path']
+    
+    file_type = PROTEINFILES[label]['file_type']
+    
+    if file_type == 'xtc':
+        trajs = [md.load_xtc(file,
+                    top=pdb_file) for file in traj_files[:20]]
+    elif file_type == 'dcd':
+        trajs = [md.load_dcd(file,
+                    top=pdb_file) for file in traj_files]
+    else:
+        raise ValueError("file type not recognizable")
+                
+    traj = md.join(trajs)
+    
+    #protein_index = traj.top.select("protein")
+                   
+    return traj
+    
+def get_Calpha(traj):
+    
+#     protein_index = traj.top.select("protein")
+#     protein_top = traj.top.subset(protein_index)
+    
+#     elements = [atom.element.symbol for atom in protein_top.atoms]
+#     atomic_nums = np.array([atomic_num_dict[el] for el in elements] )
+
+    atomic_nums, protein_index = get_atomNum(traj)
+
+    # get alpha carbon only 
+    alpha_indices = traj.top.select_atom_indices('alpha')
+    
+    #ref_xyz = traj.xyz[0]
+    mappings = []
+    skip = 200
+    for i in protein_index:
+
+        dist = traj.xyz[::skip, [i], ] - traj.xyz[::skip, alpha_indices, :]
+        map_index = np.argmin( np.sqrt( np.sum(dist ** 2, -1)).mean(0) )
+
+        mappings.append(map_index)
+
+
+    assert len(list(set(mappings))) == len(alpha_indices)
+    
+    return mappings
+
+
+def get_atomNum(traj):
+    
+    atomic_nums = [atom.element.number for atom in traj.top.atoms]
+    
+    protein_index = traj.top.select("protein")
+    protein_top = traj.top.subset(protein_index)
+
+    atomic_nums = [atom.element.number for atom in protein_top.atoms]
+    
+    return np.array(atomic_nums), protein_index
+
 def compute_nbr_list(frame, cutoff):
     
     dist = (frame[None, ...] - frame[:, None, :]).pow(2).sum(-1).sqrt()
@@ -126,6 +192,8 @@ def get_traj(pdb, files, n_frames, shuffle=False):
     atomic_nums = np.array([atomic_num_dict[el] for el in peptide_element] )
     
     return atomic_nums, traj_reshape
+
+# need a function to get mapping, and CG coordinates simultanesouly. We can have alpha carbon as the CG site
 
 
 def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, cg_traj=None):
