@@ -58,7 +58,7 @@ class CGDataset(TorchDataset):
             nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu"))
 
         for nxyz in tqdm(self.props['CG_nxyz'], desc='building CG nbr list'):
-            cg_nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu"))
+            cg_nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, cg_cutoff, undirected).to("cpu"))
 
         self.props['nbr_list'] = nbr_list
         self.props['CG_nbr_list'] = cg_nbr_list
