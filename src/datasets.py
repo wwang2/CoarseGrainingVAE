@@ -77,8 +77,8 @@ def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
 
     atomic_nums, traj = get_traj(peptide, files, n_frames=20000)
 
-    peptide_top = peptide.top.to_dataframe()[0]
-    peptide_element = peptide_top['element'].values.tolist()
+    #peptide_top = peptide.top.to_dataframe()[0]
+    peptide_element = [atom.element.atomic_number for atom in peptide.top.atoms]
 
     if len(traj) < skip:
         skip = len(traj)
