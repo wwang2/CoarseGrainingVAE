@@ -199,9 +199,10 @@ if __name__ == '__main__':
     parser.add_argument("-nsamples", type=int, default=200)
     parser.add_argument("-beta", type=float, default=0.001)
     parser.add_argument("-nsplits", type=int, default=5)
+    parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
     parser.add_argument("--randommap", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
-    parser.add_argument("--dir_mp", action='store_true', default=False)
+    parser.add_argument("--cg_mp", action='store_true', default=False)
     params = vars(parser.parse_args())
 
     if params['dataset'] not in ['dipeptide', 'pentapeptide']:
