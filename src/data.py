@@ -2,7 +2,6 @@ import torch
 import numbers
 import numpy as np
 import copy
-import nff.utils.constants as const
 from copy import deepcopy
 from sklearn.utils import shuffle as skshuffle
 from sklearn.model_selection import train_test_split
