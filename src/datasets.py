@@ -117,8 +117,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
     traj = pyemma.coordinates.load(files, features=feat)
     traj = np.concatenate(traj)
 
-    peptide_top = pdb.top.to_dataframe()[0]
-    peptide_element = peptide_top['element'].values.tolist()
+    peptide_element = [atom.element.atomic_number for atom in peptide.top.atoms]
 
     if shuffle: 
         traj = shuffle(traj)
