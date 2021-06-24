@@ -60,9 +60,6 @@ class InvariantMessage(nn.Module):
         phi = self.inv_dense(s_j)[nbrs[:, 1]]
         w_s = self.dist_embed(dist)
         output = phi * w_s
-        # split into three components, so the tensor now has
-        # shape n_atoms x 3 x feat_dim
-        #out_reshape = output.reshape(output.shape[0], 3, -1)
 
         return output
 
@@ -99,8 +96,6 @@ class ENMessageBlock(nn.Module):
         delta_v_ij = equi_filter * unit.unsqueeze(1)
         delta_s_ij = inv_filter
 
-        # add results from neighbors of each node
-
         graph_size = s_j.shape[0]
         delta_v_i = scatter_add(src=delta_v_ij,
                                 index=nbrs[:, 0],
@@ -115,8 +110,41 @@ class ENMessageBlock(nn.Module):
         return delta_s_i, delta_v_i
 
 
+class InvMessageBlock(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+        self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
+                                            out_feat_dim=feat_dim, 
+                                            activation=activation,
+                                            n_rbf=n_rbf,
+                                            cutoff=cutoff,
+                                            dropout=dropout)
 
-class MessageBlock(nn.Module):
+    def forward(self,
+                s_j,
+                v_j,
+                r_ij,
+                nbrs):
+
+        dist, unit = preprocess_r(r_ij)
+        inv_out = self.inv_message(s_j=s_j,
+                                   dist=dist,
+                                   nbrs=nbrs)
+
+        delta_s_i = scatter_add(src=inv_out,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=s_j.shape[0])
+
+        return delta_s_i, v_j
+
+
+class EquiMessageBlock(nn.Module):
     def __init__(self,
                  feat_dim,
                  activation,
@@ -194,18 +222,7 @@ class UpdateBlock(nn.Module):
                 s_i,
                 v_i):
 
-        # v_i = (num_atoms, num_feats, 3)
-        # v_i.transpose(1, 2).reshape(-1, v_i.shape[1])
-        # = (num_atoms, 3, num_feats).reshape(-1, num_feats)
-        # = (num_atoms * 3, num_feats)
-        # -> So the same u gets applied to each atom
-        # and for each of the three dimensions, but differently
-        # for the different feature dimensions
-
         v_tranpose = v_i.transpose(1, 2).reshape(-1, v_i.shape[1])
-
-        # now reshape it to (num_atoms, 3, num_feats) and transpose
-        # to get (num_atoms, num_feats, 3)
 
         num_feats = v_i.shape[1]
         u_v = (self.u_mat(v_tranpose).reshape(-1, 3, num_feats)
@@ -270,9 +287,6 @@ class ContractiveMessageBlock(nn.Module):
         w_s = self.dist_embed(dist)
             
         inv_out = phi * w_s
-
-        # split into three components, so the tensor now has
-        # shape n_atoms x 3 x feat_dim
         inv_out = inv_out.reshape(inv_out.shape[0], 3, -1)
 
         split_0 = inv_out[:, 0, :].unsqueeze(-1)
@@ -282,8 +296,6 @@ class ContractiveMessageBlock(nn.Module):
         unit_add = split_2 * unit.unsqueeze(1)
         delta_v_iI = unit_add + split_0 * v_i
         delta_s_iI = split_1
-
-        # add results from neighbors of each node
 
         delta_v_I = scatter_mean(src=delta_v_iI,
                                 index=mapping,
