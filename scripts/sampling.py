@@ -5,8 +5,6 @@ import mdshare
 import pyemma
 from tqdm import tqdm
 
-from nff.train import batch_to
-
 def batch_to(batch, device):
     gpu_batch = dict()
     for key, val in batch.items():
