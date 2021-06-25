@@ -37,19 +37,19 @@ def load_protein_traj(label):
     
     if file_type == 'xtc':
         trajs = [md.load_xtc(file,
-                    top=pdb_file) for file in traj_files[:20]]
+                    top=pdb_file) for file in traj_files]
     elif file_type == 'dcd':
         trajs = [md.load_dcd(file,
                     top=pdb_file) for file in traj_files]
     else:
-        raise ValueError("file type not recognizable")
+        raise ValueError("file type not recognized")
                 
     traj = md.join(trajs)
     
     #protein_index = traj.top.select("protein")
                    
     return traj
-    
+
 def get_Calpha(traj):
     
 #     protein_index = traj.top.select("protein")
