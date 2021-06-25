@@ -42,28 +42,55 @@ def run_cv(params):
     nsamples = params['nsamples']
     nepochs = params['nepochs']
     lr = params['lr']
-    n_atoms = DATALABELS[params['dataset']]['n_atoms']
+    #n_atoms = DATALABELS[params['dataset']]['n_atoms']
     activation = params['activation']
     optim = optim_dict[params['optimizer']]
     dataset_label = params['dataset']
     shuffle_flag = params['shuffle']
-    #dir_mp_flag = params['dir_mp']
+    dir_mp_flag = params['dir_mp']
     dec_type = params['dec_type']
     cg_mp_flag = params['cg_mp']
+    atom_decode_flag = params['atom_decode']
 
-    # generate mapping 
-    if params['randommap']:
-        mapping = get_random_mapping(n_cgs, n_atoms)
+    # peptide or protein dataset 
+
+    if dataset_label in DATALABELS.keys():
+
+        # generate mapping with Girvan Newman
+        if params['randommap']:
+            mapping = get_random_mapping(n_cgs, n_atoms)
+        else:
+            mapping = get_mapping(dataset_label, 2.0, n_atoms, n_cgs)
+
+        # combine directory 
+        atomic_nums, dataset = get_peptide_dataset(atom_cutoff=atom_cutoff,
+                                                    cg_cutoff=cg_cutoff, 
+                                                     label=dataset_label,
+                                                     mapping=mapping,
+                                                     n_frames=ndata, 
+                                                     n_cg=n_cgs)
+        n_atoms = atomic_nums.shape[0]
+
+    elif dataset_label in PROTEINFILES.keys():
+        traj = load_protein_traj(dataset_label)
+        atomic_nums, protein_index = get_atomNum(traj)
+        mapping = torch.LongTensor( get_Calpha(traj))
+
+        frames = traj.xyz[:, protein_index, :] * 10.0
+
+        frames = shuffle(frames)
+
+        dataset = build_dataset(mapping,
+                        frames[:ndata], 
+                        atom_cutoff, 
+                        cg_cutoff,
+                        atomic_nums)
+
+        n_atoms = atomic_nums.shape[0]
+        n_cgs = mapping.max().item() + 1
+
     else:
-        mapping = get_mapping(dataset_label, 2.0, n_atoms, n_cgs)
-
-    # combine directory 
-    atomic_nums, dataset = get_peptide_dataset(atom_cutoff=atom_cutoff,
-                                                cg_cutoff=cg_cutoff, 
-                                                 label=dataset_label,
-                                                 mapping=mapping,
-                                                 n_frames=ndata, 
-                                                 n_cg=n_cgs)
+        raise ValueError("data label not recognized")
 
     dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff, device=device, undirected=True)
 
@@ -90,22 +117,20 @@ def run_cv(params):
         atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
 
         # register encoder 
-        if dec_type == 'EquivariantDecoder':
-            decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
-                                      cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation)
-        elif dec_type == 'ENDecoder':
-            decoder = ENDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
-                                    cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation)
-        else:
-            raise ValueError("Decoder type {} is not valid, please choose EquivariantDecoder or ENDecoder".format(dec_type))
+
+        decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
+                                      cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, 
+                                      atomwise_z=atom_decode_flag)
 
         encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation, cg_mp=cg_mp_flag)
+                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
+                                        cg_mp=cg_mp_flag, dir_mp=dir_mp_flag, atomwise_z=atom_decode_flag)
 
         # encoder = CGEquivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, n_rbf=n_rbf, cutoff=atom_cutoff)
         # decoder = CGEquivariantDecoder(n_basis, n_rbf, cg_cutoff, n_conv=dec_nconv)
         
-        model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis).to(device)
+        model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis,
+                            atomwise_z=atom_decode_flag).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=3, factor=0.5)
@@ -133,15 +158,16 @@ def run_cv(params):
         dump_numpy2xyz(recon_hist, atomic_nums, os.path.join(split_dir, 'recon_hist.xyz'))
             
         # save sampled geometries 
-        trainloader = DataLoader(trainset, batch_size=128, collate_fn=CG_collate, shuffle=True)
+        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
         train_true_xyzs, train_recon_xyzs, train_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(trainloader, 
                                                                                              device,
                                                                                              model,
                                                                                              atomic_nums,
-                                                                                             n_cg=n_cgs)
+                                                                                             n_cg=n_cgs,
+                                                                                             atomwise_z=atom_decode_flag)
 
         # sample geometries 
-        train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs)
+        train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
         cg_types = np.array([1] * n_cgs)
 
         dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
@@ -150,15 +176,16 @@ def run_cv(params):
         dump_numpy2xyz(train_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
 
 
-        testloader = DataLoader(testset, batch_size=128, collate_fn=CG_collate, shuffle=True)
+        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
         test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(testloader, 
                                                                                              device,
                                                                                              model,
                                                                                              atomic_nums,
-                                                                                             n_cg=n_cgs)
+                                                                                             n_cg=n_cgs,
+                                                                                             atomwise_z=atom_decode_flag)
 
         # sample geometries 
-        test_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs)
+        test_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
         dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
         dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
@@ -203,10 +230,8 @@ if __name__ == '__main__':
     parser.add_argument("--randommap", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
     parser.add_argument("--cg_mp", action='store_true', default=False)
+    parser.add_argument("--dir_mp", action='store_true', default=False)
+    parser.add_argument("--atom_decode", action='store_true', default=False)
     params = vars(parser.parse_args())
-
-    if params['dataset'] not in ['dipeptide', 'pentapeptide']:
-        raise ValueError("{} dataset does not exists".format(params['dataset']))
-
 
     run_cv(params)
