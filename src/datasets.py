@@ -4,6 +4,7 @@ import networkx as nx
 import itertools
 from data import *
 from model import * 
+import glob 
 
 import mdtraj as md
 import mdshare
@@ -30,7 +31,7 @@ PROTEINFILES = {'chignolin': {'traj_paths': "../data/filtered/e1*/*.xtc",
 
 def load_protein_traj(label): 
     
-    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])
+    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:100]
     pdb_file = PROTEINFILES[label]['pdb_path']
     
     file_type = PROTEINFILES[label]['file_type']
