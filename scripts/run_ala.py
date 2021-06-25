@@ -48,13 +48,15 @@ def run_cv(params):
     dataset_label = params['dataset']
     shuffle_flag = params['shuffle']
     dir_mp_flag = params['dir_mp']
-    dec_type = params['dec_type']
+    # dec_type = params['dec_type']
     cg_mp_flag = params['cg_mp']
     atom_decode_flag = params['atom_decode']
 
     # peptide or protein dataset 
 
     if dataset_label in DATALABELS.keys():
+
+        n_atoms = DATALABELS[params['dataset']]['n_atoms']
 
         # generate mapping with Girvan Newman
         if params['randommap']:
