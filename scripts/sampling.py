@@ -4,6 +4,7 @@ import torch
 import mdshare
 import pyemma
 from tqdm import tqdm
+from torch_scatter import scatter_mean
 
 def batch_to(batch, device):
     gpu_batch = dict()
@@ -45,7 +46,7 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
     
     return atoms, data
 
-def sample(loader, mu, sigma, device, model, atomic_nums, n_cg):
+def sample(loader, mu, sigma, device, model, atomic_nums, n_cg, atomwise_z=False):
 
     model = model.to(device)
 
@@ -55,6 +56,11 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cg):
     mus = []
     sigmas = []
 
+    if atomwise_z:
+        n_z = len(atomic_nums)
+    else:
+        n_z = n_cg
+
     tqdm_data = tqdm(loader, position=0, leave=True)    
 
     for batch in tqdm_data:
@@ -63,12 +69,20 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cg):
         z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
         
         # sample latent vectors
-        S_I_list = []
+        z_list = []
         for i in range(len(num_CGs)):
-            S_I_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
+            z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
             
-        S_I = torch.cat(S_I_list)
-        xyz_recon = model.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
+        z = torch.cat(z_list)
+
+        if atomwise_z:
+            H = scatter_mean(z, mapping, dim=0)
+            h = z 
+        else: 
+            H = z 
+            h = z 
+
+        xyz_recon = model.decoder(cg_xyz, CG_nbr_list, H, z, mapping, num_CGs)
             
         recon_xyzs.append(xyz_recon.detach().cpu())
 
