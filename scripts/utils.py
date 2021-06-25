@@ -63,7 +63,7 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='')
     
     return mean_kl, mean_recon, xyz, xyz_recon 
 
-def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg):
+def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False):
 
     model = model.to(device)
 
@@ -72,6 +72,11 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     cg_xyzs = []
     mus = []
     sigmas = []
+
+    if atomwise_z == True:
+        n_z = len(atomic_nums)
+    else:
+        n_z = n_cg 
 
     tqdm_data = tqdm(loader, position=0, leave=True)    
 
@@ -90,8 +95,8 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     recon_xyzs = torch.cat(recon_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     cg_xyzs = torch.cat(cg_xyzs).reshape(-1, n_cg, 3).numpy()
     
-    mu = torch.cat(mus).reshape(-1, n_cg, S_mu.shape[-1]).mean(0)
-    sigma = torch.cat(sigmas).reshape(-1, n_cg, S_mu.shape[-1]).mean(0)
+    mu = torch.cat(mus).reshape(-1, n_z, S_mu.shape[-1]).mean(0)
+    sigma = torch.cat(sigmas).reshape(-1, n_z, S_mu.shape[-1]).mean(0)
     
     return true_xyzs, recon_xyzs, cg_xyzs, mu, sigma
 
