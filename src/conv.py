@@ -270,6 +270,7 @@ class ContractiveMessageBlock(nn.Module):
                                           bias=True,
                                           dropout_rate=dropout))
 
+    
         self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
                                         cutoff=cutoff,
                                         feat_dim=3 * feat_dim,
@@ -368,7 +369,7 @@ class EquivariantMPlayer(nn.Module):
     def forward(self, h_i, v_i, d_ij, unit_r_ij, nbrs):
         
         phi = self.layers(h_i)
-        edge_inv = phi[nbrs[:, 1]] * self.dist_embed(d_ij)
+        edge_inv = (phi[nbrs[:, 1]] *  phi[nbrs[:, 0]]) * self.dist_embed(d_ij)
         #filter1, filter2, filter3 = self.edgefilters(edge_inv)
         
         edge_inv = edge_inv.reshape(edge_inv.shape[0], 3, -1)
