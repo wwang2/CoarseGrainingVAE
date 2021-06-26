@@ -71,7 +71,11 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cg, atomwise_z=False
         # sample latent vectors
         z_list = []
         for i in range(len(num_CGs)):
-            z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
+            try:
+                z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
+            except RuntimeError:
+                print("some sigma values are negative, they are: ")
+                print(sigma[sigma <= 0.0])
             
         z = torch.cat(z_list)
 
