@@ -12,6 +12,11 @@ def batch_to(batch, device):
         gpu_batch[key] = val.to(device) if hasattr(val, 'to') else val
     return gpu_batch
 
+def sample_normal(mu, sigma):
+    eps = torch.randn_like(sigma)
+    z= eps.mul(sigma).add_(mu)
+    return z 
+
 def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
 
     model = model.to(device)
@@ -71,13 +76,11 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cg, atomwise_z=False
         # sample latent vectors
         z_list = []
         for i in range(len(num_CGs)):
-            try:
-                z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
-            except RuntimeError:
-                print("some sigma values are negative, they are: ")
-                print(sigma[sigma <= 0.0])
+
+           #z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
+           z_list.append(sample_normal(mu, sigma))
             
-        z = torch.cat(z_list)
+        z = torch.cat(z_list).to(cg_xyz.device)
 
         if atomwise_z:
             H = scatter_mean(z, mapping, dim=0)
