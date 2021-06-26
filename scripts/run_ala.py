@@ -25,7 +25,7 @@ from sklearn.model_selection import KFold
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
 def run_cv(params):
-
+    failed = False
     working_dir = params['logdir']
     device  = params['device']
     n_cgs  = params['n_cgs']
@@ -169,7 +169,11 @@ def run_cv(params):
                                                                                              atomwise_z=atom_decode_flag)
 
         # sample geometries 
-        train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+        try:
+            train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+        except:
+            failed = True 
+
         cg_types = np.array([1] * n_cgs)
 
         dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
@@ -187,7 +191,10 @@ def run_cv(params):
                                                                                              atomwise_z=atom_decode_flag)
 
         # sample geometries 
-        test_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+        try:
+            test_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+        except:
+            failed = True 
 
         dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
         dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
@@ -204,7 +211,7 @@ def run_cv(params):
     # save CV score 
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
 
-    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std()
+    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), failed
 
 if __name__ == '__main__':
 

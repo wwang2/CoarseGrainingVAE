@@ -90,17 +90,22 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['cg_mp'] = False
     trial['atom_decode'] = False
 
-    cv_mean, cv_std = run_cv(trial)
+    cv_mean, cv_std, failed = run_cv(trial)
     if np.isnan(cv_mean):
-        fail_flag = True
-    else:
-        fail_flag = False 
+        failed = True
 
-    conn.experiments(experiment.id).observations().create(
-      suggestion=suggestion.id,
-      value=cv_mean,
-      value_stddev=cv_std,
-      failed=fail_flag
-    )
+    if not failed:
+        conn.experiments(experiment.id).observations().create(
+          suggestion=suggestion.id,
+          value=cv_mean,
+          value_stddev=cv_std
+        )
+    elif failed:
+        conn.experiments(experiment.id).observations().create(
+          suggestion=suggestion.id,
+          failed=failed
+        )
+
+
 
     experiment = conn.experiments(experiment.id).fetch()
