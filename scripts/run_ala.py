@@ -142,6 +142,7 @@ def run_cv(params):
 
             # check NaN
             if np.isnan(mean_recon):
+                print("NaN encoutered, exiting...")
                 break 
 
         # dump learning trajectory 
@@ -196,6 +197,10 @@ def run_cv(params):
 
         # reconsturction loss 
         cv_rmsd.append(unaligned_test_rmsd)
+
+        # save model 
+        model = model.to('cpu')
+        torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
 
     # save CV score 
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
