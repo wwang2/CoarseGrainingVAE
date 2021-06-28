@@ -61,12 +61,14 @@ def load_protein_traj(label):
                    
     return traj
 
-def get_cg(traj, cg_method='backone', n_cgs=None):
+def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None):
 
     atomic_nums, protein_index = get_atomNum(traj)
     n_atoms = len(atomic_nums)
     skip = 200
     # get alpha carbon only 
+
+    frames = traj.xyz[:, protein_index, :] * 10.0 
 
     if cg_method in ['minimal', 'alpha']:
         mappings = []
@@ -78,10 +80,11 @@ def get_cg(traj, cg_method='backone', n_cgs=None):
             map_index = np.argmin( np.sqrt( np.sum(dist ** 2, -1)).mean(0) )
             mappings.append(map_index)
 
-        coord = traj.xyz[:, indices, :] * 10.0
+        cg_coord = traj.xyz[:, indices, :] * 10.0
         mapping = np.array(mappings)
 
         n_cgs = len(indices)
+        frames, cg_coord = shuffle(frames, cg_coord)
 
     elif cg_method =='newman':
 
@@ -93,7 +96,9 @@ def get_cg(traj, cg_method='backone', n_cgs=None):
         paritions = get_partition(g, n_cgs)
         mapping = parition2mapping(paritions, n_atoms)
         mapping = np.array(mapping)
-        coord = None
+        cg_coord = None
+
+        frames = shuffle(frames)
 
     else:
         raise ValueError("{} coarse-graining option not available".format(cg_method))
@@ -105,8 +110,10 @@ def get_cg(traj, cg_method='backone', n_cgs=None):
     print("Number of CG sites: {}".format(mapping.max() + 1))
 
     assert len(list(set(mapping.tolist()))) == n_cgs
+
+    mapping = torch.LongTensor( mapping)
     
-    return mapping, coord
+    return mapping, frames, cg_coord
 
 
 def get_atomNum(traj):

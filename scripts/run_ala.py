@@ -67,19 +67,18 @@ def run_cv(params):
 
     # mapping options: alpha carbon, backbone, Girvan-Newman
     
-    mapping, cg_coord = get_cg(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'])
-
-    mapping = torch.LongTensor( mapping)
+    mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'])
     
-    frames = traj.xyz[:, protein_index, :] * 10.0 
-    frames, cg_coord = shuffle(frames, cg_coord)
+    frames = frames[:ndata]
+    if cg_coord:
+        cg_coord == cg_coord[:ndata]
 
     dataset = build_dataset(mapping,
-                        frames[:ndata], 
+                        frames, 
                         atom_cutoff, 
                         cg_cutoff,
                         atomic_nums,
-                        cg_traj=cg_coord[:ndata])
+                        cg_traj=cg_coord)
     # get n_atoms 
     n_atoms = atomic_nums.shape[0]
     n_cgs = mapping.max().item() + 1
