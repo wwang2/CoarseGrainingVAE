@@ -61,17 +61,17 @@ def load_protein_traj(label):
                    
     return traj
 
-def get_cg(traj, cg_method='backone'):
+def get_cg(traj, cg_method='backone', n_cgs=None):
 
     atomic_nums, protein_index = get_atomNum(traj)
-    
-    #ref_xyz = traj.xyz[0]
-
-    mappings = []
+    n_atoms = len(atomic_nums)
     skip = 200
     # get alpha carbon only 
 
     if cg_method in ['minimal', 'alpha']:
+        mappings = []
+        print("Note, using CG method {}, user-specified N_cg will be overwritten".format(cg_method))
+
         indices = traj.top.select_atom_indices(cg_method)
         for i in protein_index:
             dist = traj.xyz[:, [i], ] - traj.xyz[:, indices, :]
@@ -79,21 +79,20 @@ def get_cg(traj, cg_method='backone'):
             mappings.append(map_index)
 
         coord = traj.xyz[:, indices, :] * 10.0
-        mappings = np.array(mappings)
+        mapping = np.array(mappings)
+
+        n_cgs = len(indices)
 
     elif cg_method =='newman':
-        mappings = []
 
-        for frame in traj.xyz[::skip, protein_index] :
-            # use a cutoff of 2.0 to determine molecular graphs 
-            nbr_list = compute_nbr_list(torch.Tensor(frame), 2.0)
-            paritions = get_partition(nbr_list, n_cgs)     
-            mapping = parition2mapping(paritions, n_atoms)
-            mappings.append(mapping)
+        if n_cgs is None:
+            raise ValueError("need to provided number of CG sites")
 
-        mappings = torch.Tensor( np.stack(mappings) )
-        mappings = mappings.mode(0)[0].numpy()
-
+        protein_top = traj.top.subset(protein_index)
+        g = protein_top.to_bondgraph()
+        paritions = get_partition(g, n_cgs)
+        mapping = parition2mapping(paritions, n_atoms)
+        mapping = np.array(mapping)
         coord = None
 
     else:
@@ -103,11 +102,11 @@ def get_cg(traj, cg_method='backone'):
     # print coarse graining summary 
 
     print("CG method: {}".format(cg_method))
-    print("Number of CG sites: {}".format(mappings.max() + 1))
+    print("Number of CG sites: {}".format(mapping.max() + 1))
 
-    assert len(list(set(mappings))) == len(indices)
+    assert len(list(set(mapping.tolist()))) == n_cgs
     
-    return mappings, coord
+    return mapping, coord
 
 
 def get_atomNum(traj):
@@ -138,13 +137,15 @@ def parition2mapping(partitions, n_nodes):
             
     return mapping.astype(int)
 
-def get_partition(nbr_list, n_partitions):
+def get_partition(G, n_partitions):
     
-    adj = [tuple(pair) for pair in nbr_list]
-    G = nx.Graph()
-    G.add_edges_from(adj)
+    # adj = [tuple(pair) for pair in nbr_list]
+    # G = nx.Graph()
+    # G.add_edges_from(adj)
 
+    G = nx.convert_node_labels_to_integers(G)
     comp = nx.community.girvan_newman(G)
+
     for communities in itertools.islice(comp, n_partitions-1):
             partitions = tuple(sorted(c) for c in communities)
         
@@ -152,19 +153,17 @@ def get_partition(nbr_list, n_partitions):
 
 def compute_mapping(atomic_nums, traj, cutoff, n_atoms, n_cgs, skip):
 
-    traj = shuffle(traj)[::skip].reshape(-1, len(atomic_nums),  3)
-    mappings = []
-    for frame in traj:
-        nbr_list = compute_nbr_list(torch.Tensor(frame), cutoff)
-        paritions = get_partition(nbr_list, n_cgs)     
-        mapping = parition2mapping(paritions, n_atoms)
-        mappings.append(mapping)
+    # get bond graphs 
+    g = traj.top.to_bondgraph()
+    paritions = get_partition(g, n_cgs)
+    mapping = parition2mapping(paritions, n_atoms)
+    #mappings.append(mapping)
 
-    mappings = torch.Tensor( np.stack(mappings) )
-    mappings = mappings.mode(0)[0]
+    # mappings = torch.Tensor( np.stack(mappings) )
+    # mappings = mappings.mode(0)[0]
 
 
-    return mappings
+    return mapping
 
 def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
 
@@ -173,8 +172,6 @@ def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
     files = mdshare.fetch(DATALABELS[label]['xtc'], working_directory='data')
 
     atomic_nums, traj = get_traj(peptide, files, n_frames=20000)
-
-    #peptide_top = peptide.top.to_dataframe()[0]
     peptide_element = [atom.element.symbol for atom in peptide.top.atoms]
 
     if len(traj) < skip:

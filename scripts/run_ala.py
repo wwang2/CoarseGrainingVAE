@@ -67,7 +67,7 @@ def run_cv(params):
 
     # mapping options: alpha carbon, backbone, Girvan-Newman
     
-    mapping, cg_coord = get_cg(traj, cg_method=params['cg_method'])
+    mapping, cg_coord = get_cg(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'])
 
     mapping = torch.LongTensor( mapping)
     
