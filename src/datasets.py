@@ -29,14 +29,14 @@ PROTEINFILES = {'chignolin': {'traj_paths': "../data/filtered/e1*/*.xtc",
                               'pdb_path': '../data/filtered/filtered.pdb', 
                               'file_type': 'xtc'}, 
                 'dipeptide': 
-                            {'pdb': 'alanine-dipeptide-nowater.pdb', 
-                            'xtc': 'alanine-dipeptide-*-250ns-nowater.xtc',
-                            'n_atoms': 22
+                            {'pdb_path': '../data/alanine-dipeptide-nowater.pdb', 
+                            'traj_paths': '../data/alanine-dipeptide-*-250ns-nowater.xtc',
+                            'file_type': 'xtc'
                              },
               'pentapeptide': 
-                            {'pdb': 'pentapeptide-impl-solv.pdb',
-                             'xtc': 'pentapeptide-*-500ns-impl-solv.xtc',
-                             'n_atoms': 94
+                            {'pdb_path': '../data/pentapeptide-impl-solv.pdb',
+                             'traj_paths': '../data/pentapeptide-*-500ns-impl-solv.xtc',
+                             'file_type': 'xtc'
                             }}
 
 def load_protein_traj(label): 
