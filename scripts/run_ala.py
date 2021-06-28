@@ -70,8 +70,8 @@ def run_cv(params):
     mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'])
     
     frames = frames[:ndata]
-    if cg_coord:
-        cg_coord == cg_coord[:ndata]
+    if cg_coord is not None:
+        cg_coord = cg_coord[:ndata]
 
     dataset = build_dataset(mapping,
                         frames, 
@@ -116,9 +116,6 @@ def run_cv(params):
         encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
                                         cg_mp=cg_mp_flag, dir_mp=dir_mp_flag, atomwise_z=atom_decode_flag)
-
-        # encoder = CGEquivariantEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, n_rbf=n_rbf, cutoff=atom_cutoff)
-        # decoder = CGEquivariantDecoder(n_basis, n_rbf, cg_cutoff, n_conv=dec_nconv)
         
         model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis,
                             atomwise_z=atom_decode_flag).to(device)
