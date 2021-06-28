@@ -13,7 +13,22 @@ from sklearn.utils import shuffle
 
 atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7, 'S':16, 'Se': 34}
 
-DATALABELS = {'dipeptide': 
+# DATALABELS = {'dipeptide': 
+#                             {'pdb': 'alanine-dipeptide-nowater.pdb', 
+#                             'xtc': 'alanine-dipeptide-*-250ns-nowater.xtc',
+#                             'n_atoms': 22
+#                              },
+#               'pentapeptide': 
+#                             {'pdb': 'pentapeptide-impl-solv.pdb',
+#                              'xtc': 'pentapeptide-*-500ns-impl-solv.xtc',
+#                              'n_atoms': 94
+#                             }
+#               }
+
+PROTEINFILES = {'chignolin': {'traj_paths': "../data/filtered/e1*/*.xtc", 
+                              'pdb_path': '../data/filtered/filtered.pdb', 
+                              'file_type': 'xtc'}, 
+                'dipeptide': 
                             {'pdb': 'alanine-dipeptide-nowater.pdb', 
                             'xtc': 'alanine-dipeptide-*-250ns-nowater.xtc',
                             'n_atoms': 22
@@ -22,12 +37,7 @@ DATALABELS = {'dipeptide':
                             {'pdb': 'pentapeptide-impl-solv.pdb',
                              'xtc': 'pentapeptide-*-500ns-impl-solv.xtc',
                              'n_atoms': 94
-                            }
-              }
-
-PROTEINFILES = {'chignolin': {'traj_paths': "../data/filtered/e1*/*.xtc", 
-                              'pdb_path': '../data/filtered/filtered.pdb', 
-                              'file_type': 'xtc'}}
+                            }}
 
 def load_protein_traj(label): 
     
@@ -51,33 +61,53 @@ def load_protein_traj(label):
                    
     return traj
 
-def get_Calpha(traj):
-    
-#     protein_index = traj.top.select("protein")
-#     protein_top = traj.top.subset(protein_index)
-    
-#     elements = [atom.element.symbol for atom in protein_top.atoms]
-#     atomic_nums = np.array([atomic_num_dict[el] for el in elements] )
+def get_cg(traj, cg_method='backone'):
 
     atomic_nums, protein_index = get_atomNum(traj)
-
-    # get alpha carbon only 
-    alpha_indices = traj.top.select_atom_indices('alpha')
     
     #ref_xyz = traj.xyz[0]
+
     mappings = []
     skip = 200
-    for i in protein_index:
+    # get alpha carbon only 
 
-        dist = traj.xyz[::skip, [i], ] - traj.xyz[::skip, alpha_indices, :]
-        map_index = np.argmin( np.sqrt( np.sum(dist ** 2, -1)).mean(0) )
+    if cg_method in ['minimal', 'alpha']:
+        indices = traj.top.select_atom_indices(cg_method)
+        for i in protein_index:
+            dist = traj.xyz[:, [i], ] - traj.xyz[:, indices, :]
+            map_index = np.argmin( np.sqrt( np.sum(dist ** 2, -1)).mean(0) )
+            mappings.append(map_index)
 
-        mappings.append(map_index)
+        coord = traj.xyz[:, indices, :] * 10.0
+        mappings = np.array(mappings)
+
+    elif cg_method =='newman':
+        mappings = []
+
+        for frame in traj.xyz[::skip, protein_index] :
+            # use a cutoff of 2.0 to determine molecular graphs 
+            nbr_list = compute_nbr_list(torch.Tensor(frame), 2.0)
+            paritions = get_partition(nbr_list, n_cgs)     
+            mapping = parition2mapping(paritions, n_atoms)
+            mappings.append(mapping)
+
+        mappings = torch.Tensor( np.stack(mappings) )
+        mappings = mappings.mode(0)[0].numpy()
+
+        coord = None
+
+    else:
+        raise ValueError("{} coarse-graining option not available".format(cg_method))
 
 
-    assert len(list(set(mappings))) == len(alpha_indices)
+    # print coarse graining summary 
+
+    print("CG method: {}".format(cg_method))
+    print("Number of CG sites: {}".format(mappings.max() + 1))
+
+    assert len(list(set(mappings))) == len(indices)
     
-    return mappings
+    return mappings, coord
 
 
 def get_atomNum(traj):
@@ -152,23 +182,9 @@ def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
 
     mappings = compute_mapping(atomic_nums, traj,  cutoff,  n_atoms, n_cgs, skip)
 
-    # traj_reshape = shuffle(traj)[::skip].reshape(-1, len(peptide_element),  3)
-
-    # mappings = []
-    # for frame in traj_reshape:
-    #     nbr_list = compute_nbr_list(torch.Tensor(frame), cutoff)
-    #     paritions = get_partition(nbr_list, n_cgs)     
-    #     mapping = parition2mapping(paritions, n_atoms)
-    #     mappings.append(mapping)
-
-    # mappings = torch.Tensor( np.stack(mappings) )
-    # mappings = mappings.mode(0)[0]
-    
     return mappings.long()
 
 def get_random_mapping(n_cg, n_atoms):
-    
-    # todo: need to check generate mapping covers all types 
 
     return torch.LongTensor(n_atoms).random_(0, n_cg) 
 
@@ -214,10 +230,10 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, cg_traj=No
     # Aggregate CG coorinates 
     for i, nxyz in enumerate(nxyz_data):
         xyz = torch.Tensor(nxyz[:, 1:]) 
-        if cg_traj == None:
-            CG_xyz = scatter_mean(xyz, mapping, dim=0)
+        if cg_traj is not None:
+            CG_xyz = torch.Tensor( cg_traj[i] )
         else:
-            CG_xyz = cg_traj[i]
+            CG_xyz = scatter_mean(xyz, mapping, dim=0)
 
         CG_nxyz = torch.cat((torch.LongTensor(list(range(len(CG_xyz))))[..., None], CG_xyz), dim=-1)
         CG_nxyz_data.append(CG_nxyz)

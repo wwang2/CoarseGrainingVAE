@@ -52,47 +52,37 @@ def run_cv(params):
     cg_mp_flag = params['cg_mp']
     atom_decode_flag = params['atom_decode']
 
-    # peptide or protein dataset 
+    # download data from mdshare 
+    mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
+    mdshare.fetch('pentapeptide-*-500ns-impl-solv.xtc', working_directory='../data')
+    mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='../data')
+    mdshare.fetch('alanine-dipeptide-*-250ns-nowater.xtc', working_directory='../data')
 
-    if dataset_label in DATALABELS.keys():
-
-        n_atoms = DATALABELS[params['dataset']]['n_atoms']
-
-        # generate mapping with Girvan Newman
-        if params['randommap']:
-            mapping = get_random_mapping(n_cgs, n_atoms)
-        else:
-            mapping = get_mapping(dataset_label, 2.0, n_atoms, n_cgs)
-
-        # combine directory 
-        atomic_nums, dataset = get_peptide_dataset(atom_cutoff=atom_cutoff,
-                                                    cg_cutoff=cg_cutoff, 
-                                                     label=dataset_label,
-                                                     mapping=mapping,
-                                                     n_frames=ndata, 
-                                                     n_cg=n_cgs)
-        n_atoms = atomic_nums.shape[0]
-
-    elif dataset_label in PROTEINFILES.keys():
+    if dataset_label in PROTEINFILES.keys():
         traj = load_protein_traj(dataset_label)
         atomic_nums, protein_index = get_atomNum(traj)
-        mapping = torch.LongTensor( get_Calpha(traj))
-
-        frames = traj.xyz[:, protein_index, :] * 10.0
-
-        frames = shuffle(frames)
-
-        dataset = build_dataset(mapping,
-                        frames[:ndata], 
-                        atom_cutoff, 
-                        cg_cutoff,
-                        atomic_nums)
-
-        n_atoms = atomic_nums.shape[0]
-        n_cgs = mapping.max().item() + 1
 
     else:
         raise ValueError("data label not recognized")
+
+    # mapping options: alpha carbon, backbone, Girvan-Newman
+    
+    mapping, cg_coord = get_cg(traj, cg_method=params['cg_method'])
+
+    mapping = torch.LongTensor( mapping)
+    
+    frames = traj.xyz[:, protein_index, :] * 10.0 
+    frames, cg_coord = shuffle(frames, cg_coord)
+
+    dataset = build_dataset(mapping,
+                        frames[:ndata], 
+                        atom_cutoff, 
+                        cg_cutoff,
+                        atomic_nums,
+                        cg_traj=cg_coord[:ndata])
+    # get n_atoms 
+    n_atoms = atomic_nums.shape[0]
+    n_cgs = mapping.max().item() + 1
 
     dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff, device=device, undirected=True)
 
@@ -224,6 +214,7 @@ if __name__ == '__main__':
     parser.add_argument("-n_basis", type=int, default=256)
     parser.add_argument("-n_rbf", type=int, default=10)
     parser.add_argument("-activation", type=str, default='swish')
+    parser.add_argument("-cg_method", type=str, default='minimal')
     parser.add_argument("-atom_cutoff", type=float, default=4.0)
     parser.add_argument("-optimizer", type=str, default='adam')
     parser.add_argument("-cg_cutoff", type=float, default=4.0)
