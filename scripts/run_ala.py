@@ -132,6 +132,7 @@ def run_cv(params):
         
         model.train()
 
+
         recon_hist = []
 
         for epoch in range(nepochs):
@@ -198,6 +199,9 @@ def run_cv(params):
         # compute loss and metrics 
         test_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
         unaligned_test_rmsd = np.sqrt(np.power(test_dxyz, 2).mean())
+
+        # dump test rmsd 
+        np.savetxt(os.path.join(split_dir, 'test_rmsd_format{:.4f}.txt'.format(unaligned_test_rmsd)), np.array([unaligned_test_rmsd]))
 
         # reconsturction loss 
         cv_rmsd.append(unaligned_test_rmsd)
