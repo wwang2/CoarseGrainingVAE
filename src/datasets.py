@@ -13,19 +13,11 @@ from sklearn.utils import shuffle
 
 atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7, 'S':16, 'Se': 34}
 
-# DATALABELS = {'dipeptide': 
-#                             {'pdb': 'alanine-dipeptide-nowater.pdb', 
-#                             'xtc': 'alanine-dipeptide-*-250ns-nowater.xtc',
-#                             'n_atoms': 22
-#                              },
-#               'pentapeptide': 
-#                             {'pdb': 'pentapeptide-impl-solv.pdb',
-#                              'xtc': 'pentapeptide-*-500ns-impl-solv.xtc',
-#                              'n_atoms': 94
-#                             }
-#               }
+PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-11441075-no-water-zinc-glueCA/sarscov2-11441075-no-water-zinc-glueCA/sarscov2-11441075-no-water-zinc-glueCA-00*.dcd", 
+                              'pdb_path': '../data/DESRES-Trajectory_sarscov2-11441075-no-water-zinc-glueCA/sarscov2-11441075-no-water-zinc-glueCA/DESRES-Trajectory_sarscov2-11441075-no-water-zinc-glueCA.pdb', 
+                              'file_type': 'dcd'},
 
-PROTEINFILES = {'chignolin': {'traj_paths': "../data/filtered/e1*/*.xtc", 
+                'chignolin': {'traj_paths': "../data/filtered/e1*/*.xtc", 
                               'pdb_path': '../data/filtered/filtered.pdb', 
                               'file_type': 'xtc'}, 
                 'dipeptide': 
@@ -56,8 +48,6 @@ def load_protein_traj(label):
         raise ValueError("file type not recognized")
                 
     traj = md.join(trajs)
-    
-    #protein_index = traj.top.select("protein")
                    
     return traj
 
