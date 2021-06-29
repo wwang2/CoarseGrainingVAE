@@ -12,7 +12,10 @@ parser.add_argument("-id", type=int, default=None)
 parser.add_argument("-dataset", type=str)
 parser.add_argument("-min_cgcutoff", type=float)
 parser.add_argument("-batch_size", type=int)
+parser.add_argument("-ndata", type=int, default=3000)
 parser.add_argument("-n_cgs", type=int)
+parser.add_argument("-cg_method", type=str)
+parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("--dry_run", action='store_true', default=False)
 params = vars(parser.parse_args())
 
@@ -23,9 +26,9 @@ if params['dry_run']:
     ndata = 200
 else:
     token = 'JGTKFUYDJMOKBMDFXICMGNEFBXOOSIPAVSGUWPSMJCVDWYMA'
-    n_epochs = 60 
+    n_epochs = params['n_epochs'] 
     n_obs = 1000
-    ndata = 10000
+    ndata = params['ndata']
 
 create_dir(params['logdir'])
 
@@ -62,16 +65,6 @@ while experiment.progress.observation_count < experiment.observation_budget:
     suggestion = conn.experiments(experiment.id).suggestions().create()
     trial =  suggestion.assignments
 
-    # if trial['dir_mp'] == 'True':
-    #     dir_mp_flag = True 
-    # else:
-    #     dir_mp_flag = True
-
-    # if trial['dir_mp'] == 'True':
-    #     dir_mp_flag = True 
-    # else:
-    #     dir_mp_flag = False
-
     dir_mp_flag = True
 
     trial['logdir'] = os.path.join(params['logdir'], suggestion.id)
@@ -89,6 +82,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['dir_mp'] = dir_mp_flag
     trial['cg_mp'] = False
     trial['atom_decode'] = False
+    trial['cg_method'] = params['cg_method']
 
     cv_mean, cv_std, failed = run_cv(trial)
     if np.isnan(cv_mean):
