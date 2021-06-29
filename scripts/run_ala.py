@@ -85,6 +85,13 @@ def run_cv(params):
 
     dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff, device=device, undirected=True)
 
+    # check CG nbr_list connectivity 
+
+    if not check_CGgraph(dataset):
+        # check GG graph is fully connected 
+        np.savetxt("failed", "failed.txt")
+        return np.NaN, np.NaN, True
+
     # create subdirectory 
     create_dir(working_dir)
         
@@ -201,6 +208,11 @@ def run_cv(params):
 
     # save CV score 
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
+
+    # 
+    if failed:
+        with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
+            print("TRAINING FAILED", file=text_file)
 
     return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), failed
 

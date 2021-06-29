@@ -3,10 +3,25 @@ from tqdm import tqdm
 import torch
 import numpy as np
 from ase import Atoms, io 
+import networkx as nx
 
 def create_dir(name):
     if not os.path.isdir(name):
         os.mkdir(name)   
+
+def check_CGgraph(dataset):
+    frame_idx = np.random.randint(0, len(dataset), 20)
+
+    for idx in frame_idx:
+        a = dataset.props['CG_nbr_list'][idx]
+        adj = [ tuple(pair.tolist()) for pair in a ]
+        G = nx.Graph()
+        G.add_edges_from(adj)
+        connected = nx.is_connected(G)
+        if not connected:
+            print("One of the sampled CG graph is not connected, training failed")
+            return connected
+        return True
 
 def KL(mu, std):
      return -0.5 * torch.sum(1 + torch.log(std.pow(2)) - mu.pow(2) - std.pow(2), dim=-1).mean()
