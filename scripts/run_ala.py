@@ -98,6 +98,9 @@ def run_cv(params):
         
     kf = KFold(n_splits=nsplits)
     cv_rmsd = []
+    cv_sample_rmsd = []
+    cv_sample_valid = []
+
     split_iter = kf.split(list(range(len(dataset))))
 
     for i, (train_index, test_index) in enumerate(split_iter):
@@ -211,18 +214,26 @@ def run_cv(params):
         model = model.to('cpu')
         torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
 
-
         ##### generate rotating movies for visualization #####
         n_w = 3
         n_h = 3
         n_frames = n_w * n_h
         n_ensemble = 24
 
-        idx = torch.LongTensor( np.random.choice(list(range(len(testset))), n_w * n_h) )
+        idx = torch.LongTensor( np.random.choice(list(range(len(testset))), 200) )
         sample_dataset = get_subset_by_indices(idx, trainset)
         sampleloader = DataLoader(sample_dataset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-        ensemble_xyzs = sample_ensemble(sampleloader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample=n_ensemble)
+        ensemble_xyzs, sample_rmsd, sample_valid = sample_ensemble(sampleloader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample=n_ensemble)
+
+        sample_valid = np.array(sample_valid).mean()
+        sample_rmsd = np.array(sample_rmsd).mean()
+
+        cv_sample_valid.append(sample_valid)
+        cv_sample_rmsd.append(unaligned_test_rmsd)
+
+        print("sample RMSD (compared with ref.) : {}".format(sample_rmsd))
+        print("sample validity: {}".format(sample_valid))
 
         ensemble_atoms = xyz_grid_view(torch.Tensor(ensemble_xyzs).reshape(-1, 3),
                       np.concatenate( [atomic_nums] * n_ensemble ), [n_atoms * n_ensemble] * n_frames, n_w, n_h)
@@ -242,14 +253,16 @@ def run_cv(params):
         rotate_cg = rotate_grid(cg_atoms, n_frames, axis='y')
         rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
 
-        io.write(os.path.join(split_dir, 'rotate_data.xyz'), rotate_data)
-        io.write(os.path.join(split_dir, 'rotate_recon.xyz'), rotate_recon)
-        io.write(os.path.join(split_dir, 'rotate_cg.xyz'), rotate_cg)
-        io.write(os.path.join(split_dir, 'rotate_ensemble.xyz'), rotate_ensemble)
+        io.write(os.path.join(split_dir, 'rotate_test_data.xyz'), rotate_data)
+        io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
+        io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
+        io.write(os.path.join(split_dir, 'rotate_test_ensemble.xyz'), rotate_ensemble)
 
         #########################################################
 
-    # save CV score 
+    # save test score 
+    scores = np.vstack([ np.array(cv_rmsd),  np.array(cv_sample_valid), np.array(cv_sample_rmsd) ])
+
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
 
     # 
