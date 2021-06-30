@@ -19,7 +19,7 @@ def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_size):
 
     grid_centers = torch.stack(grid_centers)
 
-    xyzs = torch.split(xyzs.detach().cpu(), num_atoms)
+    xyzs = torch.split(xyzs.detach().cpu()[:np.sum(num_atoms)], num_atoms)
     xyzs_list = []
 
     for grid, xyz in zip(grid_centers, xyzs):
