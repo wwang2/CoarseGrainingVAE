@@ -10,6 +10,7 @@ from model import *
 from conv import * 
 from datasets import * 
 from utils import * 
+from visualization import xyz_grid_view, rotate_grid
 #from plots import *
 from sampling import * 
 import torch
@@ -187,7 +188,7 @@ def run_cv(params):
 
         # sample geometries 
         try:
-            test_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+            test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
         except:
             failed = True 
 
@@ -210,6 +211,44 @@ def run_cv(params):
         model = model.to('cpu')
         torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
 
+
+        ##### generate rotating movies for visualization #####
+        n_w = 3
+        n_h = 3
+        n_frames = n_w * n_h
+        n_ensemble = 24
+
+        idx = torch.LongTensor( np.random.choice(list(range(len(testset))), n_w * n_h) )
+        sample_dataset = get_subset_by_indices(idx, trainset)
+        sampleloader = DataLoader(sample_dataset, batch_size=1, collate_fn=CG_collate, shuffle=False)
+
+        ensemble_xyzs = sample_ensemble(sampleloader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample=n_ensemble)
+
+        ensemble_atoms = xyz_grid_view(torch.Tensor(ensemble_xyzs).reshape(-1, 3),
+                      np.concatenate( [atomic_nums] * n_ensemble ), [n_atoms * n_ensemble] * n_frames, n_w, n_h)
+
+        data_atoms = xyz_grid_view(torch.Tensor(test_true_xyzs).reshape(-1, 3),
+                      atomic_nums, [n_atoms] * n_frames, n_w, n_h)
+
+        recon_atoms = xyz_grid_view(torch.Tensor(test_recon_xyzs).reshape(-1, 3),
+                      atomic_nums, [n_atoms] * n_frames, n_w, n_h)
+
+        cg_atoms = xyz_grid_view(torch.Tensor(test_cg_xyzs).reshape(-1, 3),
+                      np.ones(n_cgs) * 6, [n_cgs] * n_frames, n_w, n_h)
+
+
+        rotate_data = rotate_grid(data_atoms, n_frames, axis='y')
+        rotate_recon = rotate_grid(recon_atoms, n_frames, axis='y')
+        rotate_cg = rotate_grid(cg_atoms, n_frames, axis='y')
+        rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
+
+        io.write(os.path.join(split_dir, 'rotate_data.xyz'), rotate_data)
+        io.write(os.path.join(split_dir, 'rotate_recon.xyz'), rotate_recon)
+        io.write(os.path.join(split_dir, 'rotate_cg.xyz'), rotate_cg)
+        io.write(os.path.join(split_dir, 'rotate_ensemble.xyz'), rotate_ensemble)
+
+        #########################################################
+
     # save CV score 
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
 
@@ -219,6 +258,7 @@ def run_cv(params):
             print("TRAINING FAILED", file=text_file)
 
     return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), failed
+
 
 if __name__ == '__main__':
 
