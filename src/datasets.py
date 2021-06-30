@@ -35,7 +35,6 @@ def load_protein_traj(label):
     
     traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:100]
     pdb_file = PROTEINFILES[label]['pdb_path']
-    
     file_type = PROTEINFILES[label]['file_type']
     
     if file_type == 'xtc':
@@ -45,7 +44,7 @@ def load_protein_traj(label):
         trajs = [md.load_dcd(file,
                     top=pdb_file) for file in traj_files]
     else:
-        raise ValueError("file type not recognized")
+        raise ValueError("file type {} not recognized".format(file_type))
                 
     traj = md.join(trajs)
                    
@@ -66,7 +65,7 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None):
 
         indices = traj.top.select_atom_indices(cg_method)
         for i in protein_index:
-            dist = traj.xyz[:, [i], ] - traj.xyz[:, indices, :]
+            dist = traj.xyz[::skip, [i], ] - traj.xyz[::skip, indices, :]
             map_index = np.argmin( np.sqrt( np.sum(dist ** 2, -1)).mean(0) )
             mappings.append(map_index)
 
