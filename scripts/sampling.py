@@ -29,8 +29,8 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
     trajs = []
 
     for i in range(n_batch):
-        S_I = torch.normal(mu, sigma).to(cg_xyz.device)
-        xyz_recon = model.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
+        H = torch.normal(mu, sigma).to(cg_xyz.device)
+        xyz_recon = model.decoder(cg_xyz, CG_nbr_list, H, H, mapping, num_CGs)
         sample_xyzs.append(xyz_recon.detach().cpu())
         atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_recon.detach().cpu().numpy())
         trajs.append(atoms)
@@ -40,18 +40,36 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
     z = np.concatenate( [atomic_nums] * n_batch )
     atoms = Atoms(numbers=z, positions=sample_xyzs)
     
-    # compute dihedral angle 
-    io.write('tmp.xyz', trajs)
+    # # compute dihedral angle 
+    # io.write('tmp.xyz', trajs)
 
-    pdb = mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='data')
-    feat = pyemma.coordinates.featurizer(pdb)
-    feat.add_backbone_torsions() 
-    data = pyemma.coordinates.load('tmp.xyz', features=feat)
+    # pdb = mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='data')
+    # feat = pyemma.coordinates.featurizer(pdb)
+    # feat.add_backbone_torsions() 
+    # data = pyemma.coordinates.load('tmp.xyz', features=feat)
     
     
-    return atoms, data
+    return atoms #, data
 
-def sample(loader, mu, sigma, device, model, atomic_nums, n_cg, atomwise_z=False):
+
+def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample):
+    '''
+    conditional sampling based on CG geometry, only works for batch_size = 1
+    '''
+
+    sample_xyz_list = []
+    n_sample = n_sample
+    n_atoms = len(atomic_nums)
+    for batch in loader:    
+        sample_atoms = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device)
+        sample_xyz_list.append(sample_atoms.get_positions())
+
+    sample_xyzs = np.vstack(sample_xyz_list).reshape(-1, n_sample * n_atoms, 3)
+    
+    return sample_xyzs
+
+
+def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False):
 
     model = model.to(device)
 
@@ -64,7 +82,7 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cg, atomwise_z=False
     if atomwise_z:
         n_z = len(atomic_nums)
     else:
-        n_z = n_cg
+        n_z = n_cgs
 
     tqdm_data = tqdm(loader, position=0, leave=True)    
 
