@@ -1,0 +1,4 @@
+name: CGVAE_env
+dependencies:
+  - python=3.7
+  - xyz2mol git+git@github.com:wwang2/xyz2mol.git
