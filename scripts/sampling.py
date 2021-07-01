@@ -55,7 +55,7 @@ def sample_normal(mu, sigma):
     z= eps.mul(sigma).add_(mu)
     return z 
 
-def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
+def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_eval=True):
 
     # TODO: included batched sampling 
     model = model.to(device)
@@ -83,10 +83,13 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
     ensemble_atoms = Atoms(numbers=z, positions=sample_xyzs)
 
     # evaluate sample qualities 
-    rmsds, valid_ratio, valid_hh_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
-    
-    return ensemble_atoms, rmsds, valid_ratio, valid_hh_ratio
 
+    if graph_eval:
+        rmsds, valid_ratio, valid_hh_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
+        return ensemble_atoms, rmsds, valid_ratio, valid_hh_ratio
+    
+    else:
+        return ensemble_atoms, None, None, None
 
 def count_valid_smiles(true_smiles, inferred_smiles):
 
@@ -117,7 +120,7 @@ def eval_sample_qualities(ref_atoms, atoms_list):
 
     return rmsds, valid_ratio, valid_hh_ratio
 
-def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample):
+def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample, graph_eval=True):
     '''
     conditional sampling based on CG geometry, only works for batch_size = 1
     '''
@@ -131,7 +134,7 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     sample_hh_valid = []
 
     for batch in loader:    
-        sample_atoms, rmsds, valid_ratio, valid_hh_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device)
+        sample_atoms, rmsds, valid_ratio, valid_hh_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval)
         sample_xyz_list.append(sample_atoms.get_positions())
 
         # record sampling validity/diversity 
@@ -140,9 +143,12 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         sample_hh_valid.append(valid_hh_ratio)
 
     sample_xyzs = np.vstack(sample_xyz_list).reshape(-1, n_sample * n_atoms, 3)
-    all_rmsds = np.concatenate(sample_rmsd) # list of valid structure rmsds 
 
-    return sample_xyzs, all_rmsds, sample_valid, sample_hh_valid
+    if graph_eval:
+        all_rmsds = np.concatenate(sample_rmsd) # list of valid structure rmsds 
+        return sample_xyzs, all_rmsds, sample_valid, sample_hh_valid
+    else:
+        return sample_xyzs, None, None, None
 
 
 def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False):
