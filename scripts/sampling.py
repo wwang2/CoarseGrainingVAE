@@ -25,8 +25,7 @@ def infer_smiles_from_geoms(atoms_list, ignoreHH=True):
         try:
             mol = ase2mol(atoms, ignoreHH=ignoreHH)
             mol = Chem.rdmolops.RemoveHs(mol)
-            inferred_smiles.append(canonicalize_smiles(mol))
-
+            inferred_smiles.append(xyz2mol.canonicalize_smiles(mol))
         except:
             inferred_smiles.append("invalid")
         
@@ -41,7 +40,7 @@ def compute_rmsd(atoms_list, ref_atoms, valid_ids) :
         unaligned_test_rmsd = np.sqrt(np.power(test_dxyz, 2).mean())
         
         if i in valid_ids:
-            rmsd += unaligned_test_rmsd.tolist()
+            rmsd.append(unaligned_test_rmsd)
     
     return np.array(rmsd)#.mean()
 
@@ -107,6 +106,8 @@ def eval_sample_qualities(ref_atoms, atoms_list):
 
     infer_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=True)
     infer_hh_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=False)
+
+    #import ipdb; ipdb.set_trace()
 
     # infer recon smiles 
     valid_ids, valid_ratio = count_valid_smiles(ref_smiles, infer_smiles)
