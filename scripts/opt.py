@@ -13,6 +13,7 @@ parser.add_argument("-dataset", type=str)
 parser.add_argument("-min_cgcutoff", type=float)
 parser.add_argument("-batch_size", type=int)
 parser.add_argument("-ndata", type=int, default=3000)
+parser.add_argument("-nevals", type=int, default=24)
 parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-cg_method", type=str)
 parser.add_argument("-n_epochs", type=int, default=60)
@@ -24,11 +25,13 @@ if params['dry_run']:
     n_epochs = 2
     n_obs = 2
     ndata = 200
+    nevals = 24
 else:
     token = 'JGTKFUYDJMOKBMDFXICMGNEFBXOOSIPAVSGUWPSMJCVDWYMA'
     n_epochs = params['n_epochs'] 
     n_obs = 1000
     ndata = params['ndata']
+    nevals = params['nevals']
 
 create_dir(params['logdir'])
 

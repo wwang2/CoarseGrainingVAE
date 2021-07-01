@@ -52,6 +52,7 @@ def run_cv(params):
     # dec_type = params['dec_type']
     cg_mp_flag = params['cg_mp']
     atom_decode_flag = params['atom_decode']
+    nevals = params['nevals']
 
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
@@ -294,6 +295,7 @@ if __name__ == '__main__':
     parser.add_argument("-nepochs", type=int, default=2)
     parser.add_argument("-ndata", type=int, default=200)
     parser.add_argument("-nsamples", type=int, default=200)
+    parser.add_argument("-nevals", type=int, default=36)
     parser.add_argument("-beta", type=float, default=0.001)
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
