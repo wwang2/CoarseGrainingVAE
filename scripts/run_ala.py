@@ -220,17 +220,17 @@ def run_cv(params):
         n_frames = n_w * n_h
         n_ensemble = 24
 
-        idx = torch.LongTensor( np.random.choice(list(range(len(testset))), 200) )
+        idx = torch.LongTensor( np.random.choice(list(range(len(testset))), 24) )
         sample_dataset = get_subset_by_indices(idx, trainset)
         sampleloader = DataLoader(sample_dataset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-        ensemble_xyzs, sample_rmsd, sample_valid = sample_ensemble(sampleloader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample=n_ensemble)
+        ensemble_xyzs, sample_rmsds, sample_valid = sample_ensemble(sampleloader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample=n_ensemble)
 
         sample_valid = np.array(sample_valid).mean()
-        sample_rmsd = np.array(sample_rmsd).mean()
+        sample_rmsd = np.array(sample_rmsds).mean()
 
         cv_sample_valid.append(sample_valid)
-        cv_sample_rmsd.append(unaligned_test_rmsd)
+        cv_sample_rmsd.append(sample_rmsd)
 
         print("sample RMSD (compared with ref.) : {}".format(sample_rmsd))
         print("sample validity: {}".format(sample_valid))

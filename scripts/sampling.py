@@ -22,7 +22,6 @@ def infer_smiles_from_geoms(atoms_list):
     inferred_smiles = []
 
     for atoms in atoms_list:
-
         try:
             mol = ase2mol(atoms, ignoreHH=True)
             mol = Chem.rdmolops.RemoveHs(mol)
@@ -82,13 +81,13 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
     infer_smiles = infer_smiles_from_geoms(recon_atoms_list)
 
     # infer recon smiles 
-    valid = 0
-    for smiles in infer_smiles:
+    valid_ids = []
+    for idx, smiles in enumerate(infer_smiles):
         if smiles == ref_smiles:
-            valid += 1
+            valid_ids.append(idx)
             
-    valid_ratio = valid/len(infer_smiles)
-    mean_rmsd = compute_rmsd(recon_atoms_list, ref_atoms)
+    valid_ratio = len(valid_ids)/len(infer_smiles)
+    mean_rmsds = compute_rmsd(recon_atoms_list, ref_atoms)
 
     # compute sample diversity 
     sample_xyzs = torch.cat(sample_xyzs).detach().cpu().numpy()
@@ -96,16 +95,7 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
     z = np.concatenate( [atomic_nums] * n_batch )
     atoms = Atoms(numbers=z, positions=sample_xyzs)
     
-    # # compute dihedral angle 
-    # io.write('tmp.xyz', trajs)
-
-    # pdb = mdshare.fetch('alanine-dipeptide-nowater.pdb', working_directory='data')
-    # feat = pyemma.coordinates.featurizer(pdb)
-    # feat.add_backbone_torsions() 
-    # data = pyemma.coordinates.load('tmp.xyz', features=feat)
-    
-    
-    return atoms, mean_rmsd, valid_ratio
+    return atoms, mean_rmsds, valid_ids, valid_ratio
 
 
 def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample):
@@ -121,7 +111,7 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     sample_valid = []
 
     for batch in loader:    
-        sample_atoms, mean_rmsd, valid_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device)
+        sample_atoms, mean_rmsd, valid_ids, valid_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device)
         sample_xyz_list.append(sample_atoms.get_positions())
 
         # record sampling validity/diversity 
@@ -129,8 +119,10 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         sample_valid.append(valid_ratio)
 
     sample_xyzs = np.vstack(sample_xyz_list).reshape(-1, n_sample * n_atoms, 3)
-    
-    return sample_xyzs, sample_rmsd, sample_valid
+
+    valid_ids = np.array(valid_ids).astype(int)
+
+    return sample_xyzs, np.array(sample_rmsd)[valid_ids], sample_valid
 
 
 def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False):
