@@ -17,13 +17,13 @@ def ase2mol(atoms, ignoreHH):
         
     return mol[0]
 
-def infer_smiles_from_geoms(atoms_list):
+def infer_smiles_from_geoms(atoms_list, ignoreHH=True):
 
     inferred_smiles = []
 
     for atoms in atoms_list:
         try:
-            mol = ase2mol(atoms, ignoreHH=True)
+            mol = ase2mol(atoms, ignoreHH=ignoreHH)
             mol = Chem.rdmolops.RemoveHs(mol)
             inferred_smiles.append(canonicalize_smiles(mol))
 
@@ -33,15 +33,17 @@ def infer_smiles_from_geoms(atoms_list):
     return inferred_smiles
 
 
-def compute_rmsd(atoms_list, ref_atoms) :
+def compute_rmsd(atoms_list, ref_atoms, valid_ids) :
     rmsd = []
     # todo: need to include alignment 
-    for atoms in atoms_list:
+    for i, atoms in enumerate(atoms_list):
         test_dxyz = (atoms.get_positions() - ref_atoms.get_positions()).reshape(-1)
         unaligned_test_rmsd = np.sqrt(np.power(test_dxyz, 2).mean())
-        rmsd.append(unaligned_test_rmsd)
+        
+        if i in valid_ids:
+            rmsd += unaligned_test_rmsd.tolist()
     
-    return np.array(rmsd).mean()
+    return np.array(rmsd)#.mean()
 
 def batch_to(batch, device):
     gpu_batch = dict()
@@ -75,28 +77,44 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device):
         atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_recon.detach().cpu().numpy())
         recon_atoms_list.append(atoms)
 
-    # get base smiles 
-    ref_mol = ase2mol(ref_atoms, ignoreHH=True)
-    ref_smiles = xyz2mol.canonicalize_smiles(ref_mol)
-    infer_smiles = infer_smiles_from_geoms(recon_atoms_list)
-
-    # infer recon smiles 
-    valid_ids = []
-    for idx, smiles in enumerate(infer_smiles):
-        if smiles == ref_smiles:
-            valid_ids.append(idx)
-            
-    valid_ratio = len(valid_ids)/len(infer_smiles)
-    mean_rmsds = compute_rmsd(recon_atoms_list, ref_atoms)
-
     # compute sample diversity 
     sample_xyzs = torch.cat(sample_xyzs).detach().cpu().numpy()
     
     z = np.concatenate( [atomic_nums] * n_batch )
-    atoms = Atoms(numbers=z, positions=sample_xyzs)
-    
-    return atoms, mean_rmsds, valid_ids, valid_ratio
+    ensemble_atoms = Atoms(numbers=z, positions=sample_xyzs)
 
+    # evaluate sample qualities 
+    rmsds, valid_ratio, valid_hh_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
+    
+    return ensemble_atoms, rmsds, valid_ratio, valid_hh_ratio
+
+
+def count_valid_smiles(true_smiles, inferred_smiles):
+
+    valid_ids = []
+    for idx, smiles in enumerate(inferred_smiles):
+        if smiles == true_smiles:
+            valid_ids.append(idx)  
+    valid_ratio = len(valid_ids)/len(inferred_smiles)
+
+    return valid_ids, valid_ratio
+
+
+def eval_sample_qualities(ref_atoms, atoms_list): 
+    # get base smiles 
+    ref_mol = ase2mol(ref_atoms, ignoreHH=True)
+    ref_smiles = xyz2mol.canonicalize_smiles(ref_mol)
+
+    infer_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=True)
+    infer_hh_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=False)
+
+    # infer recon smiles 
+    valid_ids, valid_ratio = count_valid_smiles(ref_smiles, infer_smiles)
+    valid_hh_ids, valid_hh_ratio = count_valid_smiles(ref_smiles, infer_hh_smiles)
+
+    rmsds = compute_rmsd(atoms_list, ref_atoms, valid_ids)
+
+    return rmsds, valid_ratio, valid_hh_ratio
 
 def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample):
     '''
@@ -109,20 +127,21 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
 
     sample_rmsd = []
     sample_valid = []
+    sample_hh_valid = []
 
     for batch in loader:    
-        sample_atoms, mean_rmsd, valid_ids, valid_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device)
+        sample_atoms, rmsds, valid_ratio, valid_hh_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device)
         sample_xyz_list.append(sample_atoms.get_positions())
 
         # record sampling validity/diversity 
-        sample_rmsd.append(mean_rmsd)
+        sample_rmsd.append(rmsds)
         sample_valid.append(valid_ratio)
+        sample_hh_valid.append(valid_hh_ratio)
 
     sample_xyzs = np.vstack(sample_xyz_list).reshape(-1, n_sample * n_atoms, 3)
+    all_rmsds = np.concatenate(sample_rmsd) # list of valid structure rmsds 
 
-    valid_ids = np.array(valid_ids).astype(int)
-
-    return sample_xyzs, np.array(sample_rmsd)[valid_ids], sample_valid
+    return sample_xyzs, all_rmsds, sample_valid, sample_hh_valid
 
 
 def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False):

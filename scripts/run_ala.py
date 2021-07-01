@@ -101,6 +101,7 @@ def run_cv(params):
     cv_rmsd = []
     cv_sample_rmsd = []
     cv_sample_valid = []
+    cv_sample_hh_valid = []
 
     split_iter = kf.split(list(range(len(dataset))))
 
@@ -206,7 +207,7 @@ def run_cv(params):
         unaligned_test_rmsd = np.sqrt(np.power(test_dxyz, 2).mean())
 
         # dump test rmsd 
-        np.savetxt(os.path.join(split_dir, 'test_rmsd_format{:.4f}.txt'.format(unaligned_test_rmsd)), np.array([unaligned_test_rmsd]))
+        np.savetxt(os.path.join(split_dir, 'test_rmsd{:.4f}.txt'.format(unaligned_test_rmsd)), np.array([unaligned_test_rmsd]))
 
         # reconsturction loss 
         cv_rmsd.append(unaligned_test_rmsd)
@@ -225,18 +226,21 @@ def run_cv(params):
         sample_dataset = get_subset_by_indices(idx, trainset)
         sampleloader = DataLoader(sample_dataset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-        ensemble_xyzs, sample_rmsds, sample_valid = sample_ensemble(sampleloader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample=n_ensemble)
+        sample_xyzs, all_rmsds, sample_valid, sample_hh_valid = sample_ensemble(sampleloader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample=n_ensemble)
 
         sample_valid = np.array(sample_valid).mean()
-        sample_rmsd = np.array(sample_rmsds).mean()
+        sample_hh_valid = np.array(sample_hh_valid).mean()
+        mean_rmsd = np.array(all_rmsds).mean()
 
         cv_sample_valid.append(sample_valid)
-        cv_sample_rmsd.append(sample_rmsd)
+        cv_sample_hh_valid.append(sample_hh_valid)
+        cv_sample_rmsd.append(mean_rmsd)
 
-        print("sample RMSD (compared with ref.) : {}".format(sample_rmsd))
-        print("sample validity: {}".format(sample_valid))
+        print("sample RMSD (compared with ref.) : {}".format(mean_rmsd))
+        print("sample validity (heavy atoms): {}".format(sample_valid))
+        print("sample validity (all atoms): {}".format(sample_hh_valid))
 
-        ensemble_atoms = xyz_grid_view(torch.Tensor(ensemble_xyzs).reshape(-1, 3),
+        ensemble_atoms = xyz_grid_view(torch.Tensor(sample_xyzs).reshape(-1, 3),
                       np.concatenate( [atomic_nums] * n_ensemble ), [n_atoms * n_ensemble] * n_frames, n_w, n_h)
 
         data_atoms = xyz_grid_view(torch.Tensor(test_true_xyzs).reshape(-1, 3),
@@ -258,6 +262,9 @@ def run_cv(params):
         io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
         io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
         io.write(os.path.join(split_dir, 'rotate_test_ensemble.xyz'), rotate_ensemble)
+
+        # dump rmsd distributions 
+        np.savetxt(os.path.join(split_dir, 'valid_rmsds.txt'), np.array(all_rmsds))
 
         #########################################################
 

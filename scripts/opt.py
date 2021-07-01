@@ -76,7 +76,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['batch_size'] = params['batch_size']
     trial['nepochs'] = n_epochs
     trial['ndata'] = ndata
-    trial['nsamples'] = 200
+    trial['nsamples'] = 20
     trial['n_cgs'] = params['n_cgs']
     trial['nsplits'] = 3
     trial['randommap'] = False
@@ -102,7 +102,5 @@ while experiment.progress.observation_count < experiment.observation_budget:
           suggestion=suggestion.id,
           failed=failed
         )
-
-
 
     experiment = conn.experiments(experiment.id).fetch()
