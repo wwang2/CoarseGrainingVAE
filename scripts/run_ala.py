@@ -272,6 +272,8 @@ def run_cv(params):
     scores = np.vstack([ np.array(cv_rmsd),  np.array(cv_sample_valid), np.array(cv_sample_rmsd) ])
 
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
+    np.savetxt(os.path.join(working_dir, 'cv_valid.txt'), np.array(cv_sample_valid))
+    np.savetxt(os.path.join(working_dir, 'cv_hh_valid.txt'), np.array(cv_sample_hh_valid))
 
     # 
     if failed:
