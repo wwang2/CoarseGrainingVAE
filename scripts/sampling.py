@@ -7,7 +7,185 @@ from tqdm import tqdm
 from torch_scatter import scatter_mean
 import xyz2mol
 from ase import io
-from rdkit import Chem 
+#from rdkit import Chem 
+
+COVCUTOFFTABLE = {1: 0.23,
+                 2: 0.93,
+                 3: 0.68,
+                 4: 0.35,
+                 5: 0.83,
+                 6: 0.68,
+                 7: 0.68,
+                 8: 0.68,
+                 9: 0.64,
+                 10: 1.12,
+                 11: 0.97,
+                 12: 1.1,
+                 13: 1.35,
+                 14: 1.2,
+                 15: 0.75,
+                 16: 1.02,
+                 17: 0.99,
+                 18: 1.57,
+                 19: 1.33,
+                 20: 0.99,
+                 21: 1.44,
+                 22: 1.47,
+                 23: 1.33,
+                 24: 1.35,
+                 25: 1.35,
+                 26: 1.34,
+                 27: 1.33,
+                 28: 1.5,
+                 29: 1.52,
+                 30: 1.45,
+                 31: 1.22,
+                 32: 1.17,
+                 33: 1.21,
+                 34: 1.22,
+                 35: 1.21,
+                 36: 1.91,
+                 37: 1.47,
+                 38: 1.12,
+                 39: 1.78,
+                 40: 1.56,
+                 41: 1.48,
+                 42: 1.47,
+                 43: 1.35,
+                 44: 1.4,
+                 45: 1.45,
+                 46: 1.5,
+                 47: 1.59,
+                 48: 1.69,
+                 49: 1.63,
+                 50: 1.46,
+                 51: 1.46,
+                 52: 1.47,
+                 53: 1.4,
+                 54: 1.98,
+                 55: 1.67,
+                 56: 1.34,
+                 57: 1.87,
+                 58: 1.83,
+                 59: 1.82,
+                 60: 1.81,
+                 61: 1.8,
+                 62: 1.8,
+                 63: 1.99,
+                 64: 1.79,
+                 65: 1.76,
+                 66: 1.75,
+                 67: 1.74,
+                 68: 1.73,
+                 69: 1.72,
+                 70: 1.94,
+                 71: 1.72,
+                 72: 1.57,
+                 73: 1.43,
+                 74: 1.37,
+                 75: 1.35,
+                 76: 1.37,
+                 77: 1.32,
+                 78: 1.5,
+                 79: 1.5,
+                 80: 1.7,
+                 81: 1.55,
+                 82: 1.54,
+                 83: 1.54,
+                 84: 1.68,
+                 85: 1.7,
+                 86: 2.4,
+                 87: 2.0,
+                 88: 1.9,
+                 89: 1.88,
+                 90: 1.79,
+                 91: 1.61,
+                 92: 1.58,
+                 93: 1.55,
+                 94: 1.53,
+                 95: 1.51,
+                 96: 1.5,
+                 97: 1.5,
+                 98: 1.5,
+                 99: 1.5,
+                 100: 1.5,
+                 101: 1.5,
+                 102: 1.5,
+                 103: 1.5,
+                 104: 1.57,
+                 105: 1.49,
+                 106: 1.43,
+                 107: 1.41}
+
+def compute_bond_cutoff(atoms, scale=1.3):
+    atomic_nums = atoms.get_atomic_numbers()
+    vdw_array = torch.Tensor( [COVCUTOFFTABLE[int(el)] for el in atomic_nums] )
+    
+    cutoff_array = (vdw_array[None, :] + vdw_array[:, None]) * scale 
+    
+    return cutoff_array
+
+def compute_distance_mat(atoms):
+    
+    xyz = torch.Tensor( atoms.get_positions() )
+    dist = (xyz[:, None, :] - xyz[None, :, :]).pow(2).sum(-1).sqrt()
+    
+    return dist 
+
+def dropH(atoms):
+    
+    positions = atoms.get_positions()
+    atomic_nums = atoms.get_atomic_numbers()
+    
+    mask = atomic_nums != 1
+    
+    heavy_pos = positions[mask]
+    heavy_nums = atomic_nums[mask]
+    
+    new_atoms = Atoms(numbers=heavy_nums, positions=heavy_pos)
+    
+    return new_atoms
+
+def compare_graph(ref_atoms, atoms):
+
+    ref_bonds = get_bond_graphs(ref_atoms)
+
+    bonds = get_bond_graphs(atoms)
+
+    diff = (bonds != ref_bonds).sum().item()
+    
+    return diff
+
+def get_bond_graphs(atoms):
+    dist = compute_distance_mat(atoms)
+    cutoff = compute_bond_cutoff(atoms)
+    bond_mat = (dist < cutoff)
+    bond_mat[np.diag_indices(len(atoms))] = 0
+    
+    return bond_mat.to(torch.long)
+
+# compare graphs 
+
+def count_valid_graphs(ref_atoms, atoms_list, heavy_only=True):
+    
+    heavy_ref_atoms = dropH(ref_atoms)
+    
+    valid_ids = []
+    for idx, atoms in enumerate(atoms_list):
+        
+        if heavy_ref_atoms:
+            heavy_atoms = dropH(atoms)
+            if compare_graph(heavy_ref_atoms, heavy_atoms) == 0:
+                valid_ids.append(idx)
+        elif compare_graph(ref_atoms, atoms) == 0:
+                valid_ids.append(idx)
+        
+        
+    valid_ratio = len(valid_ids)/len(atoms_list)
+    
+    
+    return valid_ids, valid_ratio
+
 
 def ase2mol(atoms, ignoreHH):
     
@@ -107,14 +285,15 @@ def eval_sample_qualities(ref_atoms, atoms_list):
     ref_mol = ase2mol(ref_atoms, ignoreHH=True)
     ref_smiles = xyz2mol.canonicalize_smiles(ref_mol)
 
-    infer_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=True)
-    infer_hh_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=False)
+    # infer_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=True)
+    # infer_hh_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=False)
 
-    #import ipdb; ipdb.set_trace()
+    # # infer recon smiles 
+    # valid_ids, valid_ratio = count_valid_smiles(ref_smiles, infer_smiles)
+    # valid_hh_ids, valid_hh_ratio = count_valid_smiles(ref_smiles, infer_hh_smiles)
 
-    # infer recon smiles 
-    valid_ids, valid_ratio = count_valid_smiles(ref_smiles, infer_smiles)
-    valid_hh_ids, valid_hh_ratio = count_valid_smiles(ref_smiles, infer_hh_smiles)
+    valid_ids, valid_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=True)
+    valid_hh_ids, valid_hh_ratio = count_valid_graphs(ref_atoms, atoms_list)
 
     rmsds = compute_rmsd(atoms_list, ref_atoms, valid_ids)
 
