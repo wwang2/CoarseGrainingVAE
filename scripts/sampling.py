@@ -5,7 +5,7 @@ import mdshare
 import pyemma
 from tqdm import tqdm
 from torch_scatter import scatter_mean
-import xyz2mol
+#import xyz2mol
 from ase import io
 #from rdkit import Chem 
 
@@ -293,7 +293,7 @@ def eval_sample_qualities(ref_atoms, atoms_list):
     # valid_hh_ids, valid_hh_ratio = count_valid_smiles(ref_smiles, infer_hh_smiles)
 
     valid_ids, valid_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=True)
-    valid_hh_ids, valid_hh_ratio = count_valid_graphs(ref_atoms, atoms_list)
+    valid_hh_ids, valid_hh_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=False)
 
     rmsds = compute_rmsd(atoms_list, ref_atoms, valid_ids)
 
