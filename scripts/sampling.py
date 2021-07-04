@@ -282,8 +282,8 @@ def count_valid_smiles(true_smiles, inferred_smiles):
 
 def eval_sample_qualities(ref_atoms, atoms_list): 
     # get base smiles 
-    ref_mol = ase2mol(ref_atoms, ignoreHH=True)
-    ref_smiles = xyz2mol.canonicalize_smiles(ref_mol)
+    #ref_mol = ase2mol(ref_atoms, ignoreHH=True)
+    #ref_smiles = xyz2mol.canonicalize_smiles(ref_mol)
 
     # infer_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=True)
     # infer_hh_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=False)
