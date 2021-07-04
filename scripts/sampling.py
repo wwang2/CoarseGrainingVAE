@@ -169,12 +169,12 @@ def get_bond_graphs(atoms):
 def count_valid_graphs(ref_atoms, atoms_list, heavy_only=True):
     
     heavy_ref_atoms = dropH(ref_atoms)
-    heavy_atoms = dropH(atoms)
     
     valid_ids = []
     for idx, atoms in enumerate(atoms_list):
         
         if heavy_only:
+            heavy_atoms = dropH(atoms)
             if compare_graph(heavy_ref_atoms, heavy_atoms) == 0:
                 valid_ids.append(idx)
         else:
