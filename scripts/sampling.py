@@ -249,7 +249,7 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     ref_atoms = Atoms(positions=xyz.cpu().numpy(), numbers=atomic_nums) 
 
     for i in range(n_batch):
-        H = torch.normal(mu, sigma).to(cg_xyz.device)
+        H = sample_normal(mu, sigma)
         xyz_recon = model.decoder(cg_xyz, CG_nbr_list, H, H, mapping, num_CGs)
         sample_xyzs.append(xyz_recon.detach().cpu())
         atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_recon.detach().cpu().numpy())
