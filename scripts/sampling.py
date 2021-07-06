@@ -250,6 +250,7 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
 
     for i in range(n_batch):
         H = sample_normal(mu, sigma)
+        H = H.to(device)
         xyz_recon = model.decoder(cg_xyz, CG_nbr_list, H, H, mapping, num_CGs)
         sample_xyzs.append(xyz_recon.detach().cpu())
         atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_recon.detach().cpu().numpy())
