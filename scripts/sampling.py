@@ -251,10 +251,20 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     for i in range(n_batch):
         H = sample_normal(mu, sigma)
         H = H.to(device)
-        xyz_recon = model.decoder(cg_xyz, CG_nbr_list, H, H, mapping, num_CGs)
-        sample_xyzs.append(xyz_recon.detach().cpu())
-        atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_recon.detach().cpu().numpy())
+        xyz_decode = model.decoder(cg_xyz, CG_nbr_list, H, H, mapping, num_CGs)
+        sample_xyzs.append(xyz_decode.detach().cpu())
+        atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_decode.detach().cpu().numpy())
         recon_atoms_list.append(atoms)
+
+    # save origina ldata 
+    data_atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz.detach().cpu().numpy())
+
+    # save cg atoms 
+    cg_atoms = Atoms(numbers=[6] * len(cg_xyz), positions=cg_xyz.detach().cpu().numpy())
+
+    # save reconstructed atoms 
+    S_mu, S_sigma, xyz, xyz_recon = model(batch)
+    recon_atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_recon.detach().cpu().numpy())
 
     # compute sample diversity 
     sample_xyzs = torch.cat(sample_xyzs).detach().cpu().numpy()
@@ -266,10 +276,10 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
 
     if graph_eval:
         rmsds, valid_ratio, valid_hh_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
-        return ensemble_atoms, rmsds, valid_ratio, valid_hh_ratio
+        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, rmsds, valid_ratio, valid_hh_ratio
     
     else:
-        return ensemble_atoms, None, None, None
+        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, None, None, None
 
 def count_valid_smiles(true_smiles, inferred_smiles):
 
@@ -283,16 +293,6 @@ def count_valid_smiles(true_smiles, inferred_smiles):
 
 
 def eval_sample_qualities(ref_atoms, atoms_list): 
-    # get base smiles 
-    #ref_mol = ase2mol(ref_atoms, ignoreHH=True)
-    #ref_smiles = xyz2mol.canonicalize_smiles(ref_mol)
-
-    # infer_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=True)
-    # infer_hh_smiles = infer_smiles_from_geoms(atoms_list, ignoreHH=False)
-
-    # # infer recon smiles 
-    # valid_ids, valid_ratio = count_valid_smiles(ref_smiles, infer_smiles)
-    # valid_hh_ids, valid_hh_ratio = count_valid_smiles(ref_smiles, infer_hh_smiles)
 
     valid_ids, valid_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=True)
     valid_hh_ids, valid_hh_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=False)
@@ -307,6 +307,10 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     '''
 
     sample_xyz_list = []
+    recon_xyz_list = []
+    cg_xyz_list = []
+    data_xyz_list = []
+
     n_sample = n_sample
     n_atoms = len(atomic_nums)
 
@@ -315,8 +319,11 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     sample_hh_valid = []
 
     for batch in loader:    
-        sample_atoms, rmsds, valid_ratio, valid_hh_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval)
+        sample_atoms, data_atoms, recon_atoms, cg_atoms, rmsds,  valid_ratio, valid_hh_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval)
         sample_xyz_list.append(sample_atoms.get_positions())
+        data_xyz_list.append(data_atoms.get_positions())
+        cg_xyz_list.append(cg_atoms.get_positions())
+        recon_xyz_list.append(recon_atoms.get_positions())
 
         # record sampling validity/diversity 
         sample_rmsd.append(rmsds)
@@ -324,12 +331,15 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         sample_hh_valid.append(valid_hh_ratio)
 
     sample_xyzs = np.vstack(sample_xyz_list).reshape(-1, n_sample * n_atoms, 3)
+    data_xyzs = np.vstack(data_xyz_list).reshape(-1, n_atoms, 3)
+    cg_xyzs = np.vstack(cg_xyz_list).reshape(-1, n_cgs, 3)
+    recon_xyzs = np.vstack(recon_xyz_list).reshape(-1, n_atoms, 3)
 
     if graph_eval:
         all_rmsds = np.concatenate(sample_rmsd) # list of valid structure rmsds 
-        return sample_xyzs, all_rmsds, sample_valid, sample_hh_valid
+        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid
     else:
-        return sample_xyzs, None, None, None
+        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, None, None, None
 
 
 def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False):

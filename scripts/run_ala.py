@@ -226,7 +226,7 @@ def run_cv(params):
         sample_dataset = get_subset_by_indices(idx, trainset)
         sampleloader = DataLoader(sample_dataset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-        sample_xyzs, all_rmsds, sample_valid, sample_hh_valid = sample_ensemble(sampleloader, mu, sigma, device, 
+        sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid = sample_ensemble(sampleloader, mu, sigma, device, 
                                                                                 model, atomic_nums, 
                                                                                 n_cgs, n_sample=n_ensemble,
                                                                                 graph_eval=graph_eval)
@@ -247,13 +247,13 @@ def run_cv(params):
         ensemble_atoms = xyz_grid_view(torch.Tensor(sample_xyzs).reshape(-1, 3),
                       np.concatenate( [atomic_nums] * n_ensemble ), [n_atoms * n_ensemble] * n_frames, n_w, n_h)
 
-        data_atoms = xyz_grid_view(torch.Tensor(test_true_xyzs).reshape(-1, 3),
+        data_atoms = xyz_grid_view(torch.Tensor(data_xyzs).reshape(-1, 3),
                       atomic_nums, [n_atoms] * n_frames, n_w, n_h)
 
-        recon_atoms = xyz_grid_view(torch.Tensor(test_recon_xyzs).reshape(-1, 3),
+        recon_atoms = xyz_grid_view(torch.Tensor(recon_xyzs).reshape(-1, 3),
                       atomic_nums, [n_atoms] * n_frames, n_w, n_h)
 
-        cg_atoms = xyz_grid_view(torch.Tensor(test_cg_xyzs).reshape(-1, 3),
+        cg_atoms = xyz_grid_view(torch.Tensor(cg_xyzs).reshape(-1, 3),
                       np.ones(n_cgs) * 6, [n_cgs] * n_frames, n_w, n_h)
 
 
