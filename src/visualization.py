@@ -4,14 +4,16 @@ import torch
 import numpy as np 
 from copy import copy, deepcopy
 
-def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_scale=1.5):
+def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_scale=2.0, grid_dim=None):
     
     assert len(num_atoms) == n_w * n_h
 
     ref_xyz = xyzs[:num_atoms[0]]
     ref_xyz = ref_xyz - ref_xyz.mean(0)
     geom_max_dim = ref_xyz.max() - ref_xyz.min()
-    grid_dim = geom_max_dim * grid_scale
+
+    if grid_dim is None:
+        grid_dim = geom_max_dim * grid_scale
 
     x_basis = torch.Tensor([grid_dim, 0.0, 0.0])
     y_basis = torch.Tensor([0.0, grid_dim, 0.0])

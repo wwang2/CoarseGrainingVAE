@@ -244,17 +244,22 @@ def run_cv(params):
             print("sample validity (heavy atoms): {}".format(sample_valid))
             print("sample validity (all atoms): {}".format(sample_hh_valid))
 
+        # compute maxium dimension
+        ref_xyz = data_xyzs[:len(atomic_nums)]
+        ref_xyz = ref_xyz - ref_xyz.mean(0)
+        geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.5
+
         ensemble_atoms = xyz_grid_view(torch.Tensor(sample_xyzs).reshape(-1, 3),
-                      np.concatenate( [atomic_nums] * n_ensemble ), [n_atoms * n_ensemble] * n_frames, n_w, n_h)
+                      np.concatenate( [atomic_nums] * n_ensemble ), [n_atoms * n_ensemble] * n_frames, n_w, n_h, grid_dim=geom_max_dim)
 
         data_atoms = xyz_grid_view(torch.Tensor(data_xyzs).reshape(-1, 3),
-                      atomic_nums, [n_atoms] * n_frames, n_w, n_h)
+                      atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim)
 
         recon_atoms = xyz_grid_view(torch.Tensor(recon_xyzs).reshape(-1, 3),
-                      atomic_nums, [n_atoms] * n_frames, n_w, n_h)
+                      atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim)
 
         cg_atoms = xyz_grid_view(torch.Tensor(cg_xyzs).reshape(-1, 3),
-                      np.ones(n_cgs) * 6, [n_cgs] * n_frames, n_w, n_h)
+                      np.ones(n_cgs) * 6, [n_cgs] * n_frames, n_w, n_h, grid_dim=geom_max_dim)
 
 
         rotate_data = rotate_grid(data_atoms, n_frames, axis='y')
