@@ -1,7 +1,6 @@
 import sys
 sys.path.append("../scripts/")
 sys.path.append("../src/")
-sys.path.append("/home/wwj/Repo/packages/NeuralForceField/")
 
 import os 
 import argparse 
