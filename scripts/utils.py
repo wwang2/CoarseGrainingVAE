@@ -1,4 +1,5 @@
 import os 
+import sys
 from tqdm import tqdm 
 import torch
 import numpy as np
@@ -44,7 +45,7 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='')
         model.train() # yes, still set to train when reconstructing
         mode = '{} valid'.format(looptext)
     
-    tqdm_data = tqdm(loader, position=0,
+    tqdm_data = tqdm(loader, position=0, file=sys.stdout,
                      leave=True, desc='({} epoch #{})'.format(mode, epoch))
     
     for batch in tqdm_data:
