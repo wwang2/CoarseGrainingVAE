@@ -9,6 +9,7 @@ from ase import Atoms
 from ase.neighborlist import neighbor_list
 from torch.utils.data import Dataset as TorchDataset
 from tqdm import tqdm 
+import sys
 
 
 def get_neighbor_list(xyz, device='cpu', cutoff=5, undirected=True):
