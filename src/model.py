@@ -302,20 +302,35 @@ class CGequiVAE(nn.Module):
             S_I = sigma
             
         return S_I
-        
+
+    def CG2ChannelIdx(self, CG_mapping):
+
+        CG2atomChannel = torch.zeros_like(CG_mapping)
+
+        for cg_type in torch.unique(CG_mapping): 
+            cg_filter = CG_mapping == cg_type
+            num_contri_atoms = cg_filter.sum().item()
+            CG2atomChannel[cg_filter] = torch.LongTensor(list(range(num_contri_atoms))).to(CG_mapping.device)
+            
+        return CG2atomChannel.detach()
+            
     def decoder(self, cg_xyz, CG_nbr_list, S_I, s_i, mapping, num_CGs):
         
         cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I, s_i)
 
-        pooled_vector = []
-        v_i_splits = torch.split(cg_v, num_CGs.tolist()) 
+        # pooled_vector = []
+        # v_i_splits = torch.split(cg_v, num_CGs.tolist()) 
 
-        for vec in v_i_splits:
-            pooled_vector.append(vec)
+        # for vec in v_i_splits:
+        #     pooled_vector.append(vec)
 
-        pooled_vector = torch.stack(pooled_vector)
-        xyz_rel = torch.einsum("ji,kin->kjn", self.atomdense.weight, pooled_vector.mean(1)).reshape(-1, 3)
-        #xyz_recon = pooled_vector.mean(1)[:, :self.n_atoms, :].reshape(-1, 3) + cg_xyz[mapping]
+        # pooled_vector = torch.stack(pooled_vector)
+        # xyz_rel = torch.einsum("ji,kin->kjn", self.atomdense.weight, pooled_vector.mean(1)).reshape(-1, 3)
+        # #xyz_recon = pooled_vector.mean(1)[:, :self.n_atoms, :].reshape(-1, 3) + cg_xyz[mapping]
+        # xyz_recon = xyz_rel + cg_xyz[mapping]
+
+        CG2atomChannel = self.CG2ChannelIdx(mapping)
+        xyz_rel = cg_v[mapping, CG2atomChannel, :]
         xyz_recon = xyz_rel + cg_xyz[mapping]
         
         return xyz_recon
