@@ -332,14 +332,10 @@ class CGequiVAE(nn.Module):
         CG2atomChannel = self.CG2ChannelIdx(mapping)
         xyz_rel = cg_v[mapping, CG2atomChannel, :]
 
-        # recenter each decoded vector 
-        for cg_type in torch.unique(mapping): 
-            cg_filter = mapping == cg_type
 
-            decode_coord = xyz_rel[cg_filter]
-            offsets = decode_coord.mean(0)
-            xyz_rel[cg_filter] = decode_coord - offsets
-            
+        decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
+        xyz_rel = xyz_rel - decode_offsets[mapping]
+
         xyz_recon = xyz_rel + cg_xyz[mapping]
         
         return xyz_recon
