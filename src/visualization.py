@@ -40,7 +40,7 @@ def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_scale=2.0, grid_d
     
     return atoms 
 
-def rotate_grid(allatoms, nsamples, axis='x'):
+def rotate_grid(allatoms, nsamples, axis='x', skip=3):
 
     rotate_trajs = []
     start_frame = allatoms.positions.reshape(nsamples, -1, 3)
@@ -49,7 +49,7 @@ def rotate_grid(allatoms, nsamples, axis='x'):
     for deg in np.linspace(0, 360, 360):
         rotate_frames = []
 
-        for geom in start_frame:
+        for geom in start_frame[::skip]:
             atoms = Atoms(positions=geom, numbers=atomic_nums)
             atoms.rotate(deg, axis, center='COM')    
             rotate_frames.append(atoms.positions)
