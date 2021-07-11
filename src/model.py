@@ -318,21 +318,10 @@ class CGequiVAE(nn.Module):
         
         cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I, s_i)
 
-        # pooled_vector = []
-        # v_i_splits = torch.split(cg_v, num_CGs.tolist()) 
-
-        # for vec in v_i_splits:
-        #     pooled_vector.append(vec)
-
-        # pooled_vector = torch.stack(pooled_vector)
-        # xyz_rel = torch.einsum("ji,kin->kjn", self.atomdense.weight, pooled_vector.mean(1)).reshape(-1, 3)
-        # #xyz_recon = pooled_vector.mean(1)[:, :self.n_atoms, :].reshape(-1, 3) + cg_xyz[mapping]
-        # xyz_recon = xyz_rel + cg_xyz[mapping]
-
         CG2atomChannel = self.CG2ChannelIdx(mapping)
         xyz_rel = cg_v[mapping, CG2atomChannel, :]
 
-
+        # this constraint is only true for geometrical mean
         decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
         xyz_rel = xyz_rel - decode_offsets[mapping]
 
