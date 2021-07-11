@@ -51,7 +51,7 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='')
     for batch in tqdm_data:
 
         batch = batch_to(batch, device)
-        S_mu, S_sigma, xyz, xyz_recon = model(batch)
+        S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
         
         # loss
         loss_kl = KL(S_mu, S_sigma)

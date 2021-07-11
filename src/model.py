@@ -263,7 +263,9 @@ class EquiEncoder(nn.Module):
 class CGequiVAE(nn.Module):
     def __init__(self, encoder, equivaraintconv, 
                      atom_munet, atom_sigmanet,
-                    n_atoms, n_cgs, feature_dim, atomwise_z=False):
+                    n_atoms, n_cgs, feature_dim,
+                    prior_net=None, 
+                    atomwise_z=False):
         nn.Module.__init__(self)
         self.encoder = encoder
         self.equivaraintconv = equivaraintconv
@@ -274,6 +276,7 @@ class CGequiVAE(nn.Module):
         self.n_cgs = n_cgs
         self.atomdense = nn.Linear(feature_dim, n_atoms)
         self.atomwise_z = atomwise_z
+        self.prior_net = prior_net
         
     def get_inputs(self, batch):
 
@@ -334,6 +337,12 @@ class CGequiVAE(nn.Module):
         atomic_nums, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
         
         S_I, s_i = self.encoder(atomic_nums, xyz, cg_xyz, mapping, nbr_list, CG_nbr_list)
+
+        # get prior based on CG conv 
+        if self.prior_net:
+            H_prior_mu, H_prior_sigma = self.prior_net(cg_type, cg_xyz, CG_nbr_list)
+        else:
+            H_prior_mu, H_prior_sigma = None, None 
         
         if self.atomwise_z:
             z = s_i 
@@ -353,6 +362,6 @@ class CGequiVAE(nn.Module):
         
         xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, s_i, mapping, num_CGs)
         
-        return mu, sigma, xyz, xyz_recon
+        return mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
     
