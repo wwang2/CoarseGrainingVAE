@@ -42,7 +42,6 @@ def run_cv(params):
     nsamples = params['nsamples']
     nepochs = params['nepochs']
     lr = params['lr']
-    #n_atoms = DATALABELS[params['dataset']]['n_atoms']
     activation = params['activation']
     optim = optim_dict[params['optimizer']]
     dataset_label = params['dataset']
@@ -129,6 +128,10 @@ def run_cv(params):
         encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
                                         cg_mp=cg_mp_flag, dir_mp=dir_mp_flag, atomwise_z=atom_decode_flag)
+
+        # define prior 
+
+
         
         model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis,
                             atomwise_z=atom_decode_flag).to(device)
@@ -249,8 +252,15 @@ def run_cv(params):
         ref_xyz = ref_xyz - ref_xyz.mean(0)
         geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.5
 
-        ensemble_atoms = xyz_grid_view(torch.Tensor(sample_xyzs).reshape(-1, 3),
-                      np.concatenate( [atomic_nums] * n_ensemble ), [n_atoms * n_ensemble] * n_frames, n_w, n_h, grid_dim=geom_max_dim)
+        # loop over all the ensembles and dump individual samples
+        for sample_id in range(n_ensemble): 
+            snapshot = sample_xyzs.reshape(-1, n_ensemble, n_atoms, 3)[:, sample_id, :, :]
+            ensemble_atoms = xyz_grid_view(torch.Tensor(snapshot).reshape(-1, 3),
+                            atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim)
+
+            rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
+
+            io.write(os.path.join(split_dir, 'rotate_test_ensemble_{}.xyz'.format(sample_id)), rotate_ensemble)
 
         data_atoms = xyz_grid_view(torch.Tensor(data_xyzs).reshape(-1, 3),
                       atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim)
@@ -265,12 +275,12 @@ def run_cv(params):
         rotate_data = rotate_grid(data_atoms, n_frames, axis='y')
         rotate_recon = rotate_grid(recon_atoms, n_frames, axis='y')
         rotate_cg = rotate_grid(cg_atoms, n_frames, axis='y')
-        rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
+        #rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
 
         io.write(os.path.join(split_dir, 'rotate_test_data.xyz'), rotate_data)
         io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
         io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
-        io.write(os.path.join(split_dir, 'rotate_test_ensemble.xyz'), rotate_ensemble)
+        #io.write(os.path.join(split_dir, 'rotate_test_ensemble.xyz'), rotate_ensemble)
 
         # dump rmsd distributions 
         if graph_eval:
@@ -285,7 +295,6 @@ def run_cv(params):
         np.savetxt(os.path.join(working_dir, 'cv_valid.txt'), np.array(cv_sample_valid))
         np.savetxt(os.path.join(working_dir, 'cv_hh_valid.txt'), np.array(cv_sample_hh_valid))
 
-    # 
     if failed:
         with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
             print("TRAINING FAILED", file=text_file)
