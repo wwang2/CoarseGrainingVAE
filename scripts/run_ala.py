@@ -130,10 +130,12 @@ def run_cv(params):
                                         cg_mp=cg_mp_flag, dir_mp=dir_mp_flag, atomwise_z=atom_decode_flag)
 
         # define prior 
-
+        cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
+                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
+                                         dir_mp=dir_mp_flag)
 
         
-        model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis,
+        model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
                             atomwise_z=atom_decode_flag).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)

@@ -260,6 +260,76 @@ class EquiEncoder(nn.Module):
         return H, h
 
 
+class CGprior(nn.Module):
+    
+    def __init__(self,
+             n_conv,
+             n_atom_basis,
+             n_rbf,
+             activation,
+             cutoff,
+             dir_mp=False):
+        super().__init__()
+
+        self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
+        # distance transform
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                  cutoff=cutoff,
+                                  feat_dim=n_atom_basis,
+                                  dropout=0.0)
+
+        self.message_blocks = nn.ModuleList(
+            [EquiMessageBlock(feat_dim=n_atom_basis,
+                          activation=activation,
+                          n_rbf=n_rbf,
+                          cutoff=cutoff,
+                          dropout=0.0)
+             for _ in range(n_conv)]
+        )
+
+        self.update_blocks = nn.ModuleList(
+            [UpdateBlock(feat_dim=n_atom_basis,
+                         activation=activation,
+                         dropout=0.0)
+             for _ in range(n_conv)]
+        )
+
+        self.mu = nn.Sequential(nn.Linear(n_atom_basis, n_atom_basis), nn.Tanh(), nn.Linear(n_atom_basis, n_atom_basis))
+        self.sigma = nn.Sequential(nn.Linear(n_atom_basis, n_atom_basis), nn.Tanh(), nn.Linear(n_atom_basis, n_atom_basis))
+        
+        self.n_conv = n_conv
+        self.dir_mp = dir_mp
+    
+    def forward(self, cg_z, cg_xyz,  cg_nbr_list):
+        
+        # atomic embedding
+        if not self.dir_mp:
+            nbr_list, _ = make_directed(cg_nbr_list)
+
+        h = self.atom_embed(cg_z.long())
+        v = torch.zeros(h.shape[0], h.shape[1], 3).to(h.device)
+
+        r_ij = cg_xyz[cg_nbr_list[:, 1]] - cg_xyz[cg_nbr_list[:, 0]]
+
+        for i in range(self.n_conv):
+            ds_message, dv_message = self.message_blocks[i](s_j=h,
+                                                   v_j=v,
+                                                   r_ij=r_ij,
+                                                   nbrs=cg_nbr_list)
+            h = h + ds_message
+            v = v + dv_message
+
+            # update block
+            ds_update, dv_update = self.update_blocks[i](s_i=h, v_i=v)
+            h = h + ds_update # atom message 
+            v = v + dv_update
+
+        H_mu = self.mu(h)
+        H_sigma = self.sigma(h)
+
+        return H_mu, H_sigma
+
+
 class CGequiVAE(nn.Module):
     def __init__(self, encoder, equivaraintconv, 
                      atom_munet, atom_sigmanet,
@@ -295,7 +365,7 @@ class CGequiVAE(nn.Module):
         
         num_CGs = batch['num_CGs']
         
-        return z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs
+        return z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs
         
     def reparametrize(self, mu, sigma):
         if self.training:
@@ -334,13 +404,13 @@ class CGequiVAE(nn.Module):
         
     def forward(self, batch):
 
-        atomic_nums, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
+        atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
         
         S_I, s_i = self.encoder(atomic_nums, xyz, cg_xyz, mapping, nbr_list, CG_nbr_list)
 
         # get prior based on CG conv 
         if self.prior_net:
-            H_prior_mu, H_prior_sigma = self.prior_net(cg_type, cg_xyz, CG_nbr_list)
+            H_prior_mu, H_prior_sigma = self.prior_net(cg_z, cg_xyz, CG_nbr_list)
         else:
             H_prior_mu, H_prior_sigma = None, None 
         
