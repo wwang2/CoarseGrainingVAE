@@ -305,12 +305,12 @@ class CGequiVAE(nn.Module):
 
     def CG2ChannelIdx(self, CG_mapping):
 
-        CG2atomChannel = torch.zeros_like(CG_mapping)
+        CG2atomChannel = torch.zeros_like(CG_mapping).to("cpu")
 
         for cg_type in torch.unique(CG_mapping): 
             cg_filter = CG_mapping == cg_type
             num_contri_atoms = cg_filter.sum().item()
-            CG2atomChannel[cg_filter] = torch.LongTensor(list(range(num_contri_atoms))).to(CG_mapping.device)
+            CG2atomChannel[cg_filter] = torch.LongTensor(list(range(num_contri_atoms)))#.to(CG_mapping.device)
             
         return CG2atomChannel.detach()
             
@@ -331,6 +331,15 @@ class CGequiVAE(nn.Module):
 
         CG2atomChannel = self.CG2ChannelIdx(mapping)
         xyz_rel = cg_v[mapping, CG2atomChannel, :]
+
+        # recenter each decoded vector 
+        for cg_type in torch.unique(mapping): 
+            cg_filter = mapping == cg_type
+
+            decode_coord = xyz_rel[cg_filter]
+            offsets = decode_coord.mean(0)
+            xyz_rel[cg_filter] = decode_coord - offsets
+            
         xyz_recon = xyz_rel + cg_xyz[mapping]
         
         return xyz_recon
