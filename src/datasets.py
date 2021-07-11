@@ -5,6 +5,7 @@ import itertools
 from data import *
 from model import * 
 import glob 
+import sys
 
 import mdtraj as md
 import mdshare
@@ -153,11 +154,6 @@ def compute_mapping(atomic_nums, traj, cutoff, n_atoms, n_cgs, skip):
     g = traj.top.to_bondgraph()
     paritions = get_partition(g, n_cgs)
     mapping = parition2mapping(paritions, n_atoms)
-    #mappings.append(mapping)
-
-    # mappings = torch.Tensor( np.stack(mappings) )
-    # mappings = mappings.mode(0)[0]
-
 
     return mapping
 
