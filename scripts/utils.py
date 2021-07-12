@@ -20,12 +20,19 @@ def check_CGgraph(dataset):
         G.add_edges_from(adj)
         connected = nx.is_connected(G)
         if not connected:
-            print("One of the sampled CG graph is not connected, training failed")
+            print("One of the sampled CG graphs is not connected, training failed")
             return connected
         return True
 
-def KL(mu, std):
-     return -0.5 * torch.sum(1 + torch.log(std.pow(2)) - mu.pow(2) - std.pow(2), dim=-1).mean()
+# def KL(mu, std):
+#      return -0.5 * torch.sum(1 + torch.log(std.pow(2)) - mu.pow(2) - std.pow(2), dim=-1).mean()
+
+def KL(mu1, std1, mu2, std2):
+    if mu2 == None:
+        return -0.5 * torch.sum(1 + torch.log(std.pow(2)) - mu.pow(2) - std.pow(2), dim=-1).mean()
+    else:
+        return 0.5 * ( (std1.pow(2) / std2.pow(2)).sum(-1) + ((mu1 - mu2).pow(2) / std2).sum(-1) + \
+            torch.log(std2.pow(2)).sum(-1) - torch.log(std1.pow(2)).sum(-1) - std1.shape[-1] ).mean()
 
 def batch_to(batch, device):
     gpu_batch = dict()
@@ -52,9 +59,10 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='')
 
         batch = batch_to(batch, device)
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
-        
+
         # loss
-        loss_kl = KL(S_mu, S_sigma)
+        loss_kl = KL(S_mu, S_sigma, H_prior_mu, H_prior_sigma) 
+
         loss_recon = (xyz_recon - xyz).pow(2).mean()
         loss = loss_kl * beta + loss_recon
         
@@ -75,7 +83,6 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='')
                    'avg. recon loss={:.4f}'.format(mean_recon)]
         
         tqdm_data.set_postfix_str(' '.join(postfix))    
-    
     
     return mean_kl, mean_recon, xyz, xyz_recon 
 
