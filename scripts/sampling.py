@@ -240,7 +240,13 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     model = model.to(device)
     batch = batch_to(batch, device)
 
-    z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
+    z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
+
+    # compute cg prior 
+    if model.prior_net:
+        H_prior_mu, H_prior_sigma = model.prior_net(cg_z, cg_xyz, CG_nbr_list)
+    else:
+        H_prior_mu, H_prior_sigma = None, None 
 
     sample_xyzs = []
     recon_atoms_list = []
@@ -249,7 +255,7 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     ref_atoms = Atoms(positions=xyz.cpu().numpy(), numbers=atomic_nums) 
 
     for i in range(n_batch):
-        H = sample_normal(mu, sigma)
+        H = sample_normal(H_prior_mu, H_prior_sigma)
         H = H.to(device)
         xyz_decode = model.decoder(cg_xyz, CG_nbr_list, H, H, mapping, num_CGs)
         sample_xyzs.append(xyz_decode.detach().cpu())
@@ -263,7 +269,7 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     cg_atoms = Atoms(numbers=[6] * len(cg_xyz), positions=cg_xyz.detach().cpu().numpy())
 
     # save reconstructed atoms 
-    S_mu, S_sigma, xyz, xyz_recon = model(batch)
+    S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
     recon_atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_recon.detach().cpu().numpy())
 
     # compute sample diversity 
@@ -362,16 +368,24 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=Fals
     for batch in tqdm_data:
         batch = batch_to(batch, device)
         
-        z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
+        z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
         
-        # sample latent vectors
-        z_list = []
-        for i in range(len(num_CGs)):
+        # compute cg prior 
+        if model.prior_net:
+            H_prior_mu, H_prior_sigma = model.prior_net(cg_z, cg_xyz, CG_nbr_list)
+        else:
+            H_prior_mu, H_prior_sigma = None, None 
 
-           #z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
-           z_list.append(sample_normal(mu, sigma))
+        # sample latent vectors
+        z = sample_normal(H_prior_mu, H_prior_sigma)
+
+        # z_list = []
+        # for i in range(len(num_CGs)):
+
+        #    #z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
+        #    z_list.append(sample_normal(mu, sigma))
             
-        z = torch.cat(z_list).to(cg_xyz.device)
+        # z = torch.cat(z_list).to(cg_xyz.device)
 
         if atomwise_z:
             H = scatter_mean(z, mapping, dim=0)
