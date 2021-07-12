@@ -105,7 +105,7 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
     for batch in tqdm_data:
         batch = batch_to(batch, device)
-        S_mu, S_sigma, xyz, xyz_recon = model(batch)
+        S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
 
         true_xyzs.append(xyz.detach().cpu())
         recon_xyzs.append(xyz_recon.detach().cpu())
