@@ -327,7 +327,9 @@ class CGprior(nn.Module):
         H_mu = self.mu(h)
         H_sigma = self.sigma(h)
 
-        return H_mu, H_sigma
+        H_std = 1e-9 + torch.exp(H_sigma / 2)
+
+        return H_mu, H_std
 
 
 class CGequiVAE(nn.Module):
@@ -431,6 +433,8 @@ class CGequiVAE(nn.Module):
             S_I = z_sample # s_i not used in decoding 
         
         xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, s_i, mapping, num_CGs)
+
+        # need to compute KL loss between N(mu, sigma) and N(H_prior_mu, H_prior_sigma)
         
         return mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
