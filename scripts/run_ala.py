@@ -175,18 +175,14 @@ def run_cv(params):
                                                                                              atomwise_z=atom_decode_flag)
 
         # sample geometries 
-        try:
-            train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
-        except:
-            failed = True 
+        train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
-        cg_types = np.array([1] * n_cgs)
+        cg_types = np.array([6] * n_cgs)
 
         dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
         dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
         dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
         dump_numpy2xyz(train_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
-
 
         testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
         test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(testloader, 
@@ -197,10 +193,7 @@ def run_cv(params):
                                                                                              atomwise_z=atom_decode_flag)
 
         # sample geometries 
-        try:
-            test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
-        except:
-            failed = True 
+        test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
         dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
         dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
