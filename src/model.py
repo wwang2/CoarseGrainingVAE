@@ -48,7 +48,7 @@ class ENDecoder(nn.Module):
         return s_i, v_i 
 
 class EquivariantDecoder(nn.Module):
-    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, atomwise_z=False):   
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
         
         nn.Module.__init__(self)
         # distance transform
@@ -57,14 +57,24 @@ class EquivariantDecoder(nn.Module):
                                   feat_dim=n_atom_basis,
                                   dropout=0.0)
 
-        self.message_blocks = nn.ModuleList(
-            [EquiMessageCross(feat_dim=n_atom_basis,
-                          activation=activation,
-                          n_rbf=n_rbf,
-                          cutoff=cutoff,
-                          dropout=0.0)
-             for _ in range(num_conv)]
-        )
+        if cross_flag:
+            self.message_blocks = nn.ModuleList(
+                [EquiMessageCross(feat_dim=n_atom_basis,
+                              activation=activation,
+                              n_rbf=n_rbf,
+                              cutoff=cutoff,
+                              dropout=0.0)
+                 for _ in range(num_conv)]
+            )
+        else: 
+            self.message_blocks = nn.ModuleList(
+                [EquiMessageBlock(feat_dim=n_atom_basis,
+                              activation=activation,
+                              n_rbf=n_rbf,
+                              cutoff=cutoff,
+                              dropout=0.0)
+                 for _ in range(num_conv)]
+            )
 
         self.update_blocks = nn.ModuleList(
             [UpdateBlock(feat_dim=n_atom_basis,
