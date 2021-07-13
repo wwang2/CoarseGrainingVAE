@@ -144,6 +144,60 @@ class InvMessageBlock(nn.Module):
         return delta_s_i, v_j
 
 
+class EquiMessageCross(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+        self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
+                                            out_feat_dim=feat_dim * 4, 
+                                            activation=activation,
+                                            n_rbf=n_rbf,
+                                            cutoff=cutoff,
+                                            dropout=dropout)
+
+    def forward(self,
+                s_j,
+                v_j,
+                r_ij,
+                nbrs):
+
+        dist, unit = preprocess_r(r_ij)
+        inv_out = self.inv_message(s_j=s_j,
+                                   dist=dist,
+                                   nbrs=nbrs)
+
+        inv_out = inv_out.reshape(inv_out.shape[0], 4, -1)
+
+        split_0 = inv_out[:, 0, :].unsqueeze(-1)
+        split_1 = inv_out[:, 1, :]
+        split_2 = inv_out[:, 2, :].unsqueeze(-1)
+        split_3 = inv_out[:, 3, :].unsqueeze(-1)
+
+        unit_add = split_2 * unit.unsqueeze(1)
+        delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1]] + split_3 * torch.cross( v_j[nbrs[:, 0]],  v_j[nbrs[:, 1]])
+        delta_s_ij = split_1
+
+        # add results from neighbors of each node
+
+        graph_size = s_j.shape[0]
+        delta_v_i = scatter_add(src=delta_v_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+
+        delta_s_i = scatter_add(src=delta_s_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+
+        return delta_s_i, delta_v_i
+
+
+
 class EquiMessageBlock(nn.Module):
     def __init__(self,
                  feat_dim,

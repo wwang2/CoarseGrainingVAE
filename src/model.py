@@ -58,7 +58,7 @@ class EquivariantDecoder(nn.Module):
                                   dropout=0.0)
 
         self.message_blocks = nn.ModuleList(
-            [EquiMessageBlock(feat_dim=n_atom_basis,
+            [EquiMessageCross(feat_dim=n_atom_basis,
                           activation=activation,
                           n_rbf=n_rbf,
                           cutoff=cutoff,
