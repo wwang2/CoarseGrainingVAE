@@ -21,6 +21,7 @@ from torch_scatter import scatter_mean
 from tqdm import tqdm 
 from torch.utils.data import DataLoader
 from sklearn.model_selection import KFold
+import json
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
@@ -160,6 +161,10 @@ def run_cv(params):
             if np.isnan(mean_recon):
                 print("NaN encoutered, exiting...")
                 break 
+
+        # dump model hyperparams 
+        with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
+            json.dump(params, outfile)
 
         # dump learning trajectory 
         recon_hist = np.concatenate(recon_hist)
