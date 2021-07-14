@@ -252,7 +252,7 @@ def run_cv(params):
             print("sample validity (all atoms): {}".format(sample_hh_valid))
 
         # compute maxium dimension
-        ref_xyz = data_xyzs[:len(atomic_nums)]
+        ref_xyz = data_xyzs[0]
         ref_xyz = ref_xyz - ref_xyz.mean(0)
         geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.5
 
