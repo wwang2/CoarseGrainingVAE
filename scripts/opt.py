@@ -43,11 +43,11 @@ if params['id'] == None:
         name=params['logdir'],
         metrics=[dict(name='cv rmsd', objective='minimize')],
         parameters=[
-            dict(name='n_basis', type='int', bounds=dict(min=32, max=256)),
+            dict(name='n_basis', type='int', bounds=dict(min=32, max=600)),
             dict(name='n_rbf', type='int', bounds=dict(min=5, max=16)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
             dict(name='cg_cutoff', type='double', bounds=dict(min=params['min_cgcutoff'], max=params['min_cgcutoff'] + 10.0)),
-            dict(name='atom_cutoff', type='double', bounds=dict(min=3.0, max=4.5)),
+            dict(name='atom_cutoff', type='double', bounds=dict(min=4.0, max=8.5)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=5)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.01), transformation="log"),
