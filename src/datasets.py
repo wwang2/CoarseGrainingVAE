@@ -34,7 +34,7 @@ PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-1144
 
 def load_protein_traj(label): 
     
-    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:100]
+    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
     pdb_file = PROTEINFILES[label]['pdb_path']
     file_type = PROTEINFILES[label]['file_type']
     
