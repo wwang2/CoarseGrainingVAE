@@ -4,12 +4,12 @@ import torch
 import numpy as np 
 from copy import copy, deepcopy
 
-def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_scale=2.0, grid_dim=None):
+def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_scale=1.5, grid_dim=None):
     
     assert len(num_atoms) == n_w * n_h
 
     ref_xyz = xyzs[:num_atoms[0]]
-    ref_xyz = ref_xyz - ref_xyz.mean(0)
+    ref_xyz = ref_xyz - ref_xyz.mean(0)[None, ...]
     geom_max_dim = ref_xyz.max() - ref_xyz.min()
 
     if grid_dim is None:
