@@ -91,8 +91,7 @@ def run_cv(params):
     # check CG nbr_list connectivity 
 
     if not check_CGgraph(dataset):
-        # check GG graph is fully connected 
-        np.savetxt("failed", "failed.txt")
+        print("CG graph not connected")
         return np.NaN, np.NaN, True
 
     # create subdirectory 
