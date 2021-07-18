@@ -212,16 +212,23 @@ def infer_smiles_from_geoms(atoms_list, ignoreHH=True):
 
 
 def compute_rmsd(atoms_list, ref_atoms, valid_ids) :
-    rmsd = []
+    rmsd_array = []
     # todo: need to include alignment 
     for i, atoms in enumerate(atoms_list):
-        test_dxyz = (atoms.get_positions() - ref_atoms.get_positions()).reshape(-1)
-        unaligned_test_rmsd = np.sqrt(np.power(test_dxyz, 2).mean())
+        z = atoms.get_atomic_numbers() 
+
+        heavy_filter = z != 1. 
+
+        aa_test_dxyz = (atoms.get_positions() - ref_atoms.get_positions()).reshape(-1)
+        aa_rmsd = np.sqrt(np.power(aa_test_dxyz, 2).mean())
+
+        heavy_test_dxyz = (atoms.get_positions()[heavy_filter] - ref_atoms.get_positions()[heavy_filter]).reshape(-1)
+        heavy_rmsd = np.sqrt(np.power(heavy_test_dxyz, 2).mean())
         
         if i in valid_ids:
-            rmsd.append(unaligned_test_rmsd)
+            rmsd_array.append([aa_rmsd, heavy_rmsd])
     
-    return np.array(rmsd)#.mean()
+    return np.array(rmsd_array)
 
 def batch_to(batch, device):
     gpu_batch = dict()
