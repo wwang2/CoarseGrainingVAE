@@ -40,7 +40,7 @@ def batch_to(batch, device):
         gpu_batch[key] = val.to(device) if hasattr(val, 'to') else val
     return gpu_batch
 
-def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext=''):
+def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='', tqdm_flag=True):
     
     recon_loss = []
     kl_loss = []
@@ -51,11 +51,12 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='')
     else:
         model.train() # yes, still set to train when reconstructing
         mode = '{} valid'.format(looptext)
+
+    if tqdm_flag:
+        loader = tqdm(loader, position=0, file=sys.stdout,
+                         leave=True, desc='({} epoch #{})'.format(mode, epoch))
     
-    tqdm_data = tqdm(loader, position=0, file=sys.stdout,
-                     leave=True, desc='({} epoch #{})'.format(mode, epoch))
-    
-    for batch in tqdm_data:
+    for batch in loader:
 
         batch = batch_to(batch, device)
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
@@ -82,11 +83,15 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='')
         postfix = ['avg. KL loss={:.4f}'.format(mean_kl) , 
                    'avg. recon loss={:.4f}'.format(mean_recon)]
         
-        tqdm_data.set_postfix_str(' '.join(postfix))    
+        if tqdm_flag:
+            loader.set_postfix_str(' '.join(postfix))
+
+    for result in postfix:
+        print(result)
     
     return mean_kl, mean_recon, xyz, xyz_recon 
 
-def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False):
+def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True):
 
     model = model.to(device)
 
@@ -101,9 +106,10 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     else:
         n_z = n_cg 
 
-    tqdm_data = tqdm(loader, position=0, leave=True)    
+    if tqdm_flag:
+        loader = tqdm(loader, position=0, leave=True) 
 
-    for batch in tqdm_data:
+    for batch in loader:
         batch = batch_to(batch, device)
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
 

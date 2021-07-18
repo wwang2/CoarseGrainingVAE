@@ -53,6 +53,7 @@ def run_cv(params):
     atom_decode_flag = params['atom_decode']
     nevals = params['nevals']
     graph_eval = params['graph_eval']
+    tqdm_flag = params['tqdm_flag']
 
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
@@ -151,7 +152,8 @@ def run_cv(params):
             # train
             mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                        model, beta, epoch, train=True,
-                                                        looptext='Ncg {} Fold {}'.format(n_cgs, i))
+                                                        looptext='Ncg {} Fold {}'.format(n_cgs, i),
+                                                        tqdm_flag=tqdm_flag)
             
             scheduler.step(mean_recon)
 
@@ -181,7 +183,8 @@ def run_cv(params):
                                                                                              model,
                                                                                              atomic_nums,
                                                                                              n_cg=n_cgs,
-                                                                                             atomwise_z=atom_decode_flag)
+                                                                                             atomwise_z=atom_decode_flag,
+                                                                                             tqdm_flag=tqdm_flag)
 
         # sample geometries 
         train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
@@ -199,7 +202,8 @@ def run_cv(params):
                                                                                              model,
                                                                                              atomic_nums,
                                                                                              n_cg=n_cgs,
-                                                                                             atomwise_z=atom_decode_flag)
+                                                                                             atomwise_z=atom_decode_flag,
+                                                                                             tqdm_flag=tqdm_flag)
 
         # sample geometries 
         test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
@@ -337,6 +341,7 @@ if __name__ == '__main__':
     parser.add_argument("--cg_mp", action='store_true', default=False)
     parser.add_argument("--dir_mp", action='store_true', default=False)
     parser.add_argument("--atom_decode", action='store_true', default=False)
+    parser.add_argument("--tqdm_flag", action='store_true', default=False)
     params = vars(parser.parse_args())
 
     run_cv(params)

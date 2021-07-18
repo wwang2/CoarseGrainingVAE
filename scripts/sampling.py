@@ -348,7 +348,7 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, None, None, None
 
 
-def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False):
+def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False, tqdm_flag=False):
 
     model = model.to(device)
 
@@ -363,9 +363,10 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=Fals
     else:
         n_z = n_cgs
 
-    tqdm_data = tqdm(loader, position=0, leave=True)    
+    if tqdm_flag:
+        loader = tqdm(loader, position=0, leave=True)    
 
-    for batch in tqdm_data:
+    for batch in loader:
         batch = batch_to(batch, device)
         
         z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
