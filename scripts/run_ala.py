@@ -244,7 +244,7 @@ def run_cv(params):
         if graph_eval:
             sample_valid = np.array(sample_valid).mean()
             sample_hh_valid = np.array(sample_hh_valid).mean()
-            if all_rmsds:
+            if all_rmsds is not None:
                 mean_rmsd = np.array(all_rmsds).mean()
             else:
                 mean_rmsd = None
@@ -294,7 +294,7 @@ def run_cv(params):
 
         # dump rmsd distributions 
         if graph_eval:
-            if all_rmsds:
+            if all_rmsds is not None:
                 np.savetxt(os.path.join(split_dir, 'valid_rmsds.txt'), np.array(all_rmsds))
 
         #########################################################
