@@ -244,11 +244,14 @@ def run_cv(params):
         if graph_eval:
             sample_valid = np.array(sample_valid).mean()
             sample_hh_valid = np.array(sample_hh_valid).mean()
-            mean_rmsd = np.array(all_rmsds).mean()
+            if all_rmsds:
+                mean_rmsd = np.array(all_rmsds).mean()
+            else:
+                mean_rmsd = None
 
             cv_sample_valid.append(sample_valid)
             cv_sample_hh_valid.append(sample_hh_valid)
-            cv_sample_rmsd.append(mean_rmsd)
+            #cv_sample_rmsd.append(mean_rmsd)
 
             print("sample RMSD (compared with ref.) : {}".format(mean_rmsd))
             print("sample validity (heavy atoms): {}".format(sample_valid))
@@ -291,7 +294,8 @@ def run_cv(params):
 
         # dump rmsd distributions 
         if graph_eval:
-            np.savetxt(os.path.join(split_dir, 'valid_rmsds.txt'), np.array(all_rmsds))
+            if all_rmsds:
+                np.savetxt(os.path.join(split_dir, 'valid_rmsds.txt'), np.array(all_rmsds))
 
         #########################################################
 

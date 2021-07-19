@@ -227,8 +227,10 @@ def compute_rmsd(atoms_list, ref_atoms, valid_ids) :
         
         if i in valid_ids:
             rmsd_array.append([aa_rmsd, heavy_rmsd])
-    
-    return np.array(rmsd_array)
+    if len(valid_ids) != 0:
+        return np.array(rmsd_array)
+    else:
+        return None
 
 def batch_to(batch, device):
     gpu_batch = dict()
@@ -339,7 +341,8 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         recon_xyz_list.append(recon_atoms.get_positions())
 
         # record sampling validity/diversity 
-        sample_rmsd.append(rmsds)
+        if rmsds is not None:
+            sample_rmsd.append(rmsds)
         sample_valid.append(valid_ratio)
         sample_hh_valid.append(valid_hh_ratio)
 
@@ -349,7 +352,12 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     recon_xyzs = np.vstack(recon_xyz_list).reshape(-1, n_atoms, 3)
 
     if graph_eval:
-        all_rmsds = np.concatenate(sample_rmsd) # list of valid structure rmsds 
+
+        if len(sample_rmsd) != 0:
+            all_rmsds = np.concatenate(sample_rmsd) # list of valid structure rmsds 
+        else:
+            all_rmsds = None
+
         return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid
     else:
         return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, None, None, None
