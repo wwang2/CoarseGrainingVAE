@@ -54,6 +54,7 @@ def run_cv(params):
     nevals = params['nevals']
     graph_eval = params['graph_eval']
     tqdm_flag = params['tqdm_flag']
+    n_ensemble = params['n_ensemble']
 
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
@@ -230,7 +231,6 @@ def run_cv(params):
         n_w = 3
         n_h = 3
         n_frames = n_w * n_h
-        n_ensemble = 24
 
         idx = torch.LongTensor( np.random.choice(list(range(len(testset))), 24) )
         sample_dataset = get_subset_by_indices(idx, trainset)
@@ -330,6 +330,7 @@ if __name__ == '__main__':
     parser.add_argument("-nepochs", type=int, default=2)
     parser.add_argument("-ndata", type=int, default=200)
     parser.add_argument("-nsamples", type=int, default=200)
+    parser.add_argument("-n_ensemble", type=int, default=16)
     parser.add_argument("-nevals", type=int, default=36)
     parser.add_argument("-beta", type=float, default=0.001)
     parser.add_argument("-nsplits", type=int, default=5)

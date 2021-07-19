@@ -89,6 +89,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['nevals'] = 300
     trial['graph_eval'] = True
     trail['tqdm_flag'] = False
+    trail['n_ensemble'] = 1
 
     cv_mean, cv_std, failed = run_cv(trial)
     if np.isnan(cv_mean):
