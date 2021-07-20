@@ -104,6 +104,9 @@ def run_cv(params):
     cv_sample_valid = []
     cv_sample_hh_valid = []
 
+    cv_graph_diff = []
+    cv_graph_hh_diff = []
+
     split_iter = kf.split(list(range(len(dataset))))
 
     for i, (train_index, test_index) in enumerate(split_iter):
@@ -236,7 +239,7 @@ def run_cv(params):
         sample_dataset = get_subset_by_indices(idx, trainset)
         sampleloader = DataLoader(sample_dataset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-        sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid = sample_ensemble(sampleloader, mu, sigma, device, 
+        sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
                                                                                 model, atomic_nums, 
                                                                                 n_cgs, n_sample=n_ensemble,
                                                                                 graph_eval=graph_eval)
@@ -251,11 +254,18 @@ def run_cv(params):
 
             cv_sample_valid.append(sample_valid)
             cv_sample_hh_valid.append(sample_hh_valid)
-            #cv_sample_rmsd.append(mean_rmsd)
+            
+            mean_graph_diff = np.array(sample_graph_val_ratio_list).mean()
+            mean_graph_hh_diff = np.array(sample_graph_hh_val_ratio_list).mean()
+            cv_graph_diff.append(mean_graph_diff)
+            cv_graph_hh_diff.append(mean_graph_hh_diff)
 
             print("sample RMSD (compared with ref.) : {}".format(mean_rmsd))
             print("sample validity (heavy atoms): {}".format(sample_valid))
             print("sample validity (all atoms): {}".format(sample_hh_valid))
+            print("sample graph difference ratio (heavy atoms): {}".format(mean_graph_diff))
+            print("sample graph difference ratio (all atoms): {}".format(mean_graph_hh_diff))
+
 
         # compute maxium dimension
         ref_xyz = data_xyzs[0]
@@ -305,6 +315,8 @@ def run_cv(params):
     if graph_eval:
         np.savetxt(os.path.join(working_dir, 'cv_valid.txt'), np.array(cv_sample_valid))
         np.savetxt(os.path.join(working_dir, 'cv_hh_valid.txt'), np.array(cv_sample_hh_valid))
+        np.savetxt(os.path.join(working_dir, 'cv_graph_diff.txt'), np.array(cv_graph_diff))
+        np.savetxt(os.path.join(working_dir, 'cv_hh_graph_diff.txt'), np.array(cv_graph_hh_diff))
 
     if failed:
         with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
