@@ -71,6 +71,10 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='',
         if train:
             optimizer.zero_grad()
             loss.backward()
+
+            # perfrom gradient clipping 
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1e0)
+
             optimizer.step()
 
         # logging 
