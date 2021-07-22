@@ -144,7 +144,7 @@ def run_cv(params):
                             atomwise_z=atom_decode_flag).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=3, factor=0.5)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, factor=0.6)
         
         model.train()
 
