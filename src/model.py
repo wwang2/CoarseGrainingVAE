@@ -433,7 +433,7 @@ class CGequiVAE(nn.Module):
 
         mu = self.atom_munet(z)
         logvar = self.atom_sigmanet(z)
-        sigma = 1e-6 + torch.exp(logvar / 2)
+        sigma = 1e-9 + torch.exp(logvar / 2)
         z_sample = self.reparametrize(mu, sigma)
 
         if self.atomwise_z:
