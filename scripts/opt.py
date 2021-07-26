@@ -44,15 +44,16 @@ if params['id'] == None:
         name=params['logdir'],
         metrics=[dict(name='cv rmsd', objective='minimize')],
         parameters=[
-            dict(name='n_basis', type='int', bounds=dict(min=32, max=600)),
-            dict(name='n_rbf', type='int', bounds=dict(min=5, max=16)),
+            dict(name='n_basis', type='int', bounds=dict(min=128, max=600)),
+            dict(name='n_rbf', type='int', bounds=dict(min=5, max=10)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
             dict(name='cg_cutoff', type='double', bounds=dict(min=params['min_cgcutoff'], max=params['min_cgcutoff'] + 10.0)),
-            dict(name='atom_cutoff', type='double', bounds=dict(min=4.0, max=8.5)),
-            dict(name='enc_nconv', type='int', bounds=dict(min=2, max=5)),
+            dict(name='atom_cutoff', type='double', bounds=dict(min=7.0, max=9.5)),
+            dict(name='enc_nconv', type='int', bounds=dict(min=2, max=4)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.01), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.0001, max=0.001), transformation="log"),
+            dict(name='n_epochs', type='int', bounds=dict(min=30, max=80)),
             #dict(name='dir_mp', type='categorical', categorical_values=["True", "False"]),
             #dict(name='dec_type', type='categorical', categorical_values=["EquivariantDecoder", "ENDecoder"]),
         ],
@@ -70,6 +71,9 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial =  suggestion.assignments
 
     dir_mp_flag = True
+
+    if not params['dry_run']:
+        n_epochs = trial['n_epochs']  
 
     trial['logdir'] = os.path.join(params['logdir'], suggestion.id)
     trial['device'] = params['device']

@@ -159,7 +159,7 @@ def run_cv(params):
                                                         looptext='Ncg {} Fold {}'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
             
-            scheduler.step(mean_recon)
+            scheduler.step(mean_recon + mean_kl * beta)
 
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
             kl_loss_hist.append(mean_kl)
