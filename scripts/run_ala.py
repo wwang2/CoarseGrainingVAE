@@ -270,7 +270,7 @@ def run_cv(params):
         # compute maxium dimension
         ref_xyz = data_xyzs[0]
         ref_xyz = ref_xyz - ref_xyz.mean(0)
-        geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.5
+        geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.3
 
         # loop over all the ensembles and dump individual samples
         for sample_id in range(n_ensemble): 
@@ -322,7 +322,7 @@ def run_cv(params):
         with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
             print("TRAINING FAILED", file=text_file)
 
-    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), failed
+    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), np.array(cv_graph_diff).mean(), np.array(cv_graph_diff).std(), failed
 
 
 if __name__ == '__main__':

@@ -18,6 +18,7 @@ parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-cg_method", type=str)
 parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("--dry_run", action='store_true', default=False)
+parser.add_argument("--graph_opt", action='store_true', default=False)
 params = vars(parser.parse_args())
 
 if params['dry_run']:
@@ -91,15 +92,23 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['tqdm_flag'] = False
     trial['n_ensemble'] = 1
 
-    cv_mean, cv_std, failed = run_cv(trial)
+    cv_mean, cv_std, cv_ged_mean, cv_ged_std, failed = run_cv(trial)
+
+    if params['graph_opt']:
+        target_mean = cv_mean
+        target_std = cv_std
+    else:
+        target_mean = cv_ged_mean
+        target_std = cv_ged_std
+
     if np.isnan(cv_mean):
         failed = True
 
     if not failed:
         conn.experiments(experiment.id).observations().create(
           suggestion=suggestion.id,
-          value=cv_mean,
-          value_stddev=cv_std
+          value=target_mean,
+          value_stddev=target_std
         )
     elif failed:
         conn.experiments(experiment.id).observations().create(
