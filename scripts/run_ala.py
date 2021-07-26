@@ -149,6 +149,7 @@ def run_cv(params):
         model.train()
 
         recon_loss_hist = []
+        kl_loss_hist = []
         recon_hist = []
 
         for epoch in range(nepochs):
@@ -161,6 +162,7 @@ def run_cv(params):
             scheduler.step(mean_recon)
 
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
+            kl_loss_hist.append(mean_kl)
             recon_loss_hist.append(mean_recon)
 
             # check NaN
@@ -173,7 +175,7 @@ def run_cv(params):
             json.dump(params, outfile)
 
         # dump training curve 
-        np.savetxt(os.path.join(split_dir, 'train_loss_curve.txt'), np.array(recon_loss_hist))
+        np.savetxt(os.path.join(split_dir, 'train_loss_curve.txt'), np.vstack((np.array([recon_loss_hist]), np.array([kl_loss_hist]))))
 
         # dump learning trajectory 
         recon_hist = np.concatenate(recon_hist)
