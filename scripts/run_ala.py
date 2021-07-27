@@ -144,7 +144,7 @@ def run_cv(params):
                             atomwise_z=atom_decode_flag).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, factor=0.6)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, factor=0.6, verbose=True)
         
         model.train()
 
@@ -237,9 +237,8 @@ def run_cv(params):
         n_h = 3
         n_frames = n_w * n_h
 
-        idx = torch.LongTensor( np.random.choice(list(range(len(testset))), 24) )
-        sample_dataset = get_subset_by_indices(idx, trainset)
-        sampleloader = DataLoader(sample_dataset, batch_size=1, collate_fn=CG_collate, shuffle=False)
+ 
+        sampleloader = DataLoader(testset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
         sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
                                                                                 model, atomic_nums, 
