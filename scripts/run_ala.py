@@ -271,7 +271,7 @@ def run_cv(params):
         # compute maxium dimension
         ref_xyz = data_xyzs[0]
         ref_xyz = ref_xyz - ref_xyz.mean(0)
-        geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.3
+        geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.45
 
         # loop over all the ensembles and dump individual samples
         for sample_id in range(n_ensemble): 
