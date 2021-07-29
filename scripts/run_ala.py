@@ -22,6 +22,8 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from sklearn.model_selection import KFold
 import json
+import time
+from datetime import timedelta
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
@@ -110,6 +112,9 @@ def run_cv(params):
     split_iter = kf.split(list(range(len(dataset))))
 
     for i, (train_index, test_index) in enumerate(split_iter):
+
+        # start timing 
+        start =  time.time()
 
         split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
         create_dir(split_dir)
@@ -308,7 +313,21 @@ def run_cv(params):
             if all_rmsds is not None:
                 np.savetxt(os.path.join(split_dir, 'valid_rmsds.txt'), np.array(all_rmsds))
 
-        #########################################################
+        end = time.time()
+
+        temp = end-start
+        hours = temp//3600
+        temp = temp - 3600*hours
+        minutes = temp//60
+        seconds = temp - 60*minutes
+        format_time = '%d:%d:%d' %(hours,minutes,seconds)
+
+        np.savetxt(os.path.join(split_dir, '{}.txt'.format(format_time)), np.ones(10))
+
+        print("time elapsed: {}".format(format_time))
+
+        ########################################################
+
 
     # save test score 
     np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
