@@ -57,6 +57,7 @@ def run_cv(params):
     graph_eval = params['graph_eval']
     tqdm_flag = params['tqdm_flag']
     n_ensemble = params['n_ensemble']
+    min_lr = 1e-6
 
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
@@ -149,7 +150,7 @@ def run_cv(params):
                             atomwise_z=atom_decode_flag).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, factor=0.6, verbose=True)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, factor=0.6, verbose=True,  min_lr=min_lr)
         
         model.train()
 
@@ -174,6 +175,10 @@ def run_cv(params):
             if np.isnan(mean_recon):
                 print("NaN encoutered, exiting...")
                 break 
+
+            if optimizer.param_groups[0]['lr'] <= min_lr:
+                print('converged')
+                break
 
         # dump model hyperparams 
         with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
