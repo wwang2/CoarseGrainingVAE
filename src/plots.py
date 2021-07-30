@@ -11,7 +11,7 @@ import mdtraj as md
 import matplotlib.pyplot as plt 
 import matplotlib
 
-def kernel_density_plot(data, xlabel, ylabel, label='kT'):
+def kernel_density_plot(data, xlabel, ylabel, label='kT', figsize=(6,6)):
     k = gaussian_kde(np.vstack([data[:,0], data[:,1]]))
 
     density, x_edge, y_edge = np.histogram2d(data[:,0], data[:,1], 
@@ -23,7 +23,7 @@ def kernel_density_plot(data, xlabel, ylabel, label='kT'):
     xi, yi = np.meshgrid(x, y)
     zi = k(np.vstack([xi.flatten(), yi.flatten()]))
 
-    plt.figure(figsize=(6,6))
+    plt.figure(figsize=figsize)
     plt.pcolormesh(xi, yi, np.log(zi.reshape(xi.shape) + 1e-3), alpha=0.8, #, norm=matplotlib.colors.LogNorm() 
                    shading='nearest')
 
