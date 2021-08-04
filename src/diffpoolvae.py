@@ -45,3 +45,71 @@ class CGpool(nn.Module):
         cg_xyz = scatter_add(ciI_flat[..., None] * xyz[atom2cgmap[:, 0]], atom2cgmap[:, 1], dim=0)
     
         return h, cg_xyz, assignment_pad, cg_adj
+
+
+ class DiffCGContracMessageBlock(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+
+        
+        self.inv_dense = nn.Sequential(Dense(in_features=feat_dim,
+                                          out_features=feat_dim,
+                                          bias=True,
+                                          dropout_rate=dropout,
+                                          activation=to_module(activation)),
+                                    Dense(in_features=feat_dim,
+                                          out_features=3 * feat_dim,
+                                          bias=True,
+                                          dropout_rate=dropout))
+
+    
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                        cutoff=cutoff,
+                                        feat_dim=3 * feat_dim,
+                                        dropout=dropout)
+
+    def forward(self,
+                h_i,
+                v_i,
+                r_iI,
+                assignment_pad):
+
+        
+        mask_iI = assignment_pad.nonzero()
+
+        
+        d_iI = r_iI.pow(2).sum(-1).sqrt()
+        unit = r_iI / d_iI.unsqueeze(-1)
+        
+        phi = contraction.inv_dense(h)
+        w_s = contraction.dist_embed(d_iI)
+
+        inv_out = phi[mask_iI[:, 1]] * w_s
+        inv_out = inv_out.reshape(inv_out.shape[0], 3, -1)
+
+        ciI_flat = assignment_pad[mask_iI[:,0], mask_iI[:,1]]
+        
+        split_0 = inv_out[:, 0, :].unsqueeze(-1)
+        split_1 = inv_out[:, 1, :]
+        split_2 = inv_out[:, 2, :].unsqueeze(-1)
+
+        unit_add = split_2 * unit.unsqueeze(1)
+        delta_v_iI = unit_add + split_0 * v_i[mask_iI[:,0]]
+        delta_s_iI = split_1
+
+        # scatter_mean weighed by assignment weights 
+        dV = scatter_add(src=ciI_flat[..., None, None] *  delta_v_iI,
+                                index=mask_iI[:,1],
+                                dim=0)
+
+        dH = scatter_add(src=ciI_flat[..., None] * delta_s_iI,
+                                index=mask_iI[:,1],
+                                dim=0)
+
+        return dH, dV
+
