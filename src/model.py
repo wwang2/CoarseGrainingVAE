@@ -118,16 +118,6 @@ class EquivariantDecoder(nn.Module):
             H = H + dH_update
             V = V + dV_update
 
-            if self.atomwise_z:
-                # perform coupling 
-                # contraction 
-                Hatom = scatter_mean(h, mapping, dim=0)
-                # concat
-                H_h_cat =  torch.cat((Hatom, H), dim=-1)
-                # coupling layer 
-                dH = self.atom2CGcoupling(H_h_cat)
-                H = H + dH
-
         return H, V 
 
 
@@ -247,14 +237,6 @@ class EquiEncoder(nn.Module):
             H = H + dH_update # atom message 
             V = V + dV_update
 
-            if self.atomwise_z:
-                # perform coupling 
-                # contraction 
-                # concat
-                H_h_cat =  torch.cat((h, H[mapping]), dim=-1)
-                # coupling layer 
-                dh = self.atom2CGcoupling(H_h_cat)
-                h = h + dh
             # if self.cg_mp:
             #     dS_message, dV_message = self.cg_message_blocks[i](s_j=S_I,
             #                                            v_j=V_I,
@@ -426,25 +408,16 @@ class CGequiVAE(nn.Module):
         else:
             H_prior_mu, H_prior_sigma = None, None 
         
-        if self.atomwise_z:
-            z = s_i 
-        else:
-            z = S_I
+        z = S_I
 
         mu = self.atom_munet(z)
         logvar = self.atom_sigmanet(z)
         sigma = 1e-9 + torch.exp(logvar / 2)
         z_sample = self.reparametrize(mu, sigma)
 
-        if self.atomwise_z:
-            S_I = scatter_mean(s_i, mapping, dim=0)
-            s_i = z_sample 
-        else:
-            S_I = z_sample # s_i not used in decoding 
+        S_I = z_sample # s_i not used in decoding 
         
         xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, s_i, mapping, num_CGs)
-
-        # need to compute KL loss between N(mu, sigma) and N(H_prior_mu, H_prior_sigma)
         
         return mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
