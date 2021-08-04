@@ -113,3 +113,42 @@ class CGpool(nn.Module):
 
         return dH, dV
 
+
+class Enc(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_cg,
+                 n_rbf,
+                 cutoff):
+        super().__init__()
+        
+        self.feat_dim = feat_dim
+        
+        self.h_embed = nn.Linear(n_cg, num_features)
+        self.H_embed = nn.Linear(n_cg, num_features)
+
+        self.DiffCGContracMessageBlock = DiffCGContracMessageBlock(feat_dim=feat_dim,
+                                                                 activation=activation,
+                                                                 n_rbf=n_rbf,
+                                                                 cutoff=cutoff,
+                                                                 dropout=0.0)
+        self.update = conv.UpdateBlock(feat_dim=num_features,
+                         activation=activation,
+                         dropout=0.0)
+        # update block
+        
+    def forward(self, h, H, cg_xyz, assignment_pad, cg_adj):
+        
+        h = self.h_embed(h)
+        H = self.H_embed(H)
+        
+        V_I = torch.zeros(H.shape[0], self.feat_dim, 3).to(h.device)
+        v_i = torch.zeros(z.shape[0], self.feat_dim, 3).to(h.device)
+        
+        mask_iI = assignment_pad.nonzero()
+        r_iI = xyz[mask_iI[:, 0]] - cg_xyz[mask_iI[:, 1]]
+        
+        dH, dV = self.DiffCGContracMessageBlock(h, v_i, r_iI, assignment_pad)
+        
+        return H + dH, V_I+dV
