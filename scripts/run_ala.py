@@ -5,7 +5,7 @@ sys.path.append("../src/")
 import os 
 import argparse 
 from data import *
-from model import * 
+from cgvae import * 
 from conv import * 
 from datasets import * 
 from utils import * 
