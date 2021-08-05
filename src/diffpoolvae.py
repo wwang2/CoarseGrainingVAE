@@ -152,3 +152,111 @@ class Enc(nn.Module):
         dH, dV = self.DiffCGContracMessageBlock(h, v_i, r_iI, assignment_pad)
         
         return H + dH, V_I+dV
+
+
+class DiffPoolDecoder(nn.Module):
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation):   
+        
+        nn.Module.__init__(self)
+        # distance transform
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                  cutoff=cutoff,
+                                  feat_dim=n_atom_basis,
+                                  dropout=0.0)
+
+        self.message_blocks = nn.ModuleList(
+            [DiffpoolMessageBlock(feat_dim=n_atom_basis,
+                          activation=activation,
+                          n_rbf=n_rbf,
+                          cutoff=cutoff,
+                          dropout=0.0)
+             for _ in range(num_conv)]
+        )
+
+        self.update_blocks = nn.ModuleList(
+            [UpdateBlock(feat_dim=n_atom_basis,
+                         activation=activation,
+                         dropout=0.0)
+             for _ in range(num_conv)]
+        )
+    
+    def forward(self, cg_xyz, H, cg_adj):
+        
+        CG_nbr_list = cg_adj.nonzero()
+        #CG_nbr_list, _ = make_directed(CG_nbr_list)
+        r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
+        
+        V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
+
+        for i, message_block in enumerate(self.message_blocks):
+            
+            # message block
+            dH_message, dV_message = message_block(s_j=H,
+                                                   v_j=V,
+                                                   r_ij=r_ij,
+                                                   nbrs=CG_nbr_list,
+                                                   cg_adj=cg_adj # contains the weighted edges
+                                                   )
+            H = H + dH_message
+            V = V + dV_message
+
+            # update block
+            dH_update, dV_update = self.update_blocks[i](s_i=H,
+                                                v_i=V)
+            H = H + dH_update
+            V = V + dV_update
+
+        return H, V 
+
+
+class DiffpoolMessageBlock(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+        self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
+                                            out_feat_dim=feat_dim * 4, 
+                                            activation=activation,
+                                            n_rbf=n_rbf,
+                                            cutoff=cutoff,
+                                            dropout=dropout)
+
+    def forward(self,
+                s_j,
+                v_j,
+                r_ij,
+                nbrs,
+                cg_adj):
+
+        dist, unit = preprocess_r(r_ij)
+        inv_out = self.inv_message(s_j=s_j,
+                                   dist=dist,
+                                   nbrs=nbrs)
+
+        inv_out = inv_out.reshape(inv_out.shape[0], 4, -1)
+
+        split_0 = inv_out[:, 0, :].unsqueeze(-1)
+        split_1 = inv_out[:, 1, :]
+        split_2 = inv_out[:, 2, :].unsqueeze(-1)
+        split_3 = inv_out[:, 3, :].unsqueeze(-1)
+
+        unit_add = split_2 * unit.unsqueeze(1)
+        delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1]] + split_3 * torch.cross(v_j[nbrs[:, 0]], 
+                                                                                  v_j[nbrs[:, 1]])
+        delta_s_ij = split_1
+        
+        graph_size = s_j.shape[0]
+        delta_v_i = scatter_add(src=delta_v_ij * cg_adj[nbrs[:,0], nbrs[:,1]][..., None, None],
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+
+        delta_s_i = scatter_add(src=delta_s_ij * cg_adj[nbrs[:,0], nbrs[:,1]][..., None],
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+
+        return delta_s_i, delta_v_i
