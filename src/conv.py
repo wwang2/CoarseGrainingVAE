@@ -352,11 +352,11 @@ class ContractiveMessageBlock(nn.Module):
         delta_v_iI = unit_add + split_0 * v_i
         delta_s_iI = split_1
 
-        delta_v_I = scatter_mean(src=delta_v_iI,
+        delta_v_I = scatter_add(src=delta_v_iI,
                                 index=mapping,
                                 dim=0)
 
-        delta_s_I = scatter_mean(src=delta_s_iI,
+        delta_s_I = scatter_add(src=delta_s_iI,
                                 index=mapping,
                                 dim=0)
 
