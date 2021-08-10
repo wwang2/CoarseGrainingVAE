@@ -3,7 +3,7 @@ import numpy as np
 import networkx as nx
 import itertools
 from data import *
-from model import * 
+from torch_scatter import scatter_mean, scatter_add
 import glob 
 import sys
 
