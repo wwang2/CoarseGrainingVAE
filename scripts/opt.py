@@ -52,6 +52,7 @@ if params['id'] == None:
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=4)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.01), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.0001, max=0.001), transformation="log"),
             dict(name='n_epochs', type='int', bounds=dict(min=30, max=80)),
             #dict(name='dir_mp', type='categorical', categorical_values=["True", "False"]),
@@ -70,7 +71,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     suggestion = conn.experiments(experiment.id).suggestions().create()
     trial =  suggestion.assignments
 
-    dir_mp_flag = True
+    dir_mp_flag = False
 
     if not params['dry_run']:
         n_epochs = trial['n_epochs']  

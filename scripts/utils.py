@@ -41,7 +41,7 @@ def batch_to(batch, device):
     return gpu_batch
 
 def loop(loader, optimizer, device, model, beta, epoch, 
-        loss_graph_factor, train=True, looptext='', tqdm_flag=True):
+        gamma, train=True, looptext='', tqdm_flag=True):
     
     recon_loss = []
     kl_loss = []
@@ -75,7 +75,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
         data_dist = (xyz[nbr_list[:, 0 ]] - xyz[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
-        loss = loss_kl * beta + loss_recon + loss_graph * loss_graph_factor
+        loss = loss_kl * beta + loss_recon + loss_graph * gamma
         
         # optimize 
         if train:
