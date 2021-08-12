@@ -57,6 +57,7 @@ def run_cv(params):
     graph_eval = params['graph_eval']
     tqdm_flag = params['tqdm_flag']
     n_ensemble = params['n_ensemble']
+    gamma = params['gamma']
     min_lr = 1e-6
 
     # download data from mdshare 
@@ -150,7 +151,9 @@ def run_cv(params):
                             atomwise_z=atom_decode_flag).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, factor=0.6, verbose=True,  min_lr=min_lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, 
+                                                                factor=0.6, verbose=True, 
+                                                                threshold=1e-3,  min_lr=min_lr)
         
         model.train()
 
@@ -161,11 +164,13 @@ def run_cv(params):
         for epoch in range(nepochs):
             # train
             mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
-                                                       model, beta, epoch, train=True,
+                                                       model, beta, epoch, 
+                                                       train=True,
+                                                        gamma=gamma,
                                                         looptext='Ncg {} Fold {}'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
             
-            scheduler.step(mean_recon + mean_kl * beta)
+            scheduler.step(mean_recon)
 
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
             kl_loss_hist.append(mean_kl)
@@ -374,6 +379,7 @@ if __name__ == '__main__':
     parser.add_argument("-n_ensemble", type=int, default=16)
     parser.add_argument("-nevals", type=int, default=36)
     parser.add_argument("-beta", type=float, default=0.001)
+    parser.add_argument("-gamma", type=float, default=0.01)
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
     parser.add_argument("--graph_eval", action='store_true', default=False)
@@ -383,6 +389,7 @@ if __name__ == '__main__':
     parser.add_argument("--dir_mp", action='store_true', default=False)
     parser.add_argument("--atom_decode", action='store_true', default=False)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
+
     params = vars(parser.parse_args())
 
     run_cv(params)

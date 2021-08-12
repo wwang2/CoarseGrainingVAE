@@ -40,7 +40,8 @@ def batch_to(batch, device):
         gpu_batch[key] = val.to(device) if hasattr(val, 'to') else val
     return gpu_batch
 
-def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='', tqdm_flag=True):
+def loop(loader, optimizer, device, model, beta, epoch, 
+        loss_graph_factor, train=True, looptext='', tqdm_flag=True):
     
     recon_loss = []
     kl_loss = []
@@ -65,7 +66,16 @@ def loop(loader, optimizer, device, model, beta, epoch, train=True, looptext='',
         loss_kl = KL(S_mu, S_sigma, H_prior_mu, H_prior_sigma) 
 
         loss_recon = (xyz_recon - xyz).pow(2).mean()
-        loss = loss_kl * beta + loss_recon
+
+
+        # add graph loss 
+        nbr_list = batch['nbr_list']
+        xyz = batch['nxyz'][:, 1:]
+        gen_dist = (xyz_recon[nbr_list[:, 0 ]] - xyz_recon[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
+        data_dist = (xyz[nbr_list[:, 0 ]] - xyz[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
+        loss_graph = (gen_dist - data_dist).pow(2).mean()
+
+        loss = loss_kl * beta + loss_recon + loss_graph * loss_graph_factor
         
         # optimize 
         if train:
