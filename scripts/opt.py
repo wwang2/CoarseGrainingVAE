@@ -112,8 +112,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     if not failed:
         conn.experiments(experiment.id).observations().create(
           suggestion=suggestion.id,
-          value=target_mean,
-          value_stddev=target_std
+          value=cv_mean,
+          value_stddev=cv_std
         )
     elif failed:
         conn.experiments(experiment.id).observations().create(
