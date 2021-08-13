@@ -71,7 +71,7 @@ def run_cv(params):
         atomic_nums, protein_index = get_atomNum(traj)
 
     else:
-        raise ValueError("data label not recognized")
+        raise ValueError("data label {} not recognized".format(dataset_label))
 
     # mapping options: alpha carbon, backbone, Girvan-Newman
     
@@ -153,7 +153,7 @@ def run_cv(params):
         optimizer = optim(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, 
                                                                 factor=0.6, verbose=True, 
-                                                                threshold=1e-3,  min_lr=min_lr)
+                                                                threshold=5e-4,  min_lr=min_lr)
         
         model.train()
 
