@@ -82,17 +82,7 @@ class EquivariantDecoder(nn.Module):
                          dropout=0.0)
              for _ in range(num_conv)]
         )
-        self.atomwise_z = atomwise_z
 
-        # layers to couple H and h
-
-        self.atom2CGcoupling = nn.Sequential(Dense(in_features=2 * n_atom_basis,
-                                           out_features=2 * n_atom_basis,
-                                           bias=True,
-                                           activation=to_module(activation)),
-                                     Dense(in_features=2 * n_atom_basis,
-                                           out_features=n_atom_basis,
-                                           bias=True))
     
     def forward(self, cg_xyz, CG_nbr_list, mapping, H, h):
     
@@ -177,17 +167,17 @@ class EquiEncoder(nn.Module):
         [ContractiveMessageBlock(feat_dim=n_atom_basis,
                                          activation=activation,
                                          n_rbf=n_rbf,
-                                         cutoff=cutoff,
+                                         cutoff=20.0,
                                          dropout=0.0)
          for _ in range(n_conv)])
         
-        self.atom2CGcoupling = nn.Sequential(Dense(in_features=2 * n_atom_basis,
-                                           out_features=2 * n_atom_basis,
-                                           bias=True,
-                                           activation=to_module(activation)),
-                                     Dense(in_features=2 * n_atom_basis,
-                                           out_features=n_atom_basis,
-                                           bias=True))
+        self.atom2CGcouplings =nn.ModuleList( [ nn.Sequential(Dense(in_features=n_atom_basis,
+                                                       out_features=n_atom_basis,
+                                                       bias=True,
+                                                       activation=to_module(activation)),
+                                                 Dense(in_features=n_atom_basis,
+                                                       out_features=n_atom_basis,
+                                                       bias=True)) for _ in range(n_conv)])
 
         self.n_conv = n_conv
         self.dir_mp = dir_mp
@@ -199,6 +189,7 @@ class EquiEncoder(nn.Module):
         # atomic embedding
         if not self.dir_mp:
             nbr_list, _ = make_directed(nbr_list)
+        cg_nbr_list, _ = make_directed(cg_nbr_list)
 
         h = self.atom_embed(z.long())
         v = torch.zeros(h.shape[0], h.shape[1], 3).to(h.device)
@@ -214,40 +205,49 @@ class EquiEncoder(nn.Module):
                                                    v_j=v,
                                                    r_ij=r_ij,
                                                    nbrs=nbr_list)
-            h = h + ds_message
-            v = v + dv_message
+            h = h + 0.5 * ds_message
+            v = v + 0.5 * dv_message
 
-            # update block
+            # # update block
             ds_update, dv_update = self.update_blocks[i](s_i=h, v_i=v)
-            h = h + ds_update # atom message 
-            v = v + dv_update
+            h = h + 0.5 *  ds_update # atom message 
+            v = v + 0.5 *  dv_update
 
-            # contruct atom messages 
-            if i == 0:
-                H = scatter_mean(h, mapping, dim=0)
-                V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
+            # # contruct atom messages 
+            # if i == 0:
+            #     H = scatter_mean(h, mapping, dim=0)
+            #     V = scatter_mean(v, mapping, dim=0)  #torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
+            #     #V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
 
-            # CG message passing 
-            delta_H, delta_V = self.cgmessage_layers[i](h, v, r_iI, mapping)
+            # # CG message passing 
+            # dH, dV = self.cgmessage_layers[i](h, v, r_iI, mapping)
 
-            H = H + delta_H
-            V = V + delta_V
+            # H = H + dH
+            # V = V + dV
 
-            dH_update, dV_update = self.cg_update_blocks[i](s_i=H, v_i=V)
-            H = H + dH_update # atom message 
-            V = V + dV_update
+            #h = h + H[mapping]
 
-            # if self.cg_mp:
-            #     dS_message, dV_message = self.cg_message_blocks[i](s_j=S_I,
-            #                                            v_j=V_I,
-            #                                            r_ij=r_IJ,
-            #                                            nbrs=cg_nbr_list)
-            #     S_I = S_I + dS_message
-            #     V_I = V_I + dV_message
+            # dH_update, dV_update = self.cg_update_blocks[i](s_i=H, v_i=V)
+            # H = H + dH_update # atom message 
+            # V = V + dV_update
 
-            #     dS_update, dV_update = self.cg_update_blocks[i](s_i=S_I, v_i=V_I)
-            #     S_I = S_I + dS_update # atom message 
-            #     V_I = V_I + dV_update
+            # # couple the cg message back
+
+            # #h = h + self.atom2CGcouplings[i](H[mapping])
+
+
+            # # convolution on the CG graph 
+            # dH_message, dV_message = self.cg_message_blocks[i](s_j=H,
+            #                                        v_j=V,
+            #                                        r_ij=r_IJ,
+            #                                        nbrs=cg_nbr_list)
+            # H = H + dH_message
+            #V = V + dV_message
+
+            # dS_update, dV_update = self.cg_update_blocks[i](s_i=S_I, v_i=V_I)
+            # H = H + dS_update # atom message 
+            # V_I = V_I + dV_update
+        H = scatter_mean(h, mapping, dim=0)
           
         return H, h
 
@@ -295,8 +295,8 @@ class CGprior(nn.Module):
     def forward(self, cg_z, cg_xyz,  cg_nbr_list):
         
         # atomic embedding
-        if not self.dir_mp:
-            nbr_list, _ = make_directed(cg_nbr_list)
+        #if not self.dir_mp:
+        cg_nbr_list, _ = make_directed(cg_nbr_list)
 
         h = self.atom_embed(cg_z.long())
         v = torch.zeros(h.shape[0], h.shape[1], 3).to(h.device)
