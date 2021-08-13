@@ -58,7 +58,7 @@ def run_cv(params):
     tqdm_flag = params['tqdm_flag']
     n_ensemble = params['n_ensemble']
     gamma = params['gamma']
-    min_lr = 1e-6
+    min_lr = 1e-7
 
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
@@ -153,7 +153,7 @@ def run_cv(params):
         optimizer = optim(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, 
                                                                 factor=0.6, verbose=True, 
-                                                                threshold=5e-4,  min_lr=min_lr)
+                                                                threshold=1e-4,  min_lr=min_lr)
         
         model.train()
 
