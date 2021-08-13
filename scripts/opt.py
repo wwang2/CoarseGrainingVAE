@@ -54,7 +54,7 @@ if params['id'] == None:
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.01), transformation="log"),
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.0001, max=0.001), transformation="log"),
-            dict(name='n_epochs', type='int', bounds=dict(min=30, max=80)),
+            dict(name='n_epochs', type='int', bounds=dict(min=30, max=150)),
             #dict(name='dir_mp', type='categorical', categorical_values=["True", "False"]),
             #dict(name='dec_type', type='categorical', categorical_values=["EquivariantDecoder", "ENDecoder"]),
         ],
@@ -84,7 +84,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['ndata'] = ndata
     trial['nsamples'] = 20
     trial['n_cgs'] = params['n_cgs']
-    trial['nsplits'] = 3
+    trial['nsplits'] = 2
     trial['randommap'] = False
     trial['shuffle'] = False
     trial['optimizer'] = 'adam'
@@ -112,8 +112,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     if not failed:
         conn.experiments(experiment.id).observations().create(
           suggestion=suggestion.id,
-          value=cv_mean,
-          value_stddev=cv_std
+          value=cv_ged_mean,
+          value_stddev=cv_ged_std
         )
     elif failed:
         conn.experiments(experiment.id).observations().create(
