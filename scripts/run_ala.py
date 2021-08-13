@@ -352,7 +352,7 @@ def run_cv(params):
         with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
             print("TRAINING FAILED", file=text_file)
 
-    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), np.array(cv_graph_diff).mean(), np.array(cv_graph_diff).std(), failed
+    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), np.array(cv_graph_hh_diff).mean(), np.array(cv_graph_hh_diff).std(), failed
 
 
 if __name__ == '__main__':
