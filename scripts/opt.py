@@ -74,7 +74,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     dir_mp_flag = False
 
     if not params['dry_run']:
-        n_epochs = trial['n_epochs']  
+        n_epochs = params['n_epochs']  
 
     trial['logdir'] = os.path.join(params['logdir'], suggestion.id)
     trial['device'] = params['device']
