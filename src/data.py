@@ -31,6 +31,70 @@ def get_neighbor_list(xyz, device='cpu', cutoff=5, undirected=True):
 
     return nbr_list
 
+class DiffPoolDataset(TorchDataset):
+    
+    def __init__(self,
+                 props,
+                 check_props=True):
+        self.props = props
+
+    def __len__(self):
+        return len(self.props['xyz'])
+
+    def __getitem__(self, idx):
+        return {key: val[idx] for key, val in self.props.items()}
+    
+    def generate_neighbor_list(self, atom_cutoff,  device='cpu',  undirected=True):
+        nbr_list = []
+        for xyz in tqdm(self.props['xyz'], desc='building nbr list', file=sys.stdout):
+            nbr_list.append(get_neighbor_list(xyz, device, atom_cutoff, undirected).to("cpu"))
+
+        self.props['nbr_list'] = nbr_list
+
+
+def DiffPool_collate(dicts):
+
+    batch = {}
+    xyzs = padding_tensor([dict['xyz'] for dict in dicts])
+    zs = padding_tensor([dict['z'] for dict in dicts])
+    
+    bonds_batch = []
+    bonds = [dict['bond_edge_list'] for dict in dicts]
+    nbrs_batch = []
+    nbrs = [dict['nbr_list'] for dict in dicts]
+    
+    for i, bond in enumerate(bonds):
+        batch_index = torch.LongTensor([i] * bond.shape[0])        
+        bonds_batch.append((torch.cat( (batch_index.unsqueeze(-1), bond),dim=-1 ) )) 
+        
+    for i, nbr in enumerate(nbrs):
+        batch_index = torch.LongTensor([i] * nbr.shape[0])        
+        nbrs_batch.append((torch.cat( (batch_index.unsqueeze(-1), nbr),dim=-1 ) )) 
+        
+    nbrs_batch = torch.cat(nbrs_batch)
+    bonds_batch = torch.cat(bonds_batch)
+        
+    return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch}
+
+
+def padding_tensor(sequences):
+    """
+    :param sequences: list of tensors
+    :return:
+    """
+    num = len(sequences)
+    max_len = max([s.size(0) for s in sequences])
+    
+    out_dims = [num, max_len] + list(sequences[0].shape)[1:]
+    
+    out_tensor = sequences[0].data.new(*out_dims).fill_(0)
+    mask = sequences[0].data.new(*out_dims).fill_(0)
+    for i, tensor in enumerate(sequences):
+        length = tensor.size(0)
+        out_tensor[i, :length] = tensor
+        mask[i, :length] = 1
+    return out_tensor, mask
+    
 
 class CGDataset(TorchDataset):
     
