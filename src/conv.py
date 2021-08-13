@@ -213,6 +213,9 @@ class EquiMessageBlock(nn.Module):
                                             cutoff=cutoff,
                                             dropout=dropout)
 
+        self.h_att = nn.Sequential(nn.Linear(feat_dim, feat_dim), nn.ReLU(), nn.Linear(feat_dim, feat_dim))
+        self.v_att = nn.Sequential(nn.Linear(feat_dim, feat_dim), nn.ReLU(), nn.Linear(feat_dim, feat_dim))
+
     def forward(self,
                 s_j,
                 v_j,
@@ -223,6 +226,7 @@ class EquiMessageBlock(nn.Module):
         inv_out = self.inv_message(s_j=s_j,
                                    dist=dist,
                                    nbrs=nbrs)
+        graph_size = s_j.shape[0]
 
         inv_out = inv_out.reshape(inv_out.shape[0], 3, -1)
 
@@ -234,15 +238,30 @@ class EquiMessageBlock(nn.Module):
         delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1]]
         delta_s_ij = split_1
 
-        # add results from neighbors of each node
+        # # add results from neighbors of each node
 
-        graph_size = s_j.shape[0]
-        delta_v_i = scatter_add(src=delta_v_ij,
+        # h_att_wgt = torch.exp(-self.h_att(s_j[nbrs[:, 1]]) )
+        # h_att_norm = scatter_add(h_att_wgt, 
+        #                         index=nbrs[:, 0],
+        #                          dim=0,
+        #                         dim_size=graph_size)
+
+        # h_att_norm_wgt = h_att_wgt / h_att_norm[nbrs[:, 0]]
+
+        # v_att_wgt = torch.exp(-self.v_att(s_j[nbrs[:, 1]]) )
+        # v_att_norm = scatter_add(v_att_wgt, 
+        #                         index=nbrs[:, 0],
+        #                          dim=0,
+        #                         dim_size=graph_size)
+
+        # v_att_norm_wgt = v_att_wgt / v_att_norm[nbrs[:, 0]]
+
+        delta_v_i = scatter_add(src=delta_v_ij, #* v_att_norm_wgt.unsqueeze(-1),
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
 
-        delta_s_i = scatter_add(src=delta_s_ij,
+        delta_s_i = scatter_add(src=delta_s_ij, #* h_att_norm_wgt,
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
