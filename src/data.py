@@ -55,8 +55,8 @@ class DiffPoolDataset(TorchDataset):
 def DiffPool_collate(dicts):
 
     batch = {}
-    xyzs = padding_tensor([dict['xyz'] for dict in dicts])
-    zs = padding_tensor([dict['z'] for dict in dicts])
+    xyzs, xyz_pad = padding_tensor([dict['xyz'] for dict in dicts])
+    zs, z_pad = padding_tensor([dict['z'] for dict in dicts])
     
     bonds_batch = []
     bonds = [dict['bond_edge_list'] for dict in dicts]
@@ -74,7 +74,7 @@ def DiffPool_collate(dicts):
     nbrs_batch = torch.cat(nbrs_batch)
     bonds_batch = torch.cat(bonds_batch)
         
-    return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch}
+    return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch, 'pad': z_pad}
 
 
 def padding_tensor(sequences):
