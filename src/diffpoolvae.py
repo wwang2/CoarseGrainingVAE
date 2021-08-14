@@ -37,18 +37,16 @@ class CGpool(nn.Module):
             dh = torch.einsum('bif,bij->bjf', h, adj)
             h = h + dh 
 
-        H = torch.einsum('bnj,bnf->bjf', a, h)
+        assign = F.gumbel_softmax(self.cg_network(h), tau=tau, dim=-1, hard=True)
 
-        # to be replaced with gumbel softmax 
-        a = F.gumbel_softmax(self.cg_network(h), tau=tau, dim=-1, hard=True)
-
+        H = torch.einsum('bnj,bnf->bjf', assign, h)
         # get coordinates 
-        cg_xyz = torch.einsum("bin,bij->bjn", xyz, a)
+        cg_xyz = torch.einsum("bin,bij->bjn", xyz, assign)
 
         # compute weighted adjacency 
-        cg_adj = a.transpose(1,2).matmul(adj).matmul(a)
+        cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
 
-        return h, H, cg_xyz, cg_adj
+        return assign, h, H, cg_xyz, cg_adj
 
 class DiffCGContracMessageBlock(nn.Module):
     def __init__(self,
@@ -121,41 +119,57 @@ class Enc(nn.Module):
     def __init__(self,
                  feat_dim,
                  activation,
-                 n_cg,
-                 n_rbf,
                  cutoff):
         super().__init__()
         
         self.feat_dim = feat_dim
+        self.dist_filter = Dense(in_features=feat_dim,
+                      out_features=feat_dim * 3,
+                      bias=True,
+                      dropout_rate=0.0)
         
-        self.h_embed = nn.Linear(n_cg, num_features)
-        self.H_embed = nn.Linear(n_cg, num_features)
+        self.inv_dense = nn.Sequential(Dense(in_features=feat_dim,
+                                  out_features=feat_dim,
+                                  bias=True,
+                                  dropout_rate=0.0,
+                                  activation=to_module(activation)),
+                            Dense(in_features=feat_dim,
+                                  out_features=3 * feat_dim,
+                                  bias=True,
+                                  dropout_rate=0.0))
+        
+        self.cutoff = cutoff
+        
+    def forward(self, assign, h, H, cg_xyz, xyz, cg_adj):
+        
+        V_I = torch.zeros(H.shape[0], H.shape[1], H.shape[2], 3).to(h.device)
+        v_i = torch.zeros(h.shape[0], h.shape[1], H.shape[2], 3).to(h.device)
+        
+        r_iI = (xyz.unsqueeze(1) - cg_xyz.unsqueeze(2))
+        d_iI = r_iI.pow(2).sum(-1).sqrt()
+        unit = r_iI / d_iI.unsqueeze(-1)
+        offset = torch.linspace(0.0, self.cutoff, self.feat_dim)
+        
+        phi = self.inv_dense(h)
+        expanded_dist = (-(d_iI.unsqueeze(-1) - offset).pow(2)).exp()
+        w_s = self.dist_filter(expanded_dist)
 
-        self.DiffCGContracMessageBlock = DiffCGContracMessageBlock(feat_dim=feat_dim,
-                                                                 activation=activation,
-                                                                 n_rbf=n_rbf,
-                                                                 cutoff=cutoff,
-                                                                 dropout=0.0)
-        self.update = conv.UpdateBlock(feat_dim=num_features,
-                         activation=activation,
-                         dropout=0.0)
-        # update block
+        shape = list(w_s.shape[:-1])
         
-    def forward(self, h, H, cg_xyz, assignment_pad, cg_adj):
+        filter_w = (w_s * phi.unsqueeze(1)).reshape(shape + [h.shape[-1], 3])
         
-        h = self.h_embed(h)
-        H = self.H_embed(H)
+        split_0 = filter_w[..., 0].unsqueeze(-1)
+        split_1 = filter_w[..., 1]
+        split_2 = filter_w[..., 2].unsqueeze(-1)
         
-        V_I = torch.zeros(H.shape[0], self.feat_dim, 3).to(h.device)
-        v_i = torch.zeros(z.shape[0], self.feat_dim, 3).to(h.device)
-        
-        mask_iI = assignment_pad.nonzero()
-        r_iI = xyz[mask_iI[:, 0]] - cg_xyz[mask_iI[:, 1]]
-        
-        dH, dV = self.DiffCGContracMessageBlock(h, v_i, r_iI, assignment_pad)
-        
+        unit_add = split_2 * unit.unsqueeze(-2)
+        delta_v_iI = unit_add + split_0 * v_i.unsqueeze(1)
+        delta_s_iI = split_1
+
+        dV = delta_v_iI.sum(2)
+        dH = delta_s_iI.sum(2)
+
         return H + dH, V_I+dV
-
 
 class DiffPoolDecoder(nn.Module):
     def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation):   
