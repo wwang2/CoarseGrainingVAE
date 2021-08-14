@@ -37,18 +37,16 @@ class CGpool(nn.Module):
             dh = torch.einsum('bif,bij->bjf', h, adj)
             h = h + dh 
 
-        h = self.cg_network(h)
+        H = torch.einsum('bnj,bnf->bjf', a, h)
 
         # to be replaced with gumbel softmax 
-        a = F.gumbel_softmax(h, tau=tau, dim=-1, hard=True)
+        a = F.gumbel_softmax(self.cg_network(h), tau=tau, dim=-1, hard=True)
 
         # get coordinates 
         cg_xyz = torch.einsum("bin,bij->bjn", xyz, a)
 
         # compute weighted adjacency 
         cg_adj = a.transpose(1,2).matmul(adj).matmul(a)
-        
-        H = torch.einsum('bnj,bnf->bjf', a, h)
 
         return h, H, cg_xyz, cg_adj
 
