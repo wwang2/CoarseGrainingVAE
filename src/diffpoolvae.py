@@ -25,27 +25,33 @@ class CGpool(nn.Module):
                                        nn.Tanh(), 
                                        nn.Linear(n_atom_basis, n_cgs))
 
-    def forward(self, atoms_nodes, xyz, bond_edges):  
+    def forward(self, atoms_nodes, xyz, bond_edges, tau):  
 
-        bond_edges, _ = make_directed(bond_edges)
-        h = self.atom_embed(atoms_nodes)
+        h = self.atom_embed(batch['z'].to(torch.long))
+
+        xyz = batch['xyz']
+        bond = batch['bonds']
+
+        adj = torch.zeros(h.shape[0], h.shape[1], h.shape[1])
+        adj[bond[:, 0], bond[:,1], bond[:,2]] = 1
+        adj[bond[:, 0], bond[:,2], bond[:,1]] = 1
 
         for conv in self.update:
-            dh = scatter_add(conv(h[bond_edges[:, 1]]), bond_edges[:, 0], dim=0)
+            dh = torch.einsum('bif,bij->bjf', h, adj)
             h = h + dh 
+
         h = self.cg_network(h)
 
-        a = F.softmax(h, dim=-1)
-        assignment_pad = torch.block_diag( *torch.split(a, batch['num_atoms'].tolist()) )
-        cg_adj = assignment_pad[edge[:, 0]].t().matmul(assignment_pad[edge[:, 1]])
-        atom2cgmap = assignment_pad.nonzero()
+        # to be replaced with gumbel softmax 
+        a = F.gumbel_softmax(h, tau=tau, dim=-1, hard=True)
 
-        assignment_pad = assignment_pad / assignment_pad.sum(0)[None, :]
-        ciI_flat = assignment_pad[atom2cgmap[:,0], atom2cgmap[:,1]]
-        cg_xyz = scatter_add(ciI_flat[..., None] * xyz[atom2cgmap[:, 0]], atom2cgmap[:, 1], dim=0)
+        # get coordinates 
+        cg_xyz = torch.einsum("bin,bij->bjn", xyz, a)
+
+        # compute weighted adjacency 
+        cg_adj = a.transpose(1,2).matmul(adj).matmul(a)[0].detach().numpy()
     
-        return h, cg_xyz, assignment_pad, cg_adj
-
+        return h, cg_xyz, cg_adj
 
  class DiffCGContracMessageBlock(nn.Module):
     def __init__(self,
