@@ -25,16 +25,13 @@ class CGpool(nn.Module):
                                        nn.Tanh(), 
                                        nn.Linear(n_atom_basis, n_cgs))
 
-    def forward(self, atoms_nodes, xyz, bond_edges, tau):  
+    def forward(self, atoms_nodes, xyz, bonds, tau):  
 
-        h = self.atom_embed(batch['z'].to(torch.long))
-
-        xyz = batch['xyz']
-        bond = batch['bonds']
+        h = self.atom_embed(atoms_nodes.to(torch.long))
 
         adj = torch.zeros(h.shape[0], h.shape[1], h.shape[1])
-        adj[bond[:, 0], bond[:,1], bond[:,2]] = 1
-        adj[bond[:, 0], bond[:,2], bond[:,1]] = 1
+        adj[bonds[:, 0], bonds[:,1], bonds[:,2]] = 1
+        adj[bonds[:, 0], bonds[:,2], bonds[:,1]] = 1
 
         for conv in self.update:
             dh = torch.einsum('bif,bij->bjf', h, adj)
@@ -49,11 +46,13 @@ class CGpool(nn.Module):
         cg_xyz = torch.einsum("bin,bij->bjn", xyz, a)
 
         # compute weighted adjacency 
-        cg_adj = a.transpose(1,2).matmul(adj).matmul(a)[0].detach().numpy()
-    
-        return h, cg_xyz, cg_adj
+        cg_adj = a.transpose(1,2).matmul(adj).matmul(a)
+        
+        H = torch.einsum('bnj,bnf->bjf', a, h)
 
- class DiffCGContracMessageBlock(nn.Module):
+        return h, H, cg_xyz, cg_adj
+
+class DiffCGContracMessageBlock(nn.Module):
     def __init__(self,
                  feat_dim,
                  activation,
