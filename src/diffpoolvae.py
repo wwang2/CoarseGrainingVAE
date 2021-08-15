@@ -48,72 +48,6 @@ class CGpool(nn.Module):
 
         return assign, h, H, cg_xyz, cg_adj
 
-class DiffCGContracMessageBlock(nn.Module):
-    def __init__(self,
-                 feat_dim,
-                 activation,
-                 n_rbf,
-                 cutoff,
-                 dropout):
-        super().__init__()
-
-        
-        self.inv_dense = nn.Sequential(Dense(in_features=feat_dim,
-                                          out_features=feat_dim,
-                                          bias=True,
-                                          dropout_rate=dropout,
-                                          activation=to_module(activation)),
-                                    Dense(in_features=feat_dim,
-                                          out_features=3 * feat_dim,
-                                          bias=True,
-                                          dropout_rate=dropout))
-
-    
-        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
-                                        cutoff=cutoff,
-                                        feat_dim=3 * feat_dim,
-                                        dropout=dropout)
-
-    def forward(self,
-                h_i,
-                v_i,
-                r_iI,
-                assignment_pad):
-
-        
-        mask_iI = assignment_pad.nonzero()
-
-        
-        d_iI = r_iI.pow(2).sum(-1).sqrt()
-        unit = r_iI / d_iI.unsqueeze(-1)
-        
-        phi = contraction.inv_dense(h)
-        w_s = contraction.dist_embed(d_iI)
-
-        inv_out = phi[mask_iI[:, 1]] * w_s
-        inv_out = inv_out.reshape(inv_out.shape[0], 3, -1)
-
-        ciI_flat = assignment_pad[mask_iI[:,0], mask_iI[:,1]]
-        
-        split_0 = inv_out[:, 0, :].unsqueeze(-1)
-        split_1 = inv_out[:, 1, :]
-        split_2 = inv_out[:, 2, :].unsqueeze(-1)
-
-        unit_add = split_2 * unit.unsqueeze(1)
-        delta_v_iI = unit_add + split_0 * v_i[mask_iI[:,0]]
-        delta_s_iI = split_1
-
-        # scatter_mean weighed by assignment weights 
-        dV = scatter_add(src=ciI_flat[..., None, None] *  delta_v_iI,
-                                index=mask_iI[:,1],
-                                dim=0)
-
-        dH = scatter_add(src=ciI_flat[..., None] * delta_s_iI,
-                                index=mask_iI[:,1],
-                                dim=0)
-
-        return dH, dV
-
 
 class Enc(nn.Module):
     def __init__(self,
@@ -156,6 +90,7 @@ class Enc(nn.Module):
 
         shape = list(w_s.shape[:-1])
         
+        # is this correct? 
         filter_w = (w_s * phi.unsqueeze(1)).reshape(shape + [h.shape[-1], 3])
         
         split_0 = filter_w[..., 0].unsqueeze(-1)
@@ -163,11 +98,11 @@ class Enc(nn.Module):
         split_2 = filter_w[..., 2].unsqueeze(-1)
         
         unit_add = split_2 * unit.unsqueeze(-2)
-        delta_v_iI = unit_add + split_0 * v_i.unsqueeze(1)
-        delta_s_iI = split_1
+        dv_iI = unit_add + split_0 * v_i.unsqueeze(1)
+        ds_iI = split_1
 
-        dV = delta_v_iI.sum(2)
-        dH = delta_s_iI.sum(2)
+        dV = dv_iI.sum(2)
+        dH = ds_iI.sum(2)
 
         return H + dH, V_I+dV
 
@@ -261,19 +196,19 @@ class DiffpoolMessageBlock(nn.Module):
         split_3 = inv_out[:, 3, :].unsqueeze(-1)
 
         unit_add = split_2 * unit.unsqueeze(1)
-        delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1]] + split_3 * torch.cross(v_j[nbrs[:, 0]], 
+        dv_ij = unit_add + split_0 * v_j[nbrs[:, 1]] + split_3 * torch.cross(v_j[nbrs[:, 0]], 
                                                                                   v_j[nbrs[:, 1]])
-        delta_s_ij = split_1
+        ds_ij = split_1
         
         graph_size = s_j.shape[0]
-        delta_v_i = scatter_add(src=delta_v_ij * cg_adj[nbrs[:,0], nbrs[:,1]][..., None, None],
+        dv_i = scatter_add(src=dv_ij * cg_adj[nbrs[:,0], nbrs[:,1]][..., None, None],
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
 
-        delta_s_i = scatter_add(src=delta_s_ij * cg_adj[nbrs[:,0], nbrs[:,1]][..., None],
+        ds_i = scatter_add(src=ds_ij * cg_adj[nbrs[:,0], nbrs[:,1]][..., None],
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
 
-        return delta_s_i, delta_v_i
+        return ds_i, dv_i
