@@ -90,6 +90,12 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None):
 
         frames = shuffle(frames)
 
+    elif cg_method =='random':
+
+        mapping = get_random_mapping(n_cgs, n_atoms)
+        cg_coord = None
+        frames = shuffle(frames)
+
     else:
         raise ValueError("{} coarse-graining option not available".format(cg_method))
 
