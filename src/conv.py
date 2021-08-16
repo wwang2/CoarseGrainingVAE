@@ -209,17 +209,32 @@ class DenseEquiMessageBlock(nn.Module):
                                                   out_features=num_features,
                                                   bias=True,
                                                   dropout_rate=0.0,
-                                                  activation=to_module('ReLU')),
+                                                  activation=to_module(activation)),
                                             Dense(in_features=num_features,
-                                                  out_features=3 * num_features,
+                                                  out_features=num_features,
                                                   bias=True,
                                                   dropout_rate=0.0))
 
-        self.dist_filter = Dense(in_features=num_features,
-                      out_features=num_features * 3,
-                      bias=True,
-                      dropout_rate=0.0)
+        self.dist_filter = nn.Sequential( Dense(in_features=num_features,
+                                                  out_features=num_features,
+                                                  bias=True,
+                                                  dropout_rate=0.0,
+                                                  activation=to_module(activation)),
+                                            Dense(in_features=num_features,
+                                                  out_features=num_features,
+                                                  bias=True,
+                                                  dropout_rate=0.0))
+        self.update_filter = nn.Sequential( Dense(in_features=num_features,
+                                          out_features=num_features,
+                                          bias=True,
+                                          dropout_rate=0.0,
+                                          activation=to_module(activation)),
+                                    Dense(in_features=num_features,
+                                          out_features=3 * num_features,
+                                          bias=True,
+                                          dropout_rate=0.0))
 
+        self.layer_norm = nn.LayerNorm(num_features)
         self.offset = torch.linspace(0.0, cutoff, num_features)
         
     def forward(self, h, v, adj, xyz):
@@ -234,19 +249,33 @@ class DenseEquiMessageBlock(nn.Module):
         w = self.dist_filter(expanded_dist)
         shape = list(w.shape[:-1])
 
-        filter_w = (w *  phi.unsqueeze(2) * phi.unsqueeze(1)).reshape(shape + [h.shape[-1], 3])
+        print("phi_wegiht" ,phi.abs().mean())
+
+        print("w_wegiht" ,w.abs().mean())
+        
+        filter_w = self.update_filter((w *   phi.unsqueeze(1) * phi.unsqueeze(2))).reshape(shape + [h.shape[-1], 3])
+
+        print("filter_w_wegiht" ,filter_w.abs().mean())
 
         filter_r = filter_w[..., 0] * adj.unsqueeze(-1)
         filter_v = filter_w[..., 1] * adj.unsqueeze(-1)
         filter_h = filter_w[..., 2] * adj.unsqueeze(-1)
 
+        #import ipdb;ipdb.set_trace()
+
         dv_rcontribution = (filter_r.unsqueeze(-1) * unit_IJ.unsqueeze(-2)).sum(1)
-        dv_vcontribution = torch.einsum("bijf,bifv->bjfv", filter_v.squeeze() ,v)
+        #dv_rcontribution = (filter_r.unsqueeze(-1) * unit_IJ.unsqueeze(-2)).sum(1) + (filter_r.unsqueeze(-1) * unit_IJ.unsqueeze(-2)).sum(2)
+        dv_vcontribution = torch.einsum("bijf,bifv->bjfv", filter_v.squeeze() ,v) #+ torch.einsum("bijf,bjfv->bifv", filter_v.squeeze() ,v) 
         
         # todo add cross product contribution 
         dv = dv_rcontribution + dv_vcontribution
         dh = torch.einsum('bijf,bjf->bjf', filter_h, h)
         
+        print("h_wegiht" ,filter_h.abs().mean())
+        #import ipdb ;ipdb.set_trace()
+
+        dh = self.layer_norm(dh)
+
         return dh, dv 
 
 
