@@ -197,6 +197,58 @@ class EquiMessageCross(nn.Module):
         return delta_s_i, delta_v_i
 
 
+class DenseEquiMessageBlock(nn.Module):
+    def __init__(self,
+                 num_features,
+                 activation,
+                 n_rbf,
+                 cutoff):
+        super().__init__()
+        
+        self.inv_dense = nn.Sequential(Dense(in_features=num_features,
+                                                  out_features=num_features,
+                                                  bias=True,
+                                                  dropout_rate=0.0,
+                                                  activation=to_module('ReLU')),
+                                            Dense(in_features=num_features,
+                                                  out_features=3 * num_features,
+                                                  bias=True,
+                                                  dropout_rate=0.0))
+
+        self.dist_filter = Dense(in_features=num_features,
+                      out_features=num_features * 3,
+                      bias=True,
+                      dropout_rate=0.0)
+
+        self.offset = torch.linspace(0.0, cutoff, num_features)
+        
+    def forward(self, h, v, adj, xyz):
+        
+        R_IJ = xyz[:, None, :, :] - xyz[:, :, None, :] 
+        d_IJ = R_IJ.pow(2).sum(-1).sqrt()
+        unit_IJ = R_IJ / (d_IJ + torch.diag(torch.ones(h.shape[1]))[None, ...]).unsqueeze(-1)
+        
+        phi = self.inv_dense(h)
+
+        expanded_dist = (-(d_IJ.unsqueeze(-1) - self.offset).pow(2)).exp()
+        w = self.dist_filter(expanded_dist)
+        shape = list(w.shape[:-1])
+
+        filter_w = (w *  phi.unsqueeze(2) * phi.unsqueeze(1)).reshape(shape + [h.shape[-1], 3])
+
+        filter_r = filter_w[..., 0] * adj.unsqueeze(-1)
+        filter_v = filter_w[..., 1] * adj.unsqueeze(-1)
+        filter_h = filter_w[..., 2] * adj.unsqueeze(-1)
+
+        dv_rcontribution = (filter_r.unsqueeze(-1) * unit_IJ.unsqueeze(-2)).sum(1)
+        dv_vcontribution = torch.einsum("bijf,bifv->bjfv", filter_v.squeeze() ,v)
+        
+        # todo add cross product contribution 
+        dv = dv_rcontribution + dv_vcontribution
+        dh = torch.einsum('bijf,bjf->bjf', filter_h, h)
+        
+        return dh, dv 
+
 
 class EquiMessageBlock(nn.Module):
     def __init__(self,
