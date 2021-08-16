@@ -46,8 +46,12 @@ class CGpool(nn.Module):
         # get coordinates 
         cg_xyz = torch.einsum("bin,bij->bjn", xyz, assign_norm)
 
+        Ncg = H.shape[1]
+
         # compute weighted adjacency 
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
+
+        cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg)).unsqueeze(0)
 
         return assign, assign_logits, h, H, cg_xyz, cg_adj
 
