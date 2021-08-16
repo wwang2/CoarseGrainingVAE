@@ -34,17 +34,17 @@ class CGpool(nn.Module):
         adj[bonds[:, 0], bonds[:,2], bonds[:,1]] = 1
 
         for conv in self.update:
-            dh = torch.einsum('bif,bij->bjf', h, adj)
+            dh = torch.einsum('bif,bij->bjf', conv(h), adj)
             h = h + dh 
 
         assign_logits = self.cg_network(h)
         assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
 
-        assign = assign / assign.sum(1).unsqueeze(-2) 
+        assign_norm = assign / assign.sum(1).unsqueeze(-2) 
 
-        H = torch.einsum('bnj,bnf->bjf', assign, h)
+        H = torch.einsum('bnj,bnf->bjf', assign_norm, h)
         # get coordinates 
-        cg_xyz = torch.einsum("bin,bij->bjn", xyz, assign)
+        cg_xyz = torch.einsum("bin,bij->bjn", xyz, assign_norm)
 
         # compute weighted adjacency 
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
