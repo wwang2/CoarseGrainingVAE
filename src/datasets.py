@@ -32,6 +32,42 @@ PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-1144
                              'file_type': 'xtc'
                             }}
 
+
+def get_diffpool_data(N_cg, trajs, frame_skip=1000)
+    props = {}
+
+    num_cgs = []
+    num_atoms = []
+
+    z_data = []
+    xyz_data = []
+    graph_data = []
+
+    for traj in trajs:
+        atomic_nums, protein_index = get_atomNum(traj)
+        n_atoms = len(atomic_nums)
+        frames = traj.xyz[:, protein_index, :] * 10.0 # from nm to Angstrom
+
+        bondgraph = traj.top.to_bondgraph()
+        edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
+
+        for xyz in frames[::frame_skip]: 
+            z_data.append(torch.Tensor(atomic_nums))
+            coord = torch.Tensor(xyz)
+            xyz_data.append(coord)
+            graph_data.append(edges)
+            num_cgs.append(torch.LongTensor([N_cg]))
+            num_atoms.append(torch.LongTensor([n_atoms]))
+            
+    props = {'z': z_data,
+         'xyz': xyz_data,
+         'num_atoms': num_atoms, 
+         'num_CGs':num_cgs,
+         'bond_edge_list': graph_data
+        }
+
+    return props
+    
 def load_protein_traj(label): 
     
     traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
