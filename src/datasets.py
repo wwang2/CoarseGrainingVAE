@@ -33,7 +33,7 @@ PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-1144
                             }}
 
 
-def get_diffpool_data(N_cg, trajs, frame_skip=1000)
+def get_diffpool_data(N_cg, trajs, frame_skip=1000):
     props = {}
 
     num_cgs = []
@@ -67,7 +67,7 @@ def get_diffpool_data(N_cg, trajs, frame_skip=1000)
         }
 
     return props
-    
+
 def load_protein_traj(label): 
     
     traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
