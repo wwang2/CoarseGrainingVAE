@@ -208,6 +208,11 @@ class DenseEquivariantDecoder(nn.Module):
         
         H_stack = H.view(-1, H.shape[2])
         
+        
+        deg = cg_adj.sum(-1)
+        deg_stack = deg.view(-1)
+        deg_inv_sqrt = deg_stack.reciprocal().sqrt()
+        
         cg_nbr_list = (cg_adj > 0.0).nonzero()
         pad_nbr_list = (cg_nbr_list[:, 0] * H.shape[1]).unsqueeze(1) + cg_nbr_list[:, 1:]
         edge_weights = cg_adj[cg_nbr_list[:,0], cg_nbr_list[:,1], cg_nbr_list[:,2]]
@@ -216,6 +221,8 @@ class DenseEquivariantDecoder(nn.Module):
         
         
         V_stack = torch.zeros(list(H_stack.shape) + [3]).to(H.device)
+        
+        # compute node degress 
 
         for i, message_block in enumerate(self.message_blocks):
             
@@ -224,7 +231,8 @@ class DenseEquivariantDecoder(nn.Module):
                                                    v_j=V_stack,
                                                    r_ij=r_ij,
                                                    nbrs=pad_nbr_list,
-                                                   edge_wgt=edge_weights
+                                                   # normalize by node degree
+                                                   edge_wgt=deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
                                                    )
             H_stack = H_stack + dH_message
             V_stack = V_stack + dV_message
@@ -239,7 +247,7 @@ class DenseEquivariantDecoder(nn.Module):
             V_unpack = V_stack.reshape(H.shape[0], H.shape[1], H.shape[2], 3)
 
         return H_unpack, V_unpack 
-
+        
 class DiffpoolMessageBlock(nn.Module):
     def __init__(self,
                  feat_dim,
