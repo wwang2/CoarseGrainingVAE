@@ -167,6 +167,78 @@ class DiffPoolDecoder(nn.Module):
 
         return H, V 
 
+class DenseEquivariantDecoder(nn.Module):
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
+        
+        nn.Module.__init__(self)
+        # distance transform
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                  cutoff=cutoff,
+                                  feat_dim=n_atom_basis,
+                                  dropout=0.0)
+
+        if cross_flag:
+            self.message_blocks = nn.ModuleList(
+                [EquiMessageCross(feat_dim=n_atom_basis,
+                              activation=activation,
+                              n_rbf=n_rbf,
+                              cutoff=cutoff,
+                              dropout=0.0)
+                 for _ in range(num_conv)]
+            )
+        else: 
+            self.message_blocks = nn.ModuleList(
+                [EquiMessageBlock(feat_dim=n_atom_basis,
+                              activation=activation,
+                              n_rbf=n_rbf,
+                              cutoff=cutoff,
+                              dropout=0.0)
+                 for _ in range(num_conv)]
+            )
+
+        self.update_blocks = nn.ModuleList(
+            [UpdateBlock(feat_dim=n_atom_basis,
+                         activation=activation,
+                         dropout=0.0)
+             for _ in range(num_conv)]
+        )
+
+    
+    def forward(self, H, cg_adj, cg_xyz):
+        
+        H_stack = H.view(-1, H.shape[2])
+        
+        cg_nbr_list = (cg_adj > 0.0).nonzero()
+        pad_nbr_list = (cg_nbr_list[:, 0] * H.shape[1]).unsqueeze(1) + cg_nbr_list[:, 1:]
+        edge_weights = cg_adj[cg_nbr_list[:,0], cg_nbr_list[:,1], cg_nbr_list[:,2]]
+    
+        r_ij = cg_xyz[cg_nbr_list[:, 0], cg_nbr_list[:, 2]] - cg_xyz[cg_nbr_list[:, 0], cg_nbr_list[:, 1]] 
+        
+        
+        V_stack = torch.zeros(list(H_stack.shape) + [3]).to(H.device)
+
+        for i, message_block in enumerate(self.message_blocks):
+            
+            # message block
+            dH_message, dV_message = message_block(s_j=H_stack,
+                                                   v_j=V_stack,
+                                                   r_ij=r_ij,
+                                                   nbrs=pad_nbr_list,
+                                                   edge_wgt=edge_weights
+                                                   )
+            H_stack = H_stack + dH_message
+            V_stack = V_stack + dV_message
+
+            # update block
+            dH_update, dV_update = self.update_blocks[i](s_i=H_stack,
+                                                v_i=V_stack)
+            H_stack = H_stack + dH_update
+            V_stack = V_stack + dV_update
+            
+            H_unpack = H_stack.reshape(H.shape[0], H.shape[1], -1) 
+            V_unpack = V_stack.reshape(H.shape[0], H.shape[1], H.shape[2], 3)
+
+        return H_unpack, V_unpack 
 
 class DiffpoolMessageBlock(nn.Module):
     def __init__(self,
