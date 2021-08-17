@@ -29,7 +29,7 @@ class CGpool(nn.Module):
 
         h = self.atom_embed(atoms_nodes.to(torch.long))
 
-        adj = torch.zeros(h.shape[0], h.shape[1], h.shape[1])
+        adj = torch.zeros(h.shape[0], h.shape[1], h.shape[1]).to(h.device)
         adj[bonds[:, 0], bonds[:,1], bonds[:,2]] = 1
         adj[bonds[:, 0], bonds[:,2], bonds[:,1]] = 1
 
@@ -51,7 +51,7 @@ class CGpool(nn.Module):
         # compute weighted adjacency 
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
 
-        cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg)).unsqueeze(0)
+        cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg).to(h.device)).unsqueeze(0)
 
         return assign, assign_logits, h, H, cg_xyz, cg_adj
 
@@ -92,7 +92,7 @@ class Enc(nn.Module):
         offset = torch.linspace(0.0, self.cutoff, self.feat_dim)
         
         phi = self.inv_dense(h)
-        expanded_dist = (-(d_iI.unsqueeze(-1) - offset).pow(2)).exp()
+        expanded_dist = (-(d_iI.unsqueeze(-1) - offset.to(h.device)).pow(2)).exp()
         w_s = self.dist_filter(expanded_dist)
 
         shape = list(w_s.shape[:-1])
@@ -247,7 +247,7 @@ class DenseEquivariantDecoder(nn.Module):
             V_unpack = V_stack.reshape(H.shape[0], H.shape[1], H.shape[2], 3)
 
         return H_unpack, V_unpack 
-        
+
 class DiffpoolMessageBlock(nn.Module):
     def __init__(self,
                  feat_dim,
