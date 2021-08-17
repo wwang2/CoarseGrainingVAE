@@ -172,7 +172,7 @@ class EquiMessageCross(nn.Module):
                                    dist=dist,
                                    nbrs=nbrs)
 
-        inv_out = inv_out.reshape(inv_out.shape[0], 4, -1)
+        inv_out = inv_out.reshape(inv_out.shape[0], 4, s_j.shape[1])
 
         split_0 = inv_out[:, 0, :].unsqueeze(-1)
         split_1 = inv_out[:, 1, :]
