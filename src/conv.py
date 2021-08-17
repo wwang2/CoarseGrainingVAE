@@ -163,7 +163,9 @@ class EquiMessageCross(nn.Module):
                 s_j,
                 v_j,
                 r_ij,
-                nbrs):
+                nbrs,
+                edge_wgt=None):
+        # edge_wgt the same size as 
 
         dist, unit = preprocess_r(r_ij)
         inv_out = self.inv_message(s_j=s_j,
@@ -182,19 +184,26 @@ class EquiMessageCross(nn.Module):
         delta_s_ij = split_1
 
         # add results from neighbors of each node
+        
+        if edge_wgt is not None: 
+            v_edge_wgt = edge_wgt[..., None, None]
+            h_edge_wgt = edge_wgt[..., None]
+        else:
+            v_edge_wgt = 1 
+            h_edge_wgt = 1
 
         graph_size = s_j.shape[0]
-        delta_v_i = scatter_add(src=delta_v_ij,
+        dv = scatter_add(src=delta_v_ij * v_edge_wgt,
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
 
-        delta_s_i = scatter_add(src=delta_s_ij,
+        dh = scatter_add(src=delta_s_ij * h_edge_wgt,
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
 
-        return delta_s_i, delta_v_i
+        return dh, dv
 
 
 class DenseEquiMessageBlock(nn.Module):
@@ -249,13 +258,13 @@ class DenseEquiMessageBlock(nn.Module):
         w = self.dist_filter(expanded_dist)
         shape = list(w.shape[:-1])
 
-        print("phi_wegiht" ,phi.abs().mean())
+        #print("phi_wegiht" ,phi.abs().mean())
 
-        print("w_wegiht" ,w.abs().mean())
+        #print("w_wegiht" ,w.abs().mean())
         
-        filter_w = self.update_filter((w *   phi.unsqueeze(1) * phi.unsqueeze(2))).reshape(shape + [h.shape[-1], 3])
+        filter_w = self.update_filter((w * phi.unsqueeze(1) * phi.unsqueeze(2))).reshape(shape + [h.shape[-1], 3])
 
-        print("filter_w_wegiht" ,filter_w.abs().mean())
+        #print("filter_w_wegiht" ,filter_w.abs().mean())
 
         filter_r = filter_w[..., 0] * adj.unsqueeze(-1)
         filter_v = filter_w[..., 1] * adj.unsqueeze(-1)
@@ -271,7 +280,7 @@ class DenseEquiMessageBlock(nn.Module):
         dv = dv_rcontribution + dv_vcontribution
         dh = torch.einsum('bijf,bjf->bjf', filter_h, h)
         
-        print("h_wegiht" ,filter_h.abs().mean())
+        #print("h_wegiht" ,filter_h.abs().mean())
         #import ipdb ;ipdb.set_trace()
 
         dh = self.layer_norm(dh)
