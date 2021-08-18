@@ -124,8 +124,8 @@ def run_cv(params):
         trainset = get_subset_by_indices(train_index, dataset)
         testset = get_subset_by_indices(test_index, dataset)
 
-        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag)
-        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag)
+        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag, pin_memory=True)
+        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag, pin_memory=True)
         
         # initialize model 
         atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.Tanh(), nn.Linear(n_basis, n_basis))
@@ -184,6 +184,8 @@ def run_cv(params):
             if optimizer.param_groups[0]['lr'] <= min_lr:
                 print('converged')
                 break
+
+            del mean_kl, mean_recon, xyz_train, xyz_train_recon
 
         # dump model hyperparams 
         with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
@@ -391,5 +393,8 @@ if __name__ == '__main__':
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
 
     params = vars(parser.parse_args())
+
+    # torch.backends.cudnn.enabled = True
+    # torch.backends.cudnn.benchmark = True
 
     run_cv(params)

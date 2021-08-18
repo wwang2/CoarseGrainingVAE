@@ -57,7 +57,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
         loader = tqdm(loader, position=0, file=sys.stdout,
                          leave=True, desc='({} epoch #{})'.format(mode, epoch))
     
-    for batch in loader:
+    for i, batch in enumerate(loader):
 
         batch = batch_to(batch, device)
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
@@ -94,11 +94,16 @@ def loop(loader, optimizer, device, model, beta, epoch,
         mean_kl = np.array(kl_loss).mean()
         mean_recon = np.array(recon_loss).mean()
         
+        memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
+
         postfix = ['avg. KL loss={:.4f}'.format(mean_kl) , 
-                   'avg. recon loss={:.4f}'.format(mean_recon)]
+                   'avg. recon loss={:.4f}'.format(mean_recon),
+                   'memory ={:.4f} Mb'.format(memory) ]
         
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
+
+        del loss, loss_graph, loss_kl
 
     for result in postfix:
         print(result)
@@ -133,6 +138,18 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
         
         mus.append(S_mu.detach().cpu())
         sigmas.append(S_sigma.detach().cpu())
+
+
+        memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
+        postfix = ['avg. KL loss={:.4f}'.format(mean_kl) , 
+                   'avg. recon loss={:.4f}'.format(mean_recon),
+                   'memory ={:.4f} Mb'.format(memory) ]
+        
+        if tqdm_flag:
+            loader.set_postfix_str(' '.join(postfix))
+
+
+        del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
     true_xyzs = torch.cat(true_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     recon_xyzs = torch.cat(recon_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
