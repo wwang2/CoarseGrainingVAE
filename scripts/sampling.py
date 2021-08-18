@@ -277,6 +277,8 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
         atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz_decode.detach().cpu().numpy())
         recon_atoms_list.append(atoms)
 
+        del xyz_decode, H 
+
     # save origina ldata 
     data_atoms = Atoms(numbers=atomic_nums.ravel(), positions=xyz.detach().cpu().numpy())
 
@@ -294,6 +296,8 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     ensemble_atoms = Atoms(numbers=z, positions=sample_xyzs)
 
     # evaluate sample qualities 
+
+    del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
     if graph_eval:
         rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
@@ -406,14 +410,6 @@ def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=Fals
 
         # sample latent vectors
         z = sample_normal(H_prior_mu, H_prior_sigma)
-
-        # z_list = []
-        # for i in range(len(num_CGs)):
-
-        #    #z_list.append( torch.normal(mu, sigma).to(cg_xyz.device))
-        #    z_list.append(sample_normal(mu, sigma))
-            
-        # z = torch.cat(z_list).to(cg_xyz.device)
 
         if atomwise_z:
             H = scatter_mean(z, mapping, dim=0)

@@ -139,24 +139,22 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
         mus.append(S_mu.detach().cpu())
         sigmas.append(S_sigma.detach().cpu())
 
+        num_features = S_mu.shape[-1]
+        
+        del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
-        postfix = ['avg. KL loss={:.4f}'.format(mean_kl) , 
-                   'avg. recon loss={:.4f}'.format(mean_recon),
-                   'memory ={:.4f} Mb'.format(memory) ]
+        postfix = ['memory ={:.4f} Mb'.format(memory)]
         
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
-
-
-        del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
     true_xyzs = torch.cat(true_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     recon_xyzs = torch.cat(recon_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
     cg_xyzs = torch.cat(cg_xyzs).reshape(-1, n_cg, 3).numpy()
     
-    mu = torch.cat(mus).reshape(-1, n_z, S_mu.shape[-1]).mean(0)
-    sigma = torch.cat(sigmas).reshape(-1, n_z, S_mu.shape[-1]).mean(0)
+    mu = torch.cat(mus).reshape(-1, n_z, num_features).mean(0)
+    sigma = torch.cat(sigmas).reshape(-1, n_z, num_features).mean(0)
     
     return true_xyzs, recon_xyzs, cg_xyzs, mu, sigma
 
