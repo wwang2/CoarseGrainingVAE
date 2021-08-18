@@ -25,7 +25,7 @@ class CGpool(nn.Module):
                                        nn.Tanh(), 
                                        nn.Linear(n_atom_basis, n_cgs))
 
-    def forward(self, atoms_nodes, xyz, bonds, tau):  
+    def forward(self, atoms_nodes, xyz, bonds, tau, gumbel=False):  
 
         h = self.atom_embed(atoms_nodes.to(torch.long))
 
@@ -38,7 +38,12 @@ class CGpool(nn.Module):
             h = h + dh 
 
         assign_logits = self.cg_network(h)
-        assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
+
+        if gumbel:
+          assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
+
+        else:
+          assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
 
         assign_norm = assign / assign.sum(1).unsqueeze(-2) 
 
@@ -53,14 +58,16 @@ class CGpool(nn.Module):
 
         cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg).to(h.device)).unsqueeze(0)
 
-        return assign, assign_logits, h, H, cg_xyz, cg_adj
+        return assign_norm, assign_logits, h, H, cg_xyz, cg_adj
 
 
-class Enc(nn.Module):
+class DenseContract(nn.Module):
+    
     def __init__(self,
-                 feat_dim,
-                 activation,
-                 cutoff):
+             feat_dim,
+             n_rbf,
+             activation,
+             cutoff):
         super().__init__()
         
         self.feat_dim = feat_dim
@@ -80,38 +87,137 @@ class Enc(nn.Module):
                                   dropout_rate=0.0))
         
         self.cutoff = cutoff
+        self.offset = torch.linspace(0.0, self.cutoff, self.feat_dim)
         
-    def forward(self, assign, h, H, cg_xyz, xyz, cg_adj):
+    def forward(self, assign, h, v, cg_xyz, xyz, cg_adj):
+        # pool atomwise message to CG bead 
         
-        V_I = torch.zeros(H.shape[0], H.shape[1], H.shape[2], 3).to(h.device)
-        v_i = torch.zeros(h.shape[0], h.shape[1], H.shape[2], 3).to(h.device)
+        # xyz: b x n x 3
+        # cg_xyz: b x N x 3 
+        # h: b x n x f
+        # v: b x n x f 
+        # assign: b x n x N 
+          
+        r_iI = (xyz.unsqueeze(1) - cg_xyz.unsqueeze(2))
+        d_iI = r_iI.pow(2).sum(-1).sqrt()
+        unit_iI = r_iI / d_iI.unsqueeze(-1)
+        
+        
+        #V_I = torch.zeros(H.shape[0], H.shape[1], H.shape[2], 3).to(h.device)
         
         r_iI = (xyz.unsqueeze(1) - cg_xyz.unsqueeze(2))
         d_iI = r_iI.pow(2).sum(-1).sqrt()
         unit = r_iI / d_iI.unsqueeze(-1)
-        offset = torch.linspace(0.0, self.cutoff, self.feat_dim)
         
         phi = self.inv_dense(h)
-        expanded_dist = (-(d_iI.unsqueeze(-1) - offset.to(h.device)).pow(2)).exp()
+        expanded_dist = (-(d_iI.unsqueeze(-1) - self.offset.to(h.device)).pow(2)).exp()
         w_s = self.dist_filter(expanded_dist)
 
         shape = list(w_s.shape[:-1])
         
-        # is this correct? 
+        # need to assign with assignment vector 
         filter_w = (w_s * phi.unsqueeze(1)).reshape(shape + [h.shape[-1], 3])
         
         split_0 = filter_w[..., 0].unsqueeze(-1)
         split_1 = filter_w[..., 1]
         split_2 = filter_w[..., 2].unsqueeze(-1)
-        
         unit_add = split_2 * unit.unsqueeze(-2)
-        dv_iI = unit_add + split_0 * v_i.unsqueeze(1)
+        
+        dv_iI = unit_add + split_0 * v.unsqueeze(1)
         ds_iI = split_1
 
-        dV = dv_iI.sum(2)
-        dH = ds_iI.sum(2)
+        dV = torch.einsum('bcafe,bac->bcfe', dv_iI, assign)
+        dH = torch.einsum('bcaf,bac->bcf', ds_iI, assign)
+        
+        return dH, dV
+    
+    
+class DenseEquiEncoder(nn.Module):
+    
+    def __init__(self,
+             n_conv,
+             n_atom_basis,
+             n_rbf,
+             activation,
+             cutoff):
+        super().__init__()
 
-        return H + dH, V_I+dV
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                  cutoff=cutoff,
+                                  feat_dim=n_atom_basis,
+                                  dropout=0.0)
+
+        self.message_blocks = nn.ModuleList(
+            [EquiMessageBlock(feat_dim=n_atom_basis,
+                          activation=activation,
+                          n_rbf=n_rbf,
+                          cutoff=cutoff,
+                          dropout=0.0)
+             for _ in range(n_conv)]
+        )
+
+        self.update_blocks = nn.ModuleList(
+            [UpdateBlock(feat_dim=n_atom_basis,
+                         activation=activation,
+                         dropout=0.0)
+             for _ in range(n_conv)]
+        )
+        
+        self.contract = nn.ModuleList(
+            [DenseContract(feat_dim=n_atom_basis,
+                           activation=activation,
+                           n_rbf=n_rbf,
+                           cutoff=cutoff,
+                           )
+             for _ in range(n_conv)]
+            )
+        
+        self.n_conv = n_conv
+
+    def forward(self, h, H, xyz, cg_xyz, assign, nbr_list, cg_adj):
+        
+        # prepare inputs 
+        
+        h_shape = h.shape
+        v_shape = list(h.shape) + [3]
+        
+        h_stack = h.reshape(-1, h.shape[-1])
+        
+        v_stack_shape = list(h_stack.shape) + [3]
+        h_stack_shape = h_stack.shape 
+        
+        v_stack = torch.zeros(*v_stack_shape).to(h.device)
+        
+        pad_nbr_list = (nbr_list[:, 0] * h.shape[1]).unsqueeze(1) + nbr_list[:, 1:]
+
+        r_ij = xyz[nbr_list[:, 0], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]
+        
+        
+        # intialize H, V
+        V = torch.zeros(list(H.shape) + [3]).to(H.device)
+    
+        for i in range(self.n_conv):
+            ds_message, dv_message = self.message_blocks[i](s_j=h_stack,
+                                                   v_j=v_stack,
+                                                   r_ij=r_ij,
+                                                   nbrs=pad_nbr_list)
+            h_stack = h_stack + 0.5 * ds_message
+            v_stack = v_stack + 0.5 * dv_message
+
+            # # update block
+            ds_update, dv_update = self.update_blocks[i](s_i=h_stack, v_i=v_stack)
+            h_stack = h_stack + 0.5 *  ds_update # atom message 
+            v_stack = v_stack + 0.5 *  dv_update
+                    
+            h_pad = h_stack.reshape(h_shape)
+            v_pad = v_stack.reshape(v_shape)
+            
+            dH, dV = self.contract[i](assign, h_pad, v_pad, cg_xyz, xyz, cg_adj)
+            
+            V = V + dV 
+            H = H + dH
+            
+        return H, V
 
 class DiffPoolDecoder(nn.Module):
     def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation):   
