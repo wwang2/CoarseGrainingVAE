@@ -109,10 +109,12 @@ while experiment.progress.observation_count < experiment.observation_budget:
     if np.isnan(cv_mean):
         failed = True
 
+    print("Suggestion ID: {}".format(suggestion.id))
+
     if not failed:
         conn.experiments(experiment.id).observations().create(
           suggestion=suggestion.id,
-          value=cv_ged_mean,
+          value=cv_ged_mean + cv_mean,
           value_stddev=cv_ged_std
         )
     elif failed:

@@ -278,6 +278,7 @@ def run_cv(params):
             cv_graph_diff.append(mean_graph_diff)
             cv_graph_hh_diff.append(mean_graph_hh_diff)
 
+            print("recon RMSD : {}".format(unaligned_test_rmsd))
             print("sample RMSD (compared with ref.) : {}".format(mean_rmsd))
             print("sample validity (heavy atoms): {}".format(sample_valid))
             print("sample validity (all atoms): {}".format(sample_hh_valid))
