@@ -112,6 +112,8 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
 def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True):
 
+    model.eval()
+
     model = model.to(device)
 
     true_xyzs = []
@@ -140,7 +142,7 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
         sigmas.append(S_sigma.detach().cpu())
 
         num_features = S_mu.shape[-1]
-        
+
         del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
