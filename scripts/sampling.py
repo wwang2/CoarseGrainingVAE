@@ -226,10 +226,10 @@ def compute_rmsd(atoms_list, ref_atoms, valid_ids) :
         heavy_filter = z != 1. 
 
         aa_test_dxyz = (atoms.get_positions() - ref_atoms.get_positions()).reshape(-1)
-        aa_rmsd = np.sqrt(np.power(aa_test_dxyz, 2).mean())
+        aa_rmsd = np.sqrt(np.power(aa_test_dxyz, 2).sum(-1).mean())
 
         heavy_test_dxyz = (atoms.get_positions()[heavy_filter] - ref_atoms.get_positions()[heavy_filter]).reshape(-1)
-        heavy_rmsd = np.sqrt(np.power(heavy_test_dxyz, 2).mean())
+        heavy_rmsd = np.sqrt(np.power(heavy_test_dxyz, 2).sum(-1).mean())
         
         if i in valid_ids:
             rmsd_array.append([aa_rmsd, heavy_rmsd])
@@ -300,11 +300,11 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
     if graph_eval:
-        rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
-        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio
+        all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
+        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio
     
     else:
-        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, None, None, None, None, None
+        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, None, None, None, None, None, None
 
 def count_valid_smiles(true_smiles, inferred_smiles):
 
@@ -322,9 +322,11 @@ def eval_sample_qualities(ref_atoms, atoms_list):
     valid_ids, valid_ratio, graph_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=True)
     valid_hh_ids, valid_hh_ratio, graph_hh_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=False)
 
-    rmsds = compute_rmsd(atoms_list, ref_atoms, valid_ids)
+    # keep track of heavy and all-atom rmsds separately
+    heavy_rmsds = compute_rmsd(atoms_list, ref_atoms, valid_ids) # rmsds for valid heavy atom graphs 
+    all_rmsds = compute_rmsd(atoms_list, ref_atoms, valid_hh_ids) # rmsds for valid allatom graphs 
 
-    return rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio
+    return all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio
 
 def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample, graph_eval=True):
     '''
@@ -339,7 +341,9 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     n_sample = n_sample
     n_atoms = len(atomic_nums)
 
-    sample_rmsd = []
+    sample_all_rmsd = []
+    sample_heavy_rmsd = []
+
     sample_valid = []
     sample_hh_valid = []
 
@@ -347,15 +351,19 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     sample_graph_hh_val_ratio_list = []
 
     for batch in loader:    
-        sample_atoms, data_atoms, recon_atoms, cg_atoms, rmsds,  valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval)
+        sample_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds,  heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval)
         sample_xyz_list.append(sample_atoms.get_positions())
         data_xyz_list.append(data_atoms.get_positions())
         cg_xyz_list.append(cg_atoms.get_positions())
         recon_xyz_list.append(recon_atoms.get_positions())
 
         # record sampling validity/diversity 
-        if rmsds is not None:
-            sample_rmsd.append(rmsds)
+        if all_rmsds is not None:
+            sample_all_rmsd.append(all_rmsds)
+
+        if heavy_rmsds is not None:
+            sample_heavy_rmsd.append(heavy_rmsds)
+
         sample_valid.append(valid_ratio)
         sample_hh_valid.append(valid_hh_ratio)
 
@@ -369,14 +377,19 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
 
     if graph_eval:
 
-        if len(sample_rmsd) != 0:
-            all_rmsds = np.concatenate(sample_rmsd) # list of valid structure rmsds 
+        if len(sample_heavy_rmsd) != 0:
+            all_heavy_rmsds = np.concatenate(sample_heavy_rmsd) # list of valid structure rmsds 
+        else:
+            all_heavy_rmsds = None
+
+        if len(sample_all_rmsd) != 0:
+            all_rmsds = np.concatenate(sample_all_rmsd) # list of valid structure rmsds 
         else:
             all_rmsds = None
 
-        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list
+        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list
     else:
-        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, None, None, None, None, None 
+        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, None, None, None, None, None, None 
 
 
 def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False, tqdm_flag=False):

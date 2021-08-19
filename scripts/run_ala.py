@@ -264,7 +264,7 @@ def run_cv(params):
  
         sampleloader = DataLoader(testset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-        sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
+        sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
                                                                                 model, atomic_nums, 
                                                                                 n_cgs, n_sample=n_ensemble,
                                                                                 graph_eval=graph_eval)
@@ -272,10 +272,16 @@ def run_cv(params):
         if graph_eval:
             sample_valid = np.array(sample_valid).mean()
             sample_hh_valid = np.array(sample_hh_valid).mean()
+
             if all_rmsds is not None:
-                mean_rmsd = np.array(all_rmsds).mean()
+                mean_all_rmsd = np.array(all_rmsds)[:, 0].mean()
             else:
-                mean_rmsd = None
+                mean_all_rmsd = None
+
+            if all_heavy_rmsds is not None:
+                mean_heavy_rmsd = np.array(all_heavy_rmsds)[:, 1].mean()
+            else:
+                mean_heavy_rmsd = None
 
             cv_sample_valid.append(sample_valid)
             cv_sample_hh_valid.append(sample_hh_valid)
@@ -285,9 +291,10 @@ def run_cv(params):
             cv_graph_diff.append(mean_graph_diff)
             cv_graph_hh_diff.append(mean_graph_hh_diff)
 
-            print("recon RMSD (all atoms): {}".format(unaligned_test_all_rmsd))
             print("recon RMSD (heavy atoms): {}".format(unaligned_test_heavy_rmsd))
-            print("sample RMSD (compared with ref.) : {}".format(mean_rmsd))
+            print("recon RMSD (all atoms): {}".format(unaligned_test_all_rmsd))
+            print("sample RMSD (heavy atoms) : {}".format(mean_heavy_rmsd))
+            print("sample RMSD (all atoms) : {}".format(mean_all_rmsd))
             print("sample validity (heavy atoms): {}".format(sample_valid))
             print("sample validity (all atoms): {}".format(sample_hh_valid))
             print("sample graph difference ratio (heavy atoms): {}".format(mean_graph_diff))
@@ -332,7 +339,9 @@ def run_cv(params):
         # dump rmsd distributions 
         if graph_eval:
             if all_rmsds is not None:
-                np.savetxt(os.path.join(split_dir, 'valid_rmsds.txt'), np.array(all_rmsds))
+                np.savetxt(os.path.join(split_dir, 'valid_all_rmsds.txt'), np.array(all_rmsds))
+            if all_heavy_rmsds is not None:
+                np.savetxt(os.path.join(split_dir, 'valid_heavy_rmsds.txt'), np.array(all_heavy_rmsds))
 
         end = time.time()
 
