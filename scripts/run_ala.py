@@ -103,7 +103,8 @@ def run_cv(params):
     create_dir(working_dir)
         
     kf = KFold(n_splits=nsplits)
-    cv_rmsd = []
+    cv_all_rmsd = []
+    cv_heavy_rmsd = []
     cv_sample_rmsd = []
     cv_sample_valid = []
     cv_sample_hh_valid = []
@@ -236,14 +237,20 @@ def run_cv(params):
         dump_numpy2xyz(test_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'test_cg.xyz'))
 
         # compute loss and metrics 
-        test_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
-        unaligned_test_rmsd = np.sqrt(np.power(test_dxyz, 2).mean())
+        heavy_filter = atomic_nums != 1.
+        test_all_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
+        test_heavy_dxyz = (test_recon_xyzs - test_true_xyzs)[:, heavy_filter, :].reshape(-1)
+
+        unaligned_test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).mean())
+        unaligned_test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
 
         # dump test rmsd 
-        np.savetxt(os.path.join(split_dir, 'test_rmsd{:.4f}.txt'.format(unaligned_test_rmsd)), np.array([unaligned_test_rmsd]))
+        np.savetxt(os.path.join(split_dir, 'test_all_rmsd{:.4f}.txt'.format(unaligned_test_all_rmsd)), np.array([unaligned_test_all_rmsd]))
+        np.savetxt(os.path.join(split_dir, 'test_heavy_rmsd{:.4f}.txt'.format(unaligned_test_heavy_rmsd)), np.array([unaligned_test_heavy_rmsd]))
 
         # reconsturction loss 
-        cv_rmsd.append(unaligned_test_rmsd)
+        cv_all_rmsd.append(unaligned_test_all_rmsd)
+        cv_heavy_rmsd.append(unaligned_test_heavy_rmsd)
 
         # save model 
         model = model.to('cpu')
@@ -278,7 +285,8 @@ def run_cv(params):
             cv_graph_diff.append(mean_graph_diff)
             cv_graph_hh_diff.append(mean_graph_hh_diff)
 
-            print("recon RMSD : {}".format(unaligned_test_rmsd))
+            print("recon RMSD (all atoms): {}".format(unaligned_test_all_rmsd))
+            print("recon RMSD (heavy atoms): {}".format(unaligned_test_heavy_rmsd))
             print("sample RMSD (compared with ref.) : {}".format(mean_rmsd))
             print("sample validity (heavy atoms): {}".format(sample_valid))
             print("sample validity (all atoms): {}".format(sample_hh_valid))
@@ -343,7 +351,8 @@ def run_cv(params):
 
 
     # save test score 
-    np.savetxt(os.path.join(working_dir, 'cv_rmsd.txt'), np.array(cv_rmsd))
+    np.savetxt(os.path.join(working_dir, 'cv_all_rmsd.txt'), np.array(cv_all_rmsd))
+    np.savetxt(os.path.join(working_dir, 'cv_heavy_rmsd.txt'), np.array(cv_heavy_rmsd))
 
     if graph_eval:
         np.savetxt(os.path.join(working_dir, 'cv_valid.txt'), np.array(cv_sample_valid))
@@ -355,7 +364,7 @@ def run_cv(params):
         with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
             print("TRAINING FAILED", file=text_file)
 
-    return np.array(cv_rmsd).mean(), np.array(cv_rmsd).std(), np.array(cv_graph_hh_diff).mean(), np.array(cv_graph_hh_diff).std(), failed
+    return np.array(cv_all_rmsd).mean(), np.array(cv_all_rmsd).std(), np.array(cv_graph_hh_diff).mean(), np.array(cv_graph_hh_diff).std(), failed
 
 
 if __name__ == '__main__':
