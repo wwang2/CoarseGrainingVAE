@@ -57,6 +57,7 @@ def run_cv(params):
     graph_eval = params['graph_eval']
     tqdm_flag = params['tqdm_flag']
     n_ensemble = params['n_ensemble']
+    det = params['det']
     gamma = params['gamma']
     min_lr = 1e-7
 
@@ -149,7 +150,7 @@ def run_cv(params):
 
         
         model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
-                            atomwise_z=atom_decode_flag).to(device)
+                            atomwise_z=atom_decode_flag, det=det).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, 
@@ -291,8 +292,7 @@ def run_cv(params):
             cv_graph_diff.append(mean_graph_diff)
             cv_graph_hh_diff.append(mean_graph_hh_diff)
 
-            print("recon RMSD (heavy atoms): {}".format(unaligned_test_heavy_rmsd))
-            print("recon RMSD (all atoms): {}".format(unaligned_test_all_rmsd))
+            print("Sample Quality Stats: ")
             print("sample RMSD (heavy atoms) : {}".format(mean_heavy_rmsd))
             print("sample RMSD (all atoms) : {}".format(mean_all_rmsd))
             print("sample validity (heavy atoms): {}".format(sample_valid))
@@ -410,6 +410,7 @@ if __name__ == '__main__':
     parser.add_argument("--dir_mp", action='store_true', default=False)
     parser.add_argument("--atom_decode", action='store_true', default=False)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
+    parser.add_argument("--det", action='store_true', default=False)
 
     params = vars(parser.parse_args())
 

@@ -226,10 +226,10 @@ def compute_rmsd(atoms_list, ref_atoms, valid_ids) :
         heavy_filter = z != 1. 
 
         aa_test_dxyz = (atoms.get_positions() - ref_atoms.get_positions()).reshape(-1)
-        aa_rmsd = np.sqrt(np.power(aa_test_dxyz, 2).sum(-1).mean())
+        aa_rmsd = np.sqrt(np.power(aa_test_dxyz, 2).mean())
 
         heavy_test_dxyz = (atoms.get_positions()[heavy_filter] - ref_atoms.get_positions()[heavy_filter]).reshape(-1)
-        heavy_rmsd = np.sqrt(np.power(heavy_test_dxyz, 2).sum(-1).mean())
+        heavy_rmsd = np.sqrt(np.power(heavy_test_dxyz, 2).mean())
         
         if i in valid_ids:
             rmsd_array.append([aa_rmsd, heavy_rmsd])

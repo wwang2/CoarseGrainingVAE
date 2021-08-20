@@ -329,7 +329,8 @@ class CGequiVAE(nn.Module):
                      atom_munet, atom_sigmanet,
                     n_atoms, n_cgs, feature_dim,
                     prior_net=None, 
-                    atomwise_z=False):
+                    atomwise_z=False,
+                    det=False):
         nn.Module.__init__(self)
         self.encoder = encoder
         self.equivaraintconv = equivaraintconv
@@ -341,6 +342,7 @@ class CGequiVAE(nn.Module):
         self.atomdense = nn.Linear(feature_dim, n_atoms)
         self.atomwise_z = atomwise_z
         self.prior_net = prior_net
+        self.det = det
         
     def get_inputs(self, batch):
 
@@ -362,12 +364,9 @@ class CGequiVAE(nn.Module):
         return z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs
         
     def reparametrize(self, mu, sigma):
-        if self.training:
-            eps = torch.randn_like(sigma)
-            S_I = eps.mul(sigma).add_(mu)
-        else:
-            S_I = sigma
-            
+        eps = torch.randn_like(sigma)
+        S_I = eps.mul(sigma).add_(mu)
+
         return S_I
 
     def CG2ChannelIdx(self, CG_mapping):
@@ -414,8 +413,13 @@ class CGequiVAE(nn.Module):
         logvar = self.atom_sigmanet(z)
         sigma = 1e-9 + torch.exp(logvar / 2)
 
-        if self.train:
-            z_sample = self.reparametrize(mu, sigma)
+        # if self.train:
+
+        if self.training:
+            if not self.det: 
+                z_sample = self.reparametrize(mu, sigma)
+            else:
+                z_sample = mu
         else: 
             z_sample = mu
 
