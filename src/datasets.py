@@ -217,7 +217,13 @@ def get_mapping(label, cutoff, n_atoms, n_cgs, skip=200):
 
 def get_random_mapping(n_cg, n_atoms):
 
-    return torch.LongTensor(n_atoms).random_(0, n_cg) 
+    mapping = torch.LongTensor(n_atoms).random_(0, n_cg)
+    i = 1
+    while len(mapping.unique()) != n_cg and i <= 10000000:
+        i + 1
+        mapping = torch.LongTensor(n_atoms).random_(0, n_cg)
+
+    return mapping
 
 def get_peptide_top(label):
 
