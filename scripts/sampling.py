@@ -367,8 +367,8 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         sample_valid.append(valid_ratio)
         sample_hh_valid.append(valid_hh_ratio)
 
-        sample_graph_val_ratio_list += graph_val_ratio
-        sample_graph_hh_val_ratio_list += graph_hh_val_ratio
+        sample_graph_val_ratio_list.append(graph_val_ratio)
+        sample_graph_hh_val_ratio_list.append(graph_hh_val_ratio)
 
     sample_xyzs = np.vstack(sample_xyz_list).reshape(-1, n_sample * n_atoms, 3)
     data_xyzs = np.vstack(data_xyz_list).reshape(-1, n_atoms, 3)
