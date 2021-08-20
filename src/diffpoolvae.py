@@ -8,7 +8,8 @@ class CGpool(nn.Module):
     def __init__(self,
              n_conv,
              n_atom_basis,
-             n_cgs):
+             n_cgs,
+             assign_logits=None):
         super().__init__()
 
         self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
@@ -25,6 +26,9 @@ class CGpool(nn.Module):
                                        nn.Tanh(), 
                                        nn.Linear(n_atom_basis, n_cgs))
 
+        if assign_logits is not None: 
+            self.assign_logits = nn.Parameter(assign_logits)
+
     def forward(self, atoms_nodes, xyz, bonds, tau, gumbel=False):  
 
         h = self.atom_embed(atoms_nodes.to(torch.long))
@@ -37,13 +41,17 @@ class CGpool(nn.Module):
             dh = torch.einsum('bif,bij->bjf', conv(h), adj)
             h = h + dh 
 
-        assign_logits = self.cg_network(h)
-
-        if gumbel:
-          assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
+        if self.assign_logits is None:
+            assign_logits = self.cg_network(h)
 
         else:
-          assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
+            nbatch = h.shape[0]
+            assign_logits = torch.stack( [ self.assign_logits] * nbatch )
+
+        if gumbel:
+            assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
+        else:
+            assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
 
         assign_norm = assign / assign.sum(1).unsqueeze(-2) 
 
