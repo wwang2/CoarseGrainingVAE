@@ -96,6 +96,9 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['graph_eval'] = True
     trial['tqdm_flag'] = False
     trial['n_ensemble'] = 1
+    trial['det'] = True 
+
+    print("Suggestion ID: {}".format(suggestion.id))
 
     cv_mean, cv_std, cv_ged_mean, cv_ged_std, failed = run_cv(trial)
 
@@ -109,13 +112,11 @@ while experiment.progress.observation_count < experiment.observation_budget:
     if np.isnan(cv_mean):
         failed = True
 
-    print("Suggestion ID: {}".format(suggestion.id))
-
     if not failed:
         conn.experiments(experiment.id).observations().create(
           suggestion=suggestion.id,
-          value=cv_ged_mean + cv_mean,
-          value_stddev=cv_ged_std
+          value=cv_mean,
+          value_stddev=cv_std
         )
     elif failed:
         conn.experiments(experiment.id).observations().create(
