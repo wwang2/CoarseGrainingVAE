@@ -61,6 +61,8 @@ def run_cv(params):
     gamma = params['gamma']
     factor = params['factor']
     patience = params['patience']
+    eta = params['eta']
+    kappa = params['kappa']
     min_lr = 1e-8
 
     # download data from mdshare 
@@ -171,6 +173,8 @@ def run_cv(params):
                                                        model, beta, epoch, 
                                                        train=True,
                                                         gamma=gamma,
+                                                        eta=eta,
+                                                        kappa=kappa,
                                                         looptext='Ncg {} Fold {}'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
             
@@ -413,6 +417,8 @@ if __name__ == '__main__':
     parser.add_argument("-nevals", type=int, default=36)
     parser.add_argument("-beta", type=float, default=0.001)
     parser.add_argument("-gamma", type=float, default=0.01)
+    parser.add_argument("-eta", type=float, default=0.01)
+    parser.add_argument("-kappa", type=float, default=0.01)
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("-patience", type=int, default=5)
     parser.add_argument("-factor", type=int, default=0.6)
@@ -426,6 +432,7 @@ if __name__ == '__main__':
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
     parser.add_argument("--det", action='store_true', default=False)
 
+
     params = vars(parser.parse_args())
-    
+
     run_cv(params)
