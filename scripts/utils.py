@@ -41,9 +41,12 @@ def batch_to(batch, device):
     return gpu_batch
 
 def loop(loader, optimizer, device, model, beta, epoch, 
-        gamma, train=True, looptext='', tqdm_flag=True):
+        gamma, eta=0.0, kappa=0.0, train=True, looptext='', tqdm_flag=True):
     
     recon_loss = []
+    orient_loss = []
+    norm_loss = []
+    graph_loss = []
     kl_loss = []
     
     if train:
@@ -75,7 +78,26 @@ def loop(loader, optimizer, device, model, beta, epoch,
         data_dist = (xyz[nbr_list[:, 0 ]] - xyz[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
-        loss = loss_kl * beta + loss_recon + loss_graph * gamma
+        # add orientation loss 
+        cg_xyz = batch['CG_nxyz'][:, 1:]
+        mapping = batch['CG_mapping']
+
+        recon_dx = xyz_recon - cg_xyz[mapping]
+        data_dx = xyz - cg_xyz[mapping]
+
+        recon_norm = recon_dx.pow(2).sum(-1).sqrt()
+        data_norm = data_dx.pow(2).sum(-1).sqrt()
+
+        recon_unit = recon_dx / recon_norm.unsqueeze(-1)
+        data_unit = data_dx / data_norm.unsqueeze(-1)
+
+        # minimize norm
+        loss_dx_norm = (recon_norm - data_norm).pow(2).mean()
+        # maxmize orientation
+        #import ipdb ;ipdb.set_trace()
+        loss_dx_orient = -(data_unit * recon_unit).sum(-1).mean()
+
+        loss = loss_kl * beta + loss_recon + loss_graph * gamma + eta * loss_dx_orient + kappa * loss_dx_norm
         
         # optimize 
         if train:
@@ -90,14 +112,23 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # logging 
         recon_loss.append(loss_recon.item())
         kl_loss.append(loss_kl.item())
+        orient_loss.append(loss_dx_orient.item())
+        norm_loss.append(loss_dx_norm.item())
+        graph_loss.append(loss_graph.item())
         
         mean_kl = np.array(kl_loss).mean()
         mean_recon = np.array(recon_loss).mean()
+        mean_orient = np.array(orient_loss).mean()
+        mean_norm = np.array(norm_loss).mean()
+        mean_graph = np.array(graph_loss).mean()
         
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
-        postfix = ['avg. KL loss={:.4f}'.format(mean_kl) , 
-                   'avg. recon loss={:.4f}'.format(mean_recon),
+        postfix = ['KL={:.4f}'.format(mean_kl) , 
+                   'recon={:.4f}'.format(mean_recon),
+                   'norm={:.4f}'.format(mean_norm) , 
+                   'orient={:.4f}'.format(mean_orient),
+                   'graph={:.4f}'.format(mean_graph) , 
                    'memory ={:.4f} Mb'.format(memory) ]
         
         if tqdm_flag:
