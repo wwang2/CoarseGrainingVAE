@@ -59,7 +59,9 @@ def run_cv(params):
     n_ensemble = params['n_ensemble']
     det = params['det']
     gamma = params['gamma']
-    min_lr = 1e-7
+    factor = params['factor']
+    patience = params['patience']
+    min_lr = 1e-8
 
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
@@ -153,9 +155,9 @@ def run_cv(params):
                             atomwise_z=atom_decode_flag, det=det).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=1, 
-                                                                factor=0.6, verbose=True, 
-                                                                threshold=1e-4,  min_lr=min_lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=patience, 
+                                                                factor=factor, verbose=True, 
+                                                                threshold=5e-5,  min_lr=min_lr)
         
         model.train()
 
@@ -412,6 +414,8 @@ if __name__ == '__main__':
     parser.add_argument("-beta", type=float, default=0.001)
     parser.add_argument("-gamma", type=float, default=0.01)
     parser.add_argument("-nsplits", type=int, default=5)
+    parser.add_argument("-patience", type=int, default=5)
+    parser.add_argument("-factor", type=int, default=0.6)
     parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
     parser.add_argument("--graph_eval", action='store_true', default=False)
     parser.add_argument("--randommap", action='store_true', default=False)
@@ -423,8 +427,5 @@ if __name__ == '__main__':
     parser.add_argument("--det", action='store_true', default=False)
 
     params = vars(parser.parse_args())
-
-    # torch.backends.cudnn.enabled = True
-    # torch.backends.cudnn.benchmark = True
-
+    
     run_cv(params)
