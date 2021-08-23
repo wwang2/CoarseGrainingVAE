@@ -11,6 +11,11 @@ import mdtraj as md
 import matplotlib.pyplot as plt 
 import matplotlib
 
+import numpy.ma as ma
+import itertools
+import re
+
+
 def kernel_density_plot(data, xlabel, ylabel, label='kT', figsize=(6,6)):
     k = gaussian_kde(np.vstack([data[:,0], data[:,1]]))
 
@@ -85,3 +90,61 @@ def get_bonds(traj, pdb, backbone = True):
     
     bonds = bonds * 10.0 # to Angstroms 
     return bonds, bond_names
+
+def get_sample_rmsd(rmsd_samples, axis):
+    merged = list(itertools.chain(*rmsd_samples))
+
+    cg_res = [int(re.search('(?<=_)[0-9]+', path).group(0)) for path in merged]
+
+    sample_gen = []
+    rmsd_vals = {}
+
+
+    for path in merged:
+        res = int(re.search('(?<=_)[0-9]+', path).group(0))
+        rmsd_data = np.loadtxt(path)
+
+        if res not in rmsd_vals.keys():
+            rmsd_data = np.loadtxt(path)
+            rmsd_vals[res] = [rmsd_data[:, axis].mean()]
+
+        else:
+            rmsd_vals[res].append(rmsd_data[:, axis].mean())
+            
+    rmsd_mean = [np.array(val).mean() for val in list( rmsd_vals.values() )]
+    cg_res = list( rmsd_vals.keys() )
+
+    reorder = np.argsort(cg_res)
+    cg_res = np.array(cg_res)[reorder]
+
+    rmsd_mean = np.array(rmsd_mean)[reorder]
+            
+    return cg_res, rmsd_mean
+
+
+def get_cv(files, mask=None):
+    cg_res = []
+    cv = []
+
+    for exp in files:
+        m = re.search('(?<=_)[0-9]+', exp)
+        cg_res.append(int(m.group(0)))
+        cv.append( np.loadtxt(exp) )
+    cv = np.array(cv)
+    
+    # apply argsort 
+    cg_res = np.array(cg_res)
+    order = np.argsort(cg_res)
+    
+    cg_res = cg_res[order]
+    cv = cv[order]
+    
+    if mask is not None: 
+        mask_value = ma.array(cv, mask=mask).mean(axis=1)[:, None]        
+        cv = np.where(mask, mask_value, cv) 
+    # else:
+    #     mask = mask = np.isnan(cv)
+    #     mask_value = ma.array(cv, mask=mask).mean(axis=1)[:, None]        
+    #     cv = np.where(mask, mask_value, cv)  
+
+    return cg_res, cv, order
