@@ -3,6 +3,38 @@ from torch import nn
 from conv import * 
 from torch_scatter import scatter_mean, scatter_add
 
+class DiffPoolVAE(nn.Module):
+    def __init__(self, encoder, decoder, pooler):
+        nn.Module.__init__(self)
+        self.encoder = encoder
+        self.decoder = decoder
+        self.pooler = pooler 
+        
+    def forward(self, batch, tau):
+    
+        xyz = batch['xyz']        
+        device = xyz.device
+        
+        z = batch['z'] # torch.ones_like( batch['z'] ) 
+        nbr_list = batch['nbr_list']
+
+        assign, assign_logits, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+                                                                   batch['xyz'], 
+                                                                   batch['bonds'], 
+                                                                   tau=tau,
+                                                                   gumbel=True)
+
+        cg_adj = (soft_cg_adj > 0.01).to(torch.float).to(device)
+
+        H, V = self.encoder(h, H, xyz, cg_xyz, assign, nbr_list, cg_adj)
+        H, V = self.decoder(H, cg_adj, cg_xyz)
+
+        dx = torch.einsum('bcfe,bac->bcfe', V[:, :, :z.shape[1], :], assign).sum(1)
+
+        x_recon = torch.einsum('bce,bac->bae', cg_xyz, assign) + dx
+        
+        return xyz, x_recon, assign, adj
+
 class CGpool(nn.Module):
     
     def __init__(self,
@@ -68,7 +100,7 @@ class CGpool(nn.Module):
 
         cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg).to(h.device)).unsqueeze(0)
 
-        return assign, assign_logits, h, H, cg_xyz, cg_adj
+        return assign, assign_logits, h, H, adj, cg_xyz, cg_adj
 
 
 class DenseContract(nn.Module):
