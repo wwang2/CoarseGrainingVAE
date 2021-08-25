@@ -22,6 +22,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt 
 from tqdm import tqdm 
+from sklearn.model_selection import train_test_split
 
 def plot_map(assign, z, save_path=None):
     mapping = assign.detach().cpu().numpy().transpose()
@@ -110,6 +111,7 @@ def run(params):
     kappa = params['kappa']
     lr = params['lr']
     working_dir = params['logdir']
+    tqdm_flag = params['tqdm_flag']
 
     create_dir(working_dir)
     
@@ -126,14 +128,22 @@ def run(params):
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
-    
-    loader = DataLoader(dataset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+
+    # split train, test index 
+    train_index, test_index = train_test_split(list(range(len(dataset))),test_size=0.2)
+
+    trainset = get_subset_by_indices(train_index, dataset)
+    testset = get_subset_by_indices(test_index, dataset)
+
+#    import ipdb; ipdb.set_trace()
+
+    trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
     pooler = CGpool(nconv_pool, num_features, N_cg, assign_logits=None)
     
     encoder = DenseEquiEncoder(n_conv=dec_nconv, 
                            n_atom_basis=num_features,
                            n_rbf=n_rbf, 
-                           activation='swish', 
+                           activation=activation, 
                            cutoff=cutoff)
     
     decoder = DenseEquivariantDecoder(n_atom_basis=num_features,
@@ -148,13 +158,14 @@ def run(params):
                                                             threshold=1e-4,  min_lr=1e-7)
     
     failed = False 
-    
+
+    # train     
     for epoch in range(n_epochs):
     
-        mean_recon, assign, xyz, xyz_recon = loop(loader, optimizer, device, model, tau_sched[epoch], epoch, 
-                                        gamma, kappa, train=True, looptext='', tqdm_flag=True)
+        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_sched[epoch], epoch, 
+                                        gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
-        if np.isnan(mean_recon):
+        if np.isnan(mean_train_recon):
             print("NaN encoutered, exiting...")
             failed = True
             break 
@@ -163,33 +174,47 @@ def run(params):
             map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
             plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
-        scheduler.step(mean_recon)
+
+        scheduler.step(mean_train_recon)
+
+    dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
+
+    # test 
+    testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+    model.eval()
+    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched[epoch], epoch, 
+                                gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
+
+    # dump train recon 
+    dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
 
 
-    return mean_recon, failed, assign
+    print("train msd : {:.4f}".format(mean_train_recon))
+    print("test msd : {:.4f}".format(mean_test_recon))
 
-
+    return mean_test_recon, failed, assign
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-logdir', type=str)
     parser.add_argument('-device', type=int)
-    parser.add_argument('-num_features',  type=int, default= 512)
+    parser.add_argument('-num_features',  type=int, default=512)
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-N_cg', type=int, default= 3)
-    parser.add_argument('-nconv_pool', type=int, default= 4)
-    parser.add_argument('-enc_nconv', type=int, default= 3)
+    parser.add_argument('-nconv_pool', type=int, default= 7)
+    parser.add_argument('-enc_nconv', type=int, default= 4)
     parser.add_argument('-dec_nconv', type=int, default= 3)
-    parser.add_argument('-cutoff', type=float, default= 6.0)
+    parser.add_argument('-cutoff', type=float, default= 8.0)
     parser.add_argument('-n_rbf', type=int,  default= 7)
     parser.add_argument('-activation', type=str,  default= 'ReLU')
-    parser.add_argument('-n_epochs', default= 50)
-    parser.add_argument('-tau_rate', type=float, default= 0.04 )
-    parser.add_argument('-tau_0', type=float, default= 2.0 )
+    parser.add_argument('-n_epochs', type=int, default= 50)
+    parser.add_argument('-tau_rate', type=float, default= 0.004 )
+    parser.add_argument('-tau_0', type=float, default= 2.36)
     parser.add_argument('-gamma', type=float, default= 10.0)
     parser.add_argument('-kappa', type=float, default= 0.1)
-    parser.add_argument('-lr', type=float, default= 1e-4 )
+    parser.add_argument('-lr', type=float, default=1e-4)
+    parser.add_argument("--tqdm_flag", action='store_true', default=False)
 
     params = vars(parser.parse_args())
 
