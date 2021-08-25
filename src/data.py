@@ -9,6 +9,7 @@ from ase import Atoms
 from ase.neighborlist import neighbor_list
 from torch.utils.data import Dataset as TorchDataset
 from tqdm import tqdm 
+import copy 
 import sys
 
 
@@ -174,12 +175,20 @@ def split_train_test(dataset,
 
 
 def get_subset_by_indices(indices, dataset):
-    
-    subset = CGDataset(
-        props={key: [val[i] for i in indices]
-               for key, val in dataset.props.items()},
-    )
-    
+
+    if isinstance(dataset, CGDataset):
+        subset = CGDataset(
+            props={key: [val[i] for i in indices]
+                   for key, val in dataset.props.items()},
+        )
+    elif isinstance(dataset, DiffPoolDataset):
+        subset = DiffPoolDataset(
+            props={key: [val[i] for i in indices]
+                   for key, val in dataset.props.items()},
+        )
+    else:
+        raise ValueError("dataset type {} not recognized".format(dataset.__name__))
+
     return subset 
 
 
