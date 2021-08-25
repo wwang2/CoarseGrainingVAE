@@ -21,6 +21,7 @@ parser.add_argument("-n_epochs", type=int, default=60)
 # parser.add_argument("-graph_wgt", type=float, default=1.0)
 parser.add_argument("--dry_run", action='store_true', default=False)
 parser.add_argument("--graph_opt", action='store_true', default=False)
+parser.add_argument("--det", action='store_true', default=False)
 params = vars(parser.parse_args())
 
 if params['dry_run']:
@@ -102,7 +103,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['graph_eval'] = True
     trial['tqdm_flag'] = False
     trial['n_ensemble'] = 1
-    trial['det'] = True 
+    trial['det'] = params['det'] 
 
     print("Suggestion ID: {}".format(suggestion.id))
 
