@@ -28,6 +28,8 @@ class CGpool(nn.Module):
 
         if assign_logits is not None: 
             self.assign_logits = nn.Parameter(assign_logits)
+        else:
+            self.assign_logits = None
 
     def forward(self, atoms_nodes, xyz, bonds, tau, gumbel=False):  
 
@@ -66,7 +68,7 @@ class CGpool(nn.Module):
 
         cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg).to(h.device)).unsqueeze(0)
 
-        return assign_norm, assign_logits, h, H, cg_xyz, cg_adj
+        return assign, assign_logits, h, H, cg_xyz, cg_adj
 
 
 class DenseContract(nn.Module):
