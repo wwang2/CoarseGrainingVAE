@@ -397,8 +397,6 @@ class CGequiVAE(nn.Module):
     def forward(self, batch):
 
         atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
-
-        xyz_rel_data = xyz - cg_xyz[mapping]
         
         S_I, s_i = self.encoder(atomic_nums, xyz, cg_xyz, mapping, nbr_list, CG_nbr_list)
 
