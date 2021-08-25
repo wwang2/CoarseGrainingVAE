@@ -2,6 +2,9 @@ import sys
 sys.path.append("../scripts/")
 sys.path.append("../src/")
 
+import os 
+import argparse 
+
 from data import *
 from diffpoolvae import * 
 from conv import * 
@@ -18,13 +21,80 @@ from torch_scatter import scatter_mean
 from tqdm import tqdm 
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt 
-
 from tqdm import tqdm 
 
+def plot_map(assign, z, save_path=None):
+    mapping = assign.detach().cpu().numpy().transpose()
+    z = z.tolist()
+    z = [int(el) for el in z] 
+    plt.imshow( mapping)
+    plt.xticks(list(range(mapping.shape[1])), z)
+    if save_path is not None:
+        plt.savefig(save_path)
+        
+    plt.show()
 
-def run(params, device):
+def loop(loader, optimizer, device, model, tau, epoch, 
+        gamma, kappa, train=True, looptext='', tqdm_flag=True):
+    
+    recon_loss = []
+    adj_loss = []
+    ent_loss = []
+    
+    if train:
+        model.train()
+        mode = '{} train'.format(looptext)
+    else:
+        model.train() # yes, still set to train when reconstructing
+        mode = '{} valid'.format(looptext)
+        
+        
+    if tqdm_flag:
+        loader = tqdm(loader, position=0, file=sys.stdout,
+                         leave=True, desc='({} epoch #{})'.format(mode, epoch))
+        
+        
+    for batch in loader:     
+        batch = batch_to(batch, device=device)
+        
+        xyz, xyz_recon, assign, adj = model(batch, tau)
+        
+        # compute loss
+        loss_recon = (xyz_recon - xyz).pow(2).mean()
+        loss_entropy = -(assign * torch.log(assign)).sum(-1).mean()
+        node_sim_mat = assign.matmul(assign.transpose(1,2))
+        loss_adj = (node_sim_mat - adj).pow(2).mean()
+        
+        loss = loss_recon + gamma * loss_adj +  kappa * loss_entropy            
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        recon_loss.append(loss_recon.item())
+        adj_loss.append(loss_adj.item())
+        ent_loss.append(loss_entropy.item())
+
+        mean_recon = np.array(recon_loss).mean()
+        mean_adj = np.array(adj_loss).mean()
+        mean_ent = np.array(ent_loss).mean()
+        
+        del loss_adj, loss_entropy, loss_recon
+
+        postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
+                   'avg. adj loss={:.4f}'.format(mean_adj),
+                   'avg. entropy loss={:.4f}'.format(mean_ent),
+                   'tau = {:.4f}'.format(tau)]
+
+        loader.set_postfix_str(' '.join(postfix))
+    
+    
+    return mean_recon, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
+
+def run(params):
 
     num_features = params['num_features']
+    device = params['device']
     nconv_pool = params['nconv_pool']
     batch_size = params['batch_size']
     N_cg = params['N_cg']
@@ -39,6 +109,9 @@ def run(params, device):
     gamma = params['gamma']
     kappa = params['kappa']
     lr = params['lr']
+    working_dir = params['logdir']
+
+    create_dir(working_dir)
     
     tau_sched = tau_0 * np.exp(-tau_rate * torch.linspace(0, n_epochs-1, n_epochs))
 
@@ -49,97 +122,75 @@ def run(params, device):
 
     trajs = [md.load_xtc(file,
                 top=pdb_file) for file in traj_files]
-    props = get_diffpool_data(N_cg, trajs, frame_skip=500)
+    props = get_diffpool_data(N_cg, trajs, frame_skip=500)    
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
     
     loader = DataLoader(dataset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    cgpool_model = CGpool(nconv_pool, num_features, N_cg, assign_logits=None).to(device)
+    pooler = CGpool(nconv_pool, num_features, N_cg, assign_logits=None)
     
-    enc = DenseEquiEncoder(n_conv=dec_nconv, 
+    encoder = DenseEquiEncoder(n_conv=dec_nconv, 
                            n_atom_basis=num_features,
                            n_rbf=n_rbf, 
                            activation='swish', 
-                           cutoff=cutoff).to(device)
+                           cutoff=cutoff)
     
     decoder = DenseEquivariantDecoder(n_atom_basis=num_features,
                                       n_rbf=n_rbf, cutoff=cutoff, 
-                                      num_conv=dec_nconv, activation=activation).to(device)
+                                      num_conv=dec_nconv, activation=activation)
     
+    model = DiffPoolVAE(encoder=encoder,decoder=decoder, pooler=pooler).to(device)
     
-    optimizer = torch.optim.Adam(list(cgpool_model.parameters()) + list(enc.parameters()) + list(decoder.parameters()),
-                             lr=lr)
-
+    optimizer = torch.optim.Adam(model.parameters(),lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
                                                             factor=0.6, verbose=True, 
                                                             threshold=1e-4,  min_lr=1e-7)
     
     failed = False 
-
+    
     for epoch in range(n_epochs):
-        batch_loss = []
-        recon_batch_loss = []
-        adj_batch_loss = [] 
+    
+        mean_recon, assign, xyz, xyz_recon = loop(loader, optimizer, device, model, tau_sched[epoch], epoch, 
+                                        gamma, kappa, train=True, looptext='', tqdm_flag=True)
 
-        loader = tqdm(loader, position=0, leave=True) 
-        for batch in loader:     
-            batch = batch_to(batch, device=device)
-            xyz = batch['xyz']        
-            z = torch.ones_like( batch['z'] ) 
-            nbr_list = batch['nbr_list']
-
-            assign, assign_logits, h, H, cg_xyz, soft_cg_adj = cgpool_model(z, 
-                                                                       batch['xyz'], 
-                                                                       batch['bonds'], 
-                                                                       tau=tau_sched[epoch],
-                                                                       gumbel=True)
-
-
-
-            cg_adj = (soft_cg_adj > 0.01).to(torch.float).to(device)
-            assign_entropy = -(assign * torch.log(assign)).sum(-1).mean()
-
-            adj_loss = soft_cg_adj.pow(2).mean()
-
-            H, V = enc(h, H, xyz, cg_xyz, assign, nbr_list, cg_adj)
-            H, V = decoder(H, cg_adj, cg_xyz)
-
-            dx = torch.einsum('bcfe,bac->bcfe', V[:, :, :z.shape[1], :], assign).sum(1)
-
-            x_recon = torch.einsum('bce,bac->bae', cg_xyz, assign) + dx
-            loss_recon = (x_recon - xyz).pow(2).mean() 
-            loss = loss_recon + gamma * adj_loss +  kappa * assign_entropy
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            batch_loss.append(loss_recon.item())
-            adj_batch_loss.append(adj_loss.item())
-
-            recon_batch_loss.append(loss_recon.item())
-
-            mean_recon = np.array(recon_batch_loss).mean()
-
-            postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
-                       'avg. adj loss={:.4f}'.format(adj_loss),
-                       'tau = {:.4f}'.format(tau_sched[epoch])]
-
-            loader.set_postfix_str(' '.join(postfix))
-
-    #     if epoch % 5 == 0:
-    #         plot_map(assign[0], batch['z'][0])
-
-            if np.isnan(mean_recon):
-                print("NaN encoutered, exiting...")
-                failed = True
-                break 
+        if np.isnan(mean_recon):
+            print("NaN encoutered, exiting...")
+            failed = True
+            break 
+            
+        if epoch % 5 == 0:
+            map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
+            plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
         scheduler.step(mean_recon)
 
-    return mean_recon, failed
+
+    return mean_recon, failed, assign
 
 
 
+if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-logdir', type=str)
+    parser.add_argument('-device', type=int)
+    parser.add_argument('-num_features',  type=int, default= 512)
+    parser.add_argument('-batch_size', type=int,default= 32)
+    parser.add_argument('-N_cg', type=int, default= 3)
+    parser.add_argument('-nconv_pool', type=int, default= 4)
+    parser.add_argument('-enc_nconv', type=int, default= 3)
+    parser.add_argument('-dec_nconv', type=int, default= 3)
+    parser.add_argument('-cutoff', type=float, default= 6.0)
+    parser.add_argument('-n_rbf', type=int,  default= 7)
+    parser.add_argument('-activation', type=str,  default= 'ReLU')
+    parser.add_argument('-n_epochs', default= 50)
+    parser.add_argument('-tau_rate', type=float, default= 0.04 )
+    parser.add_argument('-tau_0', type=float, default= 2.0 )
+    parser.add_argument('-gamma', type=float, default= 10.0)
+    parser.add_argument('-kappa', type=float, default= 0.1)
+    parser.add_argument('-lr', type=float, default= 1e-4 )
+
+    params = vars(parser.parse_args())
+
+    run(params)
