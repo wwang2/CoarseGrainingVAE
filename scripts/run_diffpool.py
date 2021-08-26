@@ -114,6 +114,7 @@ def run(params):
     lr = params['lr']
     working_dir = params['logdir']
     tqdm_flag = params['tqdm_flag']
+    cg_method = params['cg_method']
 
     create_dir(working_dir)
     
@@ -126,6 +127,20 @@ def run(params):
 
     trajs = [md.load_xtc(file,
                 top=pdb_file) for file in traj_files]
+
+    # get cg_map 
+    if cg_method == 'newman':
+        atomic_nums, protein_index = get_atomNum(trajs[0])
+        n_atoms = len(atomic_nums)
+        protein_top = trajs[0].top.subset(protein_index)
+        g = protein_top.to_bondgraph()
+        paritions = get_partition(g, N_cg)
+        mapping = parition2mapping(paritions, n_atoms)
+        assign_idx = torch.LongTensor( np.array(mapping) ) 
+    elif cg_method == 'diff':
+        assign_idx = None
+
+
     props = get_diffpool_data(N_cg, trajs, frame_skip=500)    
 
     dataset = DiffPoolDataset(props)
@@ -137,10 +152,8 @@ def run(params):
     trainset = get_subset_by_indices(train_index, dataset)
     testset = get_subset_by_indices(test_index, dataset)
 
-#    import ipdb; ipdb.set_trace()
-
     trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    pooler = CGpool(nconv_pool, num_features, N_cg, assign_logits=None)
+    pooler = CGpool(nconv_pool, num_features, N_cg, assign_idx=assign_idx)
     
     encoder = DenseEquiEncoder(n_conv=dec_nconv, 
                            n_atom_basis=num_features,
@@ -217,6 +230,7 @@ if __name__ == '__main__':
     parser.add_argument('-kappa', type=float, default= 0.1)
     parser.add_argument('-lr', type=float, default=1e-4)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
+    parser.add_argument("-cg_method", type=str, default='diff')
 
     params = vars(parser.parse_args())
 

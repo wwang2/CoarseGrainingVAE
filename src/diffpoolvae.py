@@ -18,7 +18,7 @@ class DiffPoolVAE(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        assign, assign_logits, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=tau,
@@ -26,14 +26,14 @@ class DiffPoolVAE(nn.Module):
 
         cg_adj = (soft_cg_adj > 0.01).to(torch.float).to(device)
 
-        H, V = self.encoder(h, H, xyz, cg_xyz, assign, nbr_list, cg_adj)
+        H, V = self.encoder(h, H, xyz, cg_xyz, soft_assign, nbr_list, cg_adj)
         H, V = self.decoder(H, cg_adj, cg_xyz)
 
-        dx = torch.einsum('bcfe,bac->bcfe', V[:, :, :z.shape[1], :], assign).sum(1)
+        dx = torch.einsum('bcfe,bac->bcfe', V[:, :, :z.shape[1], :], soft_assign).sum(1)
 
-        x_recon = torch.einsum('bce,bac->bae', cg_xyz, assign) + dx
+        x_recon = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) + dx
         
-        return xyz, x_recon, assign, adj, soft_cg_adj
+        return xyz, x_recon, soft_assign, adj, soft_cg_adj
 
 class CGpool(nn.Module):
     
@@ -41,7 +41,7 @@ class CGpool(nn.Module):
              n_conv,
              n_atom_basis,
              n_cgs,
-             assign_logits=None):
+             assign_idx=None):
         super().__init__()
 
         self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
@@ -58,10 +58,9 @@ class CGpool(nn.Module):
                                        nn.Tanh(), 
                                        nn.Linear(n_atom_basis, n_cgs))
 
-        if assign_logits is not None: 
-            self.assign_logits = nn.Parameter(assign_logits)
-        else:
-            self.assign_logits = None
+        # todo: function to parameterize assignment weights 
+        self.n_cgs = n_cgs
+        self.assign_idx = assign_idx
 
     def forward(self, atoms_nodes, xyz, bonds, tau, gumbel=False):  
 
@@ -71,21 +70,21 @@ class CGpool(nn.Module):
         adj[bonds[:, 0], bonds[:,1], bonds[:,2]] = 1
         adj[bonds[:, 0], bonds[:,2], bonds[:,1]] = 1
 
-        for conv in self.update:
-            dh = torch.einsum('bif,bij->bjf', conv(h), adj)
-            h = h + dh 
+        if self.assign_idx is not None:
+            assign = torch.zeros(h.shape[0], h.shape[1], self.n_cgs).to(h.device)
+            assign[:, torch.LongTensor(list(range(h.shape[1]))), torch.LongTensor(self.assign_idx)] = 1.
 
-        if self.assign_logits is None:
+        else:
+            for conv in self.update:
+                dh = torch.einsum('bif,bij->bjf', conv(h), adj)
+                h = h + dh 
+
             assign_logits = self.cg_network(h)
 
-        else:
-            nbatch = h.shape[0]
-            assign_logits = torch.stack( [ self.assign_logits] * nbatch )
-
-        if gumbel:
-            assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
-        else:
-            assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
+            if gumbel:
+                assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
+            else:
+                assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
 
         assign_norm = assign / assign.sum(1).unsqueeze(-2) 
 
@@ -98,9 +97,7 @@ class CGpool(nn.Module):
         # compute weighted adjacency 
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
 
-        #cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg).to(h.device)).unsqueeze(0)
-
-        return assign, assign_logits, h, H, adj, cg_xyz, cg_adj
+        return assign, h, H, adj, cg_xyz, cg_adj
 
 
 class DenseContract(nn.Module):
