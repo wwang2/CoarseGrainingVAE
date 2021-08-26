@@ -29,7 +29,7 @@ class DiffPoolVAE(nn.Module):
         H, V = self.encoder(h, H, xyz, cg_xyz, soft_assign, nbr_list, cg_adj)
         H, V = self.decoder(H, cg_adj, cg_xyz)
 
-        dx = torch.einsum('bcfe,bac->bcfe', V[:, :, :z.shape[1], :], soft_assign).sum(1)
+        dx = torch.einsum('bcae,bac->bae', V, soft_assign)
 
         x_recon = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) + dx
         
@@ -278,7 +278,7 @@ class DenseEquiEncoder(nn.Module):
 
 
 class DenseEquivariantDecoder(nn.Module):
-    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
+    def __init__(self, n_atoms, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
         
         nn.Module.__init__(self)
         # distance transform
@@ -312,6 +312,8 @@ class DenseEquivariantDecoder(nn.Module):
                          dropout=0.0)
              for _ in range(num_conv)]
         )
+
+        self.channel_pooler = nn.Parameter(torch.randn(n_atoms, n_atom_basis))
 
     
     def forward(self, H, cg_adj, cg_xyz):
@@ -356,7 +358,8 @@ class DenseEquivariantDecoder(nn.Module):
             H_unpack = H_stack.reshape(H.shape[0], H.shape[1], -1) 
             V_unpack = V_stack.reshape(H.shape[0], H.shape[1], H.shape[2], 3)
 
-        return H_unpack, V_unpack 
+        V_dec = torch.einsum('bcfe,nf->bcne', V_unpack, self.channel_pooler)
+        return H_unpack, V_dec 
 
 class DiffpoolMessageBlock(nn.Module):
     def __init__(self,

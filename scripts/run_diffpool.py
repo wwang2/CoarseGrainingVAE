@@ -128,10 +128,11 @@ def run(params):
     trajs = [md.load_xtc(file,
                 top=pdb_file) for file in traj_files]
 
+    atomic_nums, protein_index = get_atomNum(trajs[0])
+    n_atoms = len(atomic_nums)
+
     # get cg_map 
     if cg_method == 'newman':
-        atomic_nums, protein_index = get_atomNum(trajs[0])
-        n_atoms = len(atomic_nums)
         protein_top = trajs[0].top.subset(protein_index)
         g = protein_top.to_bondgraph()
         paritions = get_partition(g, N_cg)
@@ -140,9 +141,7 @@ def run(params):
     elif cg_method == 'diff':
         assign_idx = None
 
-
     props = get_diffpool_data(N_cg, trajs, frame_skip=500)
-    n_atoms = props['xyz'][0].shape[1]
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
@@ -162,7 +161,7 @@ def run(params):
                            activation=activation, 
                            cutoff=cutoff)
     
-    decoder = DenseEquivariantDecoder(n_atom_basis=num_features,
+    decoder = DenseEquivariantDecoder(n_atoms=n_atoms, n_atom_basis=num_features,
                                       n_rbf=n_rbf, cutoff=cutoff, 
                                       num_conv=dec_nconv, activation=activation)
     
