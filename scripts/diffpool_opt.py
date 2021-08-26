@@ -14,6 +14,7 @@ parser.add_argument("-batch_size", type=int, default=32)
 parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("--dry_run", action='store_true', default=False)
+parser.add_argument("--tqdm_flag", action='store_true', default=False)
 params = vars(parser.parse_args())
 
 if params['dry_run']:
@@ -25,7 +26,7 @@ else:
     n_epochs = params['n_epochs'] 
     n_obs = 1000
 
-
+create_dir(params['logdir'])
 conn = Connection(client_token=token)
 
 if params['id'] == None:
@@ -60,18 +61,21 @@ while experiment.progress.observation_count < experiment.observation_budget:
     suggestion = conn.experiments(experiment.id).suggestions().create()
     trial =  suggestion.assignments
 
+    trial['logdir'] = os.path.join(params['logdir'], suggestion.id)
     trial['n_epochs'] = params['n_epochs']
     trial['N_cg'] = params['n_cgs'] 
     trial['batch_size'] = params['batch_size']
+    trial['device'] = params['device']
+    trial['tqdm_flag'] = params['tqdm_flag']
 
     print("Suggestion ID: {}".format(suggestion.id))
 
-    recon, failed = run(trial, device=params['device'])
+    test_recon, failed, assign = run(trial)
 
     if not failed:
         conn.experiments(experiment.id).observations().create(
           suggestion=suggestion.id,
-          value=recon,
+          value=test_recon,
         )
     elif failed:
         conn.experiments(experiment.id).observations().create(
