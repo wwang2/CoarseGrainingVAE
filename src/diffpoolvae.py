@@ -33,7 +33,7 @@ class DiffPoolVAE(nn.Module):
 
         x_recon = torch.einsum('bce,bac->bae', cg_xyz, assign) + dx
         
-        return xyz, x_recon, assign, adj
+        return xyz, x_recon, assign, adj, soft_cg_adj
 
 class CGpool(nn.Module):
     
@@ -98,7 +98,7 @@ class CGpool(nn.Module):
         # compute weighted adjacency 
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
 
-        cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg).to(h.device)).unsqueeze(0)
+        #cg_adj = cg_adj * (1 - torch.eye(Ncg, Ncg).to(h.device)).unsqueeze(0)
 
         return assign, assign_logits, h, H, adj, cg_xyz, cg_adj
 
