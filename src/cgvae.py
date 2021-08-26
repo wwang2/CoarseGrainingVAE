@@ -412,14 +412,9 @@ class CGequiVAE(nn.Module):
         logvar = self.atom_sigmanet(z)
         sigma = 1e-9 + torch.exp(logvar / 2)
 
-        # if self.train:
-
-        if self.training:
-            if not self.det: 
-                z_sample = self.reparametrize(mu, sigma)
-            else:
-                z_sample = mu
-        else: 
+        if not self.det: 
+            z_sample = self.reparametrize(mu, sigma)
+        else:
             z_sample = mu
 
         S_I = z_sample # s_i not used in decoding 
