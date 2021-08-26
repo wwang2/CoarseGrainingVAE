@@ -141,7 +141,8 @@ def run(params):
         assign_idx = None
 
 
-    props = get_diffpool_data(N_cg, trajs, frame_skip=500)    
+    props = get_diffpool_data(N_cg, trajs, frame_skip=500)
+    n_atoms = props['xyz'][0].shape[1]
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
@@ -153,7 +154,7 @@ def run(params):
     testset = get_subset_by_indices(test_index, dataset)
 
     trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    pooler = CGpool(nconv_pool, num_features, N_cg, assign_idx=assign_idx)
+    pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
     
     encoder = DenseEquiEncoder(n_conv=dec_nconv, 
                            n_atom_basis=num_features,

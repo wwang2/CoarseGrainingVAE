@@ -40,8 +40,11 @@ class CGpool(nn.Module):
     def __init__(self,
              n_conv,
              n_atom_basis,
+             n_atoms,
              n_cgs,
-             assign_idx=None):
+             assign_idx=None,
+             assign_weights=None,
+             trainable_weights=False):
         super().__init__()
 
         self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
@@ -61,10 +64,15 @@ class CGpool(nn.Module):
         self.cg_weights = nn.Sequential(nn.Linear(n_atom_basis, n_atom_basis), 
                                nn.Tanh(), 
                                nn.Linear(n_atom_basis, 1))
-
-        # todo: function to parameterize assignment weights 
         self.n_cgs = n_cgs
         self.assign_idx = assign_idx
+
+        assign_weights = torch.ones(n_atoms)
+
+        if trainable_weights:
+            self.assign_weights = nn.Parameter(assign_weights)
+        else:
+            self.register_buffer("assign_weights", assign_weights)
 
     def forward(self, atoms_nodes, xyz, bonds, tau, gumbel=False):  
 
@@ -77,6 +85,8 @@ class CGpool(nn.Module):
         if self.assign_idx is not None:
             assign = torch.zeros(h.shape[0], h.shape[1], self.n_cgs).to(h.device)
             assign[:, torch.LongTensor(list(range(h.shape[1]))), torch.LongTensor(self.assign_idx)] = 1.
+
+            coord_assign = assign * self.assign_weights.unsqueeze(-1).unsqueeze(0)
 
             assign_norm = assign / assign.sum(1).unsqueeze(-2) 
 
