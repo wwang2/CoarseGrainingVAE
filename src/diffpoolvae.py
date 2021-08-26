@@ -58,6 +58,10 @@ class CGpool(nn.Module):
                                        nn.Tanh(), 
                                        nn.Linear(n_atom_basis, n_cgs))
 
+        self.cg_weights = nn.Sequential(nn.Linear(n_atom_basis, n_atom_basis), 
+                               nn.Tanh(), 
+                               nn.Linear(n_atom_basis, 1))
+
         # todo: function to parameterize assignment weights 
         self.n_cgs = n_cgs
         self.assign_idx = assign_idx
@@ -74,19 +78,23 @@ class CGpool(nn.Module):
             assign = torch.zeros(h.shape[0], h.shape[1], self.n_cgs).to(h.device)
             assign[:, torch.LongTensor(list(range(h.shape[1]))), torch.LongTensor(self.assign_idx)] = 1.
 
+            assign_norm = assign / assign.sum(1).unsqueeze(-2) 
+
         else:
             for conv in self.update:
                 dh = torch.einsum('bif,bij->bjf', conv(h), adj)
                 h = h + dh 
 
             assign_logits = self.cg_network(h)
+            assign_weights = self.cg_weights(h)
 
             if gumbel:
                 assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
             else:
                 assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
 
-        assign_norm = assign / assign.sum(1).unsqueeze(-2) 
+            coord_assign = assign * assign_weights
+            assign_norm = coord_assign / coord_assign.sum(1).unsqueeze(-2) 
 
         H = torch.einsum('bnj,bnf->bjf', assign_norm, h)
         # get coordinates 
@@ -258,59 +266,6 @@ class DenseEquiEncoder(nn.Module):
             
         return H, V
 
-class DiffPoolDecoder(nn.Module):
-    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation):   
-        
-        nn.Module.__init__(self)
-        # distance transform
-        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
-                                  cutoff=cutoff,
-                                  feat_dim=n_atom_basis,
-                                  dropout=0.0)
-
-        self.message_blocks = nn.ModuleList(
-            [DiffpoolMessageBlock(feat_dim=n_atom_basis,
-                          activation=activation,
-                          n_rbf=n_rbf,
-                          cutoff=cutoff,
-                          dropout=0.0)
-             for _ in range(num_conv)]
-        )
-
-        self.update_blocks = nn.ModuleList(
-            [UpdateBlock(feat_dim=n_atom_basis,
-                         activation=activation,
-                         dropout=0.0)
-             for _ in range(num_conv)]
-        )
-    
-    def forward(self, cg_xyz, H, cg_adj):
-        
-        CG_nbr_list = cg_adj.nonzero()
-        #CG_nbr_list, _ = make_directed(CG_nbr_list)
-        r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
-        
-        V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
-
-        for i, message_block in enumerate(self.message_blocks):
-            
-            # message block
-            dH_message, dV_message = message_block(s_j=H,
-                                                   v_j=V,
-                                                   r_ij=r_ij,
-                                                   nbrs=CG_nbr_list,
-                                                   cg_adj=cg_adj # contains the weighted edges
-                                                   )
-            H = H + dH_message
-            V = V + dV_message
-
-            # update block
-            dH_update, dV_update = self.update_blocks[i](s_i=H,
-                                                v_i=V)
-            H = H + dH_update
-            V = V + dV_update
-
-        return H, V 
 
 class DenseEquivariantDecoder(nn.Module):
     def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
