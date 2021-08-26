@@ -58,11 +58,11 @@ def loop(loader, optimizer, device, model, tau, epoch,
     for batch in loader:     
         batch = batch_to(batch, device=device)
         
-        xyz, xyz_recon, assign, adj = model(batch, tau)
+        xyz, xyz_recon, assign, adj, soft_cg_adj = model(batch, tau)
         
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean()
-        loss_entropy = -(assign * torch.log(assign)).sum(-1).mean()
+        loss_entropy = soft_cg_adj.diagonal(dim1=1, dim2=2).std(-1).mean()# -(assign * torch.log(assign)).sum(-1).mean()
         node_sim_mat = assign.matmul(assign.transpose(1,2))
         loss_adj = (node_sim_mat - adj).pow(2).mean()
         
@@ -86,9 +86,11 @@ def loop(loader, optimizer, device, model, tau, epoch,
                    'avg. adj loss={:.4f}'.format(mean_adj),
                    'avg. entropy loss={:.4f}'.format(mean_ent),
                    'tau = {:.4f}'.format(tau)]
-
-        loader.set_postfix_str(' '.join(postfix))
-    
+        if tqdm_flag:
+            loader.set_postfix_str(' '.join(postfix))
+        else:
+            for result in postfix:
+                print(result)
     
     return mean_recon, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
 
