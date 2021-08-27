@@ -94,14 +94,14 @@ def get_bonds(traj, pdb, backbone = True):
 def get_sample_rmsd(rmsd_samples, axis):
     merged = list(itertools.chain(*rmsd_samples))
 
-    cg_res = [int(re.search('(?<=_)[0-9]+', path).group(0)) for path in merged]
+    cg_res = [int(re.search('(?<=N)[0-9]+', path).group(0)) for path in merged]
 
     sample_gen = []
     rmsd_vals = {}
 
 
     for path in merged:
-        res = int(re.search('(?<=_)[0-9]+', path).group(0))
+        res = int(re.search('(?<=N)[0-9]+', path).group(0))
         rmsd_data = np.loadtxt(path)
 
         if res not in rmsd_vals.keys():
@@ -127,7 +127,7 @@ def get_cv(files, mask=None):
     cv = []
 
     for exp in files:
-        m = re.search('(?<=_)[0-9]+', exp)
+        m = re.search('(?<=N)[0-9]+', exp)
         cg_res.append(int(m.group(0)))
         cv.append( np.loadtxt(exp) )
     cv = np.array(cv)
