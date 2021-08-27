@@ -52,6 +52,13 @@ class InvariantMessage(nn.Module):
                                         feat_dim=out_feat_dim,
                                         dropout=dropout)
 
+        self.dist_filter = Dense(in_features=in_feat_dim,
+              out_features=out_feat_dim,
+              bias=True,
+              dropout_rate=0.0)
+
+        self.offset = torch.linspace(0.0, cutoff, in_feat_dim)
+
     def forward(self,
                 s_j,
                 dist,
@@ -59,6 +66,9 @@ class InvariantMessage(nn.Module):
 
         phi = self.inv_dense(s_j)[nbrs[:, 1]]
         w_s = self.dist_embed(dist)
+        # expanded_dist = (-(dist.unsqueeze(-1) - self.offset.to(phi.device)).pow(2)).exp()
+        # w_s = self.dist_filter(expanded_dist)
+
         output = phi * w_s
 
         return output
