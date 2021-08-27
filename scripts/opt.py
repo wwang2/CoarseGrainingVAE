@@ -8,7 +8,7 @@ import shutil
 parser = argparse.ArgumentParser()
 parser.add_argument("-logdir", type=str)
 parser.add_argument("-device", type=int, default=0)
-parser.add_argument("-id", type=int, default=None)
+parser.add_argument("-id", type=int, default=0)
 parser.add_argument("-dataset", type=str)
 parser.add_argument("-min_cgcutoff", type=float)
 parser.add_argument("-batch_size", type=int)
@@ -51,7 +51,7 @@ create_dir(params['logdir'])
 #Intiailize connections 
 conn = Connection(client_token=token)
 
-if params['id'] == None:
+if params['id'] == 0:
     experiment = conn.experiments().create(
         name=params['logdir'],
         metrics=[dict(name='cv rmsd', objective='minimize')],
