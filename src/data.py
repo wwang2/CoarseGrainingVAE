@@ -114,9 +114,6 @@ class CGDataset(TorchDataset):
     
 
     def generate_neighbor_list(self, atom_cutoff, cg_cutoff,  device='cpu',  undirected=True):
-        
-        if cg_cutoff == None:
-            cg_cutoff = atom_cutoff
 
         # todo : create progress bar
         nbr_list = []
@@ -124,9 +121,29 @@ class CGDataset(TorchDataset):
 
         for nxyz in tqdm(self.props['nxyz'], desc='building nbr list', file=sys.stdout):
             nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu"))
+        if cg_cutoff is not None:    
+            for nxyz in tqdm(self.props['CG_nxyz'], desc='building CG nbr list', file=sys.stdout):
+                cg_nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, cg_cutoff, undirected).to("cpu"))
 
-        for nxyz in tqdm(self.props['CG_nxyz'], desc='building CG nbr list', file=sys.stdout):
-            cg_nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, cg_cutoff, undirected).to("cpu"))
+        elif cg_cutoff is None :
+            for i, bond in enumerate( self.props['bond_edge_list'] ):
+                
+                mapping = self.props['CG_mapping'][i]
+                n_atoms = self.props['num_atoms'][i]
+                n_cgs = self.props['num_CGs'][i]
+                adj = torch.zeros(n_atoms, n_atoms)
+                adj[bond[:, 0], bond[:,1]] = 1
+                adj[bond[:, 1], bond[:,0]] = 1
+
+                # get assignment vector 
+                assign = torch.zeros(n_atoms, n_cgs)
+                atom_idx = torch.LongTensor(list(range(n_atoms)))
+
+                assign[atom_idx, mapping] = 1
+                # compute CG ajacency 
+                cg_adj = assign.transpose(0,1).matmul(adj).matmul(assign)
+
+                cg_nbr_list.append( cg_adj.nonzero() )
 
         self.props['nbr_list'] = nbr_list
         self.props['CG_nbr_list'] = cg_nbr_list
