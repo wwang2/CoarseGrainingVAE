@@ -47,7 +47,7 @@ class DiffPoolDataset(TorchDataset):
         single_item['xyz'] += torch.randn(1, 3) * 10.0
         return single_item
     
-    def generate_neighbor_list(self, atom_cutoff,  device='cpu',  undirected=True):
+    def generate_neighbor_list(self, atom_cutoff,  device='cpu',  undirected=False):
         nbr_list = []
         for xyz in tqdm(self.props['xyz'], desc='building nbr list', file=sys.stdout):
             nbr_list.append(get_neighbor_list(xyz, device, atom_cutoff, undirected).to("cpu"))
