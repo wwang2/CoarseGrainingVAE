@@ -444,6 +444,6 @@ if __name__ == '__main__':
     else:
         task = 'sample'
 
-    params['logdir'] = annotate_job(task, params['logdir'], params['n_cgs'])
+    params['logdir'] = annotate_job(params['cg_method'] + '_' + task, params['logdir'], params['n_cgs'])
 
     run_cv(params)
