@@ -91,6 +91,9 @@ class EquivariantDecoder(nn.Module):
         
         V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
 
+        # compute node degree 
+        deg_inv_sqrt = scatter_add(torch.ones(CG_nbr_list.shape[0]).to(H.device), index=CG_nbr_list[:,0]).reciprocal().sqrt()
+
         for i, message_block in enumerate(self.message_blocks):
             
             # message block
@@ -98,6 +101,7 @@ class EquivariantDecoder(nn.Module):
                                                    v_j=V,
                                                    r_ij=r_ij,
                                                    nbrs=CG_nbr_list,
+                                                   edge_wgt=deg_inv_sqrt[CG_nbr_list[:,0]] * deg_inv_sqrt[CG_nbr_list[:,1]]
                                                    )
             H = H + dH_message
             V = V + dV_message
