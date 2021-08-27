@@ -250,7 +250,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
 # need a function to get mapping, and CG coordinates simultanesouly. We can have alpha carbon as the CG site
 
 
-def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, cg_traj=None):
+def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, cg_traj=None):
     
     CG_nxyz_data = []
     nxyz_data = []
@@ -258,11 +258,15 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, cg_traj=No
     num_atoms_list = []
     num_CGs_list = []
     CG_mapping_list = []
+    bond_edge_list = []
+    bondgraph = top.to_bondgraph()
+    edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
 
     for xyz in traj:   
         nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)
         nxyz_data.append(nxyz)
         num_atoms_list.append(torch.LongTensor( [len(nxyz)]))
+        bond_edge_list.append(edges)
 
     # Aggregate CG coorinates 
     for i, nxyz in enumerate(nxyz_data):
@@ -282,7 +286,8 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, cg_traj=No
              'CG_nxyz': CG_nxyz_data,
              'num_atoms': num_atoms_list, 
              'num_CGs':num_CGs_list,
-             'CG_mapping': CG_mapping_list
+             'CG_mapping': CG_mapping_list, 
+             'bond_edge_list':  bond_edge_list
             }
 
     dataset = CGDataset(props.copy())
@@ -298,6 +303,6 @@ def get_peptide_dataset(atom_cutoff,  cg_cutoff, label, mapping, n_frames=20000,
     
     atomic_nums, traj_reshape = get_traj(pdb, files, n_frames)
 
-    dataset = build_dataset(mapping, traj_reshape, atom_cutoff, cg_cutoff, atomic_nums)
+    dataset = build_dataset(mapping, traj_reshape, atom_cutoff, cg_cutoff, atomic_nums, pdb.top)
 
     return atomic_nums, dataset
