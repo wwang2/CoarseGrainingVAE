@@ -17,6 +17,7 @@ parser.add_argument("-nevals", type=int, default=24)
 parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-cg_method", type=str)
 parser.add_argument("-n_epochs", type=int, default=60)
+parser.add_argument("-n_splits", type=int, default=3)
 # parser.add_argument("-rmsd_wgt", type=float, default=1.0)
 # parser.add_argument("-graph_wgt", type=float, default=1.0)
 parser.add_argument("--dry_run", action='store_true', default=False)
@@ -104,7 +105,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['ndata'] = ndata
     trial['nsamples'] = 20
     trial['n_cgs'] = params['n_cgs']
-    trial['nsplits'] = 2
+    trial['nsplits'] = params['n_splits']
     trial['randommap'] = False
     trial['shuffle'] = False
     trial['optimizer'] = 'adam'
