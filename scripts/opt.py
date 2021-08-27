@@ -43,7 +43,7 @@ if params['det']:
     task = 'recon'
 else:
     task = 'sample'
-params['logdir'] = annotate_job(task, params['logdir'],  params['n_cgs'])
+params['logdir'] = annotate_job(params['cg_method'] + '_' + task, params['logdir'],  params['n_cgs'])
 
 create_dir(params['logdir'])
 
@@ -58,14 +58,15 @@ if params['id'] == None:
             dict(name='n_basis', type='int', bounds=dict(min=128, max=600)),
             dict(name='n_rbf', type='int', bounds=dict(min=5, max=10)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
+            dict(name='cg_radius_graph', type='categorical', categorical_values=["True", "False"]),
             dict(name='cg_cutoff', type='double', bounds=dict(min=params['min_cgcutoff'], max=params['min_cgcutoff'] + 10.0)),
             dict(name='atom_cutoff', type='double', bounds=dict(min=7.0, max=9.5)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=4)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.01), transformation="log"),
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
-            dict(name='eta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
-            dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
+            # dict(name='eta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
+            # dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.0001, max=0.001), transformation="log"),
             dict(name='factor', type='double', bounds=dict(min=0.1, max=0.9), transformation="log"),
             dict(name='patience', type='int', bounds=dict(min=1, max=10)),
@@ -90,6 +91,10 @@ while experiment.progress.observation_count < experiment.observation_budget:
 
     if not params['dry_run']:
         n_epochs = params['n_epochs']  
+    if trial['cg_radius_graph'] == 'True':
+        trial['cg_radius_graph'] = True 
+    else:
+        trial['cg_radius_graph'] = False
 
     trial['logdir'] = os.path.join(params['logdir'], suggestion.id)
     trial['device'] = params['device']
@@ -112,6 +117,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['tqdm_flag'] = False
     trial['n_ensemble'] = 1
     trial['det'] = params['det'] 
+    trial['eta'] = 0.0 
+    trial['kappa'] = 0.0
 
     print("Suggestion ID: {}".format(suggestion.id))
 
