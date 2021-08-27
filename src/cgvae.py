@@ -51,11 +51,6 @@ class EquivariantDecoder(nn.Module):
     def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
         
         nn.Module.__init__(self)
-        # distance transform
-        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
-                                  cutoff=cutoff,
-                                  feat_dim=n_atom_basis,
-                                  dropout=0.0)
 
         if cross_flag:
             self.message_blocks = nn.ModuleList(
@@ -88,7 +83,7 @@ class EquivariantDecoder(nn.Module):
     
         CG_nbr_list, _ = make_directed(CG_nbr_list)
         r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
-        
+
         V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
 
         # compute node degree 
@@ -101,7 +96,7 @@ class EquivariantDecoder(nn.Module):
                                                    v_j=V,
                                                    r_ij=r_ij,
                                                    nbrs=CG_nbr_list,
-                                                   edge_wgt=deg_inv_sqrt[CG_nbr_list[:,0]] * deg_inv_sqrt[CG_nbr_list[:,1]]
+                                                   edge_wgt=None#deg_inv_sqrt[CG_nbr_list[:,0]] * deg_inv_sqrt[CG_nbr_list[:,1]]
                                                    )
             H = H + dH_message
             V = V + dV_message
@@ -217,23 +212,23 @@ class EquiEncoder(nn.Module):
             h = h + 0.5 *  ds_update # atom message 
             v = v + 0.5 *  dv_update
 
-            # # contruct atom messages 
-            # if i == 0:
-            #     H = scatter_mean(h, mapping, dim=0)
-            #     V = scatter_mean(v, mapping, dim=0)  #torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
-            #     #V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
+            # contruct atom messages 
+            if i == 0:
+                H = scatter_mean(h, mapping, dim=0)
+                V = scatter_mean(v, mapping, dim=0)  #torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
+                #V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
 
-            # # CG message passing 
-            # dH, dV = self.cgmessage_layers[i](h, v, r_iI, mapping)
+            # CG message passing 
+            dH, dV = self.cgmessage_layers[i](h, v, r_iI, mapping)
 
-            # H = H + dH
-            # V = V + dV
+            H = H + dH
+            V = V + dV
 
             #h = h + H[mapping]
 
-            # dH_update, dV_update = self.cg_update_blocks[i](s_i=H, v_i=V)
-            # H = H + dH_update # atom message 
-            # V = V + dV_update
+            dH_update, dV_update = self.cg_update_blocks[i](s_i=H, v_i=V)
+            H = H + dH_update # atom message 
+            V = V + dV_update
 
             # # couple the cg message back
 
@@ -251,7 +246,7 @@ class EquiEncoder(nn.Module):
             # dS_update, dV_update = self.cg_update_blocks[i](s_i=S_I, v_i=V_I)
             # H = H + dS_update # atom message 
             # V_I = V_I + dV_update
-        H = scatter_mean(h, mapping, dim=0)
+        #H = scatter_mean(h, mapping, dim=0)
           
         return H, h
 
@@ -343,7 +338,6 @@ class CGequiVAE(nn.Module):
         
         self.n_atoms = n_atoms
         self.n_cgs = n_cgs
-        self.atomdense = nn.Linear(feature_dim, n_atoms)
         self.atomwise_z = atomwise_z
         self.prior_net = prior_net
         self.det = det
@@ -390,7 +384,7 @@ class CGequiVAE(nn.Module):
         CG2atomChannel = self.CG2ChannelIdx(mapping)
         xyz_rel = cg_v[mapping, CG2atomChannel, :]
 
-        # this constraint is only true for geometrical mean
+        #this constraint is only true for geometrical mean
         decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
         xyz_rel = xyz_rel - decode_offsets[mapping]
 
@@ -401,6 +395,8 @@ class CGequiVAE(nn.Module):
     def forward(self, batch):
 
         atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
+
+        #import ipdb; ipdb.set_trace()
         
         S_I, s_i = self.encoder(atomic_nums, xyz, cg_xyz, mapping, nbr_list, CG_nbr_list)
 
@@ -414,12 +410,12 @@ class CGequiVAE(nn.Module):
 
         mu = self.atom_munet(z)
         logvar = self.atom_sigmanet(z)
-        sigma = 1e-9 + torch.exp(logvar / 2)
+        sigma = 1e-12 + torch.exp(logvar / 2)
 
         if not self.det: 
             z_sample = self.reparametrize(mu, sigma)
         else:
-            z_sample = mu
+            z_sample = z
 
         S_I = z_sample # s_i not used in decoding 
         
