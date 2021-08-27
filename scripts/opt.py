@@ -37,6 +37,14 @@ else:
     ndata = params['ndata']
     nevals = params['nevals']
 
+
+# add more info about this job 
+if params['det']:
+    task = 'recon'
+else:
+    task = 'sample'
+params['logdir'] = annotate_job(task, params['logdir'],  params['n_cgs'])
+
 create_dir(params['logdir'])
 
 #Intiailize connections 

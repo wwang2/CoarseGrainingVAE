@@ -5,6 +5,11 @@ import torch
 import numpy as np
 from ase import Atoms, io 
 import networkx as nx
+from datetime import date
+
+def annotate_job(task, job_name, N_cg):
+    today = date.today().strftime('%m-%d')
+    return "{}_{}_{}_N{}".format(job_name, today, task, N_cg)
 
 def create_dir(name):
     if not os.path.isdir(name):

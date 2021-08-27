@@ -65,6 +65,9 @@ def run_cv(params):
     kappa = params['kappa']
     min_lr = 1e-8
 
+    if det:
+        beta = 0.0
+
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
     mdshare.fetch('pentapeptide-*-500ns-impl-solv.xtc', working_directory='../data')
@@ -434,5 +437,13 @@ if __name__ == '__main__':
 
 
     params = vars(parser.parse_args())
+
+    # add more info about this job 
+    if params['det']:
+        task = 'recon'
+    else:
+        task = 'sample'
+
+    params['logdir'] = annotate_job(task, params['logdir'], params['n_cgs'])
 
     run_cv(params)
