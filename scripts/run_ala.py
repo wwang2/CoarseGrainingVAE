@@ -94,12 +94,16 @@ def run_cv(params):
                         atom_cutoff, 
                         cg_cutoff,
                         atomic_nums,
+                        traj.top,
                         cg_traj=cg_coord)
     # get n_atoms 
     n_atoms = atomic_nums.shape[0]
     n_cgs = mapping.max().item() + 1
 
-    dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff, device=device, undirected=True)
+    if params['cg_radius_graph']:
+        dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=None, device=device, undirected=True)
+    else:
+        dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff, device=device, undirected=True)       
 
     # check CG nbr_list connectivity 
 
@@ -434,6 +438,7 @@ if __name__ == '__main__':
     parser.add_argument("--atom_decode", action='store_true', default=False)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
     parser.add_argument("--det", action='store_true', default=False)
+    parser.add_argument("--cg_radius_graph", action='store_true', default=False)
 
 
     params = vars(parser.parse_args())
