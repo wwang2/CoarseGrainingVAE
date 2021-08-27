@@ -141,9 +141,12 @@ class CGDataset(TorchDataset):
 
                 assign[atom_idx, mapping] = 1
                 # compute CG ajacency 
-                cg_adj = assign.transpose(0,1).matmul(adj).matmul(assign)
+                cg_adj = assign.transpose(0,1).matmul(adj).matmul(assign) 
 
-                cg_nbr_list.append( cg_adj.nonzero() )
+                cg_nbr = cg_adj.nonzero()
+                cg_nbr = cg_nbr[cg_nbr[:, 0] != cg_nbr[:, 1]]
+
+                cg_nbr_list.append( cg_nbr )
 
         self.props['nbr_list'] = nbr_list
         self.props['CG_nbr_list'] = cg_nbr_list
