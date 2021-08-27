@@ -68,7 +68,7 @@ if params['id'] == 0:
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             # dict(name='eta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             # dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
-            dict(name='lr', type='double', bounds=dict(min=0.0001, max=0.001), transformation="log"),
+            dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.001), transformation="log"),
             dict(name='factor', type='double', bounds=dict(min=0.1, max=0.9), transformation="log"),
             dict(name='patience', type='int', bounds=dict(min=1, max=10)),
             #dict(name='n_epochs', type='int', bounds=dict(min=30, max=150)),
