@@ -44,7 +44,7 @@ class DiffPoolDataset(TorchDataset):
 
     def __getitem__(self, idx):
         single_item = {key: val[idx] for key, val in self.props.items()}
-        single_item['xyz'] += torch.randn(1, 3) * 10.0
+        #single_item['xyz'] += torch.randn(1, 3) * 10.0
         return single_item
     
     def generate_neighbor_list(self, atom_cutoff,  device='cpu',  undirected=False):
