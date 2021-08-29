@@ -87,20 +87,22 @@ def loop(loader, optimizer, device, model, beta, epoch,
         cg_xyz = batch['CG_nxyz'][:, 1:]
         mapping = batch['CG_mapping']
 
-        recon_dx = xyz_recon - cg_xyz[mapping]
-        data_dx = xyz - cg_xyz[mapping]
+        # recon_dx = xyz_recon - cg_xyz[mapping]
+        # data_dx = xyz - cg_xyz[mapping]
 
-        recon_norm = recon_dx.pow(2).sum(-1).sqrt()
-        data_norm = data_dx.pow(2).sum(-1).sqrt()
+        # recon_norm = recon_dx.pow(2).sum(-1).sqrt()
+        # data_norm = data_dx.pow(2).sum(-1).sqrt()
 
-        recon_unit = recon_dx / recon_norm.unsqueeze(-1)
-        data_unit = data_dx / data_norm.unsqueeze(-1)
+        # recon_unit = recon_dx / recon_norm.unsqueeze(-1)
+        # data_unit = data_dx / data_norm.unsqueeze(-1)
 
-        # minimize norm
-        loss_dx_norm = (recon_norm - data_norm).pow(2).mean()
-        # maxmize orientation
-        #import ipdb ;ipdb.set_trace()
-        loss_dx_orient = -(data_unit * recon_unit).sum(-1).mean()
+        # # minimize norm
+        # loss_dx_norm = (recon_norm - data_norm).pow(2).mean()
+        # # maxmize orientation
+        # #import ipdb ;ipdb.set_trace()
+        # loss_dx_orient = -(data_unit * recon_unit).sum(-1).mean()
+        loss_dx_orient = 0.0
+        loss_dx_norm = 0.0
 
         loss = loss_kl * beta + loss_recon + loss_graph * gamma + eta * loss_dx_orient + kappa * loss_dx_norm
         
@@ -117,24 +119,25 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # logging 
         recon_loss.append(loss_recon.item())
         kl_loss.append(loss_kl.item())
-        orient_loss.append(loss_dx_orient.item())
-        norm_loss.append(loss_dx_norm.item())
+        # orient_loss.append(loss_dx_orient.item())
+        # norm_loss.append(loss_dx_norm.item())
         graph_loss.append(loss_graph.item())
         
         mean_kl = np.array(kl_loss).mean()
         mean_recon = np.array(recon_loss).mean()
-        mean_orient = np.array(orient_loss).mean()
-        mean_norm = np.array(norm_loss).mean()
+        # mean_orient = np.array(orient_loss).mean()
+        # mean_norm = np.array(norm_loss).mean()
         mean_graph = np.array(graph_loss).mean()
         
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
         postfix = ['KL={:.4f}'.format(mean_kl) , 
                    'recon={:.4f}'.format(mean_recon),
-                   'norm={:.4f}'.format(mean_norm) , 
-                   'orient={:.4f}'.format(mean_orient),
+                   # 'norm={:.4f}'.format(mean_norm) , 
+                   # 'orient={:.4f}'.format(mean_orient),
                    'graph={:.4f}'.format(mean_graph) , 
-                   'memory ={:.4f} Mb'.format(memory) ]
+                   'memory ={:.4f} Mb'.format(memory) 
+                   ]
         
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
