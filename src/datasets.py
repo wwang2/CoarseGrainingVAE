@@ -11,6 +11,7 @@ import mdtraj as md
 import mdshare
 import pyemma
 from sklearn.utils import shuffle
+import random
 
 atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7, 'S':16, 'Se': 34}
 
@@ -33,7 +34,7 @@ PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-1144
                             }}
 
 
-def get_diffpool_data(N_cg, trajs, frame_skip=1000):
+def get_diffpool_data(N_cg, trajs, n_data):
     props = {}
 
     num_cgs = []
@@ -51,7 +52,9 @@ def get_diffpool_data(N_cg, trajs, frame_skip=1000):
         bondgraph = traj.top.to_bondgraph()
         edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
 
-        for xyz in frames[::frame_skip]: 
+        frames = shuffle(frames)
+
+        for xyz in frames: 
             z_data.append(torch.Tensor(atomic_nums))
             coord = torch.Tensor(xyz)
             xyz_data.append(coord)
@@ -59,11 +62,11 @@ def get_diffpool_data(N_cg, trajs, frame_skip=1000):
             num_cgs.append(torch.LongTensor([N_cg]))
             num_atoms.append(torch.LongTensor([n_atoms]))
             
-    props = {'z': z_data,
-         'xyz': xyz_data,
-         'num_atoms': num_atoms, 
-         'num_CGs':num_cgs,
-         'bond_edge_list': graph_data
+    props = {'z': z_data[:n_data],
+         'xyz': xyz_data[:n_data],
+         'num_atoms': num_atoms[:n_data], 
+         'num_CGs':num_cgs[:n_data],
+         'bond_edge_list': graph_data[:n_data]
         }
 
     return props
@@ -87,7 +90,7 @@ def load_protein_traj(label):
                    
     return traj
 
-def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None):
+def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
 
     atomic_nums, protein_index = get_atomNum(traj)
     n_atoms = len(atomic_nums)
@@ -123,6 +126,14 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None):
         mapping = parition2mapping(paritions, n_atoms)
         mapping = np.array(mapping)
         cg_coord = None
+
+        # randomly shuffle map 
+        perm_percent = mapshuffle
+
+        if mapshuffle > 0.0:
+            ran_idx = random.sample(range(mapping.shape[0]), int(perm_percent * mapping.shape[0])  )
+            idx2map = mapping[ran_idx]
+            mapping[ran_idx] = idx2map
 
         frames = shuffle(frames)
 

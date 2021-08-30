@@ -63,6 +63,7 @@ def run_cv(params):
     patience = params['patience']
     eta = params['eta']
     kappa = params['kappa']
+    mapshuffle = params['mapshuffle']
     min_lr = 1e-8
 
     if det:
@@ -83,7 +84,7 @@ def run_cv(params):
 
     # mapping options: alpha carbon, backbone, Girvan-Newman
     
-    mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'])
+    mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'], mapshuffle=mapshuffle)
     
     frames = frames[:ndata]
     if cg_coord is not None:
@@ -429,9 +430,10 @@ if __name__ == '__main__':
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("-patience", type=int, default=5)
     parser.add_argument("-factor", type=float, default=0.6)
+    parser.add_argument("-mapshuffle", type=float, default=0.0)
     parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
     parser.add_argument("--graph_eval", action='store_true', default=False)
-    parser.add_argument("--randommap", action='store_true', default=False)
+    #parser.add_argument("--map_shuffle", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
     parser.add_argument("--cg_mp", action='store_true', default=False)
     parser.add_argument("--dir_mp", action='store_true', default=False)
