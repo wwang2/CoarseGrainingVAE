@@ -115,25 +115,34 @@ def run(params):
     working_dir = params['logdir']
     tqdm_flag = params['tqdm_flag']
     cg_method = params['cg_method']
+    n_data = params['n_data']
+    label =params['dataset']
 
     create_dir(working_dir)
     
     tau_sched = tau_0 * np.exp(-tau_rate * torch.linspace(0, n_epochs-1, n_epochs))
 
-    label = 'dipeptide'
-    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
-    pdb_file = PROTEINFILES[label]['pdb_path']
-    file_type = PROTEINFILES[label]['file_type']
+    # label = 'dipeptide'
+    # traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
+    # pdb_file = PROTEINFILES[label]['pdb_path']
+    # file_type = PROTEINFILES[label]['file_type']
 
-    trajs = [md.load_xtc(file,
-                top=pdb_file) for file in traj_files]
+    # trajs = [md.load_xtc(file,
+    #             top=pdb_file) for file in traj_files]
 
-    atomic_nums, protein_index = get_atomNum(trajs[0])
-    n_atoms = len(atomic_nums)
+    # atomic_nums, protein_index = get_atomNum(trajs[0])
+    # n_atoms = len(atomic_nums)
+
+    if label in PROTEINFILES.keys():
+        traj = load_protein_traj(label)
+        atomic_nums, protein_index = get_atomNum(traj)
+        n_atoms = len(atomic_nums)
+    else:
+        raise ValueError("data label {} not recognized".format(label))
 
     # get cg_map 
     if cg_method == 'newman':
-        protein_top = trajs[0].top.subset(protein_index)
+        protein_top = traj.top.subset(protein_index)
         g = protein_top.to_bondgraph()
         paritions = get_partition(g, N_cg)
         mapping = parition2mapping(paritions, n_atoms)
@@ -141,7 +150,7 @@ def run(params):
     elif cg_method == 'diff':
         assign_idx = None
 
-    props = get_diffpool_data(N_cg, trajs, frame_skip=500)
+    props = get_diffpool_data(N_cg, [traj], n_data=n_data)
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
@@ -214,8 +223,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-logdir', type=str)
     parser.add_argument('-device', type=int)
+    parser.add_argument('-dataset', type=str, default='dipeptide')
     parser.add_argument('-num_features',  type=int, default=512)
     parser.add_argument('-batch_size', type=int,default= 32)
+    parser.add_argument('-n_data', type=int, default= 1000)
     parser.add_argument('-N_cg', type=int, default= 3)
     parser.add_argument('-nconv_pool', type=int, default= 7)
     parser.add_argument('-enc_nconv', type=int, default= 4)
