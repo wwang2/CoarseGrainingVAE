@@ -24,6 +24,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt 
 from tqdm import tqdm 
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 
 def plot_map(assign, z, save_path=None):
     mapping = assign.detach().cpu().numpy().transpose()
@@ -35,6 +36,45 @@ def plot_map(assign, z, save_path=None):
         plt.savefig(save_path)
         
     plt.show()
+
+def retrive_recon_structures(loader, device, model, tqdm_flag=True):
+    # get all structure
+    # compute rmsd 
+    # compute graph metric 
+
+    all_xyz_data = []
+    all_xyz_recon = []
+
+    heavy_ged = []
+    all_ged = []
+
+    model.eval()
+
+    if tqdm_flag:
+        loader = tqdm(loader, position=0, file=sys.stdout,
+                         leave=True, desc='eval')
+
+    for batch in loader:     
+        batch = batch_to(batch, device=device)
+
+        assign, xyz, xyz_recon = model(batch)
+
+        all_xyz_data.append(xyz.detach().cpu().numpy())
+        all_xyz_recon.append(xyz_recon.detach().cpu().numpy())
+
+        for i, x in enumerate(xyz):
+            z = batch['z'][0].detach().cpu().numpy()
+            ref_atoms = Atoms(numbers=z, positions=x.detach().cpu().numpy())
+            recon_atoms = Atoms(numbers=z, positions=xyz_recon[i].detach().cpu().numpy())
+
+            # compute ged diff 
+            all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, [recon_atoms])
+
+            heavy_ged.append(graph_val_ratio)
+            all_ged.append(graph_hh_val_ratio)
+
+    return np.concatenate(all_xyz_data), np.concatenate(all_xyz_recon), np.array(heavy_ged).mean(), np.array(all_ged).mean()
+
 
 def loop(loader, optimizer, device, model, epoch, train=True, looptext='', tqdm_flag=True):
     
@@ -124,55 +164,111 @@ def run(params):
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(5.0)
 
-    # split train, test index 
-    train_index, test_index = train_test_split(list(range(len(dataset))),test_size=0.2)
+    nsplits = 3
+    kf = KFold(n_splits=nsplits)
 
-    trainset = get_subset_by_indices(train_index, dataset)
-    testset = get_subset_by_indices(test_index, dataset)
+    split_iter = kf.split(list(range(len(dataset))))
 
-    trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    pooler = CGpool(1, 16, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
-    
-    model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
-    
-    optimizer = torch.optim.Adam(model.parameters(),lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
-                                                            factor=0.6, verbose=True, 
-                                                            threshold=1e-4,  min_lr=1e-7)
-    
-    failed = False 
 
-    # train     
-    for epoch in range(n_epochs):
-    
-        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model,  epoch, train=True, looptext='', tqdm_flag=tqdm_flag)
+    cv_heavy_rmsd = []
+    cv_all_rmsd = []
+    cv_heavy_ged = []
+    cv_all_ged = []
 
-        if np.isnan(mean_train_recon):
-            print("NaN encoutered, exiting...")
-            failed = True
+
+    for i, (train_index, test_index) in enumerate(split_iter):
+
+        split_iter = kf.split(list(range(len(dataset))))
+
+        split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
+        create_dir(split_dir)
+
+        trainset = get_subset_by_indices(train_index, dataset)
+        testset = get_subset_by_indices(test_index, dataset)
+
+        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True, pin_memory=True)
+        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True, pin_memory=True)
+
+        trainset = get_subset_by_indices(train_index, dataset)
+        testset = get_subset_by_indices(test_index, dataset)
+
+        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+        pooler = CGpool(1, 16, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
+        
+        model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
+        
+        optimizer = torch.optim.Adam(model.parameters(),lr=lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
+                                                                factor=0.6, verbose=True, 
+                                                                threshold=1e-4,  min_lr=1e-7)
+        
+        failed = False 
+
+        # train     
+        for epoch in range(n_epochs):
+        
+            mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model,  epoch, train=True, looptext='', tqdm_flag=tqdm_flag)
+
+            if np.isnan(mean_train_recon):
+                print("NaN encoutered, exiting...")
+                failed = True
+                break 
+                
+            # if epoch % 5 == 0:
+            #     map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
+            #     #plot_map(assign[0], props['z'][0].numpy(), map_save_path)
+
+
+            scheduler.step(mean_train_recon)
+
+        dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
+
+        # test 
+        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+        model.eval()
+    #    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model,  epoch, train=True, looptext='', tqdm_flag=tqdm_flag)
+
+        all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged = retrive_recon_structures(testloader, device, model, tqdm_flag=True)
+
+        # compute rmsd 
+        atomic_nums = props['z'][0].numpy()
+        heavy_filter = atomic_nums != 1.
+
+        test_all_dxyz = (all_test_xyz_data - all_test_xyz_recon).reshape(-1)
+        test_heavy_dxyz = (all_test_xyz_data - all_test_xyz_recon)[:, heavy_filter, :].reshape(-1)
+
+        test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).mean())
+        test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
+
+        # dump train recon 
+        dump_numpy2xyz(all_test_xyz_recon[:32], props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
+
+        print("split {}".format(i))
+        print("test rmsd (all atoms): {:.4f}".format(test_all_rmsd))
+        print("test rmsd (heavy atoms): {:.4f}".format(test_heavy_rmsd))
+        print("test rel ged (all atoms) : {:.4f}".format(all_ged))
+        print("test rel ged (heavy atoms) : {:.4f}".format(heavy_ged))
+
+        cv_all_rmsd.append(test_all_rmsd)
+        cv_heavy_rmsd.append(test_heavy_rmsd)
+        cv_all_ged.append(all_ged)
+        cv_heavy_ged.append(heavy_ged)
+
+        if failed:
             break 
-            
-        if epoch % 5 == 0:
-            map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
-            plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
+    cv_all_rmsd = np.array(cv_all_rmsd)
+    cv_heavy_rmsd = np.array(cv_heavy_rmsd)
+    cv_all_ged = np.array(cv_all_ged)
+    cv_heavy_ged = np.array(cv_heavy_ged)
 
-        scheduler.step(mean_train_recon)
+    print("CV results N = {}".format(N_cg))
+    print("heavy rmsd {} +- {}".format(cv_heavy_rmsd.mean(), cv_heavy_rmsd.std()) )
+    print("all rmsd {} +- {}".format(cv_all_rmsd.mean(), cv_all_rmsd.std()) )
+    print("heavy ged diff {} +- {}".format(cv_all_ged.mean(), cv_all_ged.std()) )
+    print("all ged diff {} +- {}".format(cv_all_ged.mean(), cv_all_ged.std()) )
 
-    dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
-
-    # test 
-    testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    model.eval()
-    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model,  epoch, train=True, looptext='', tqdm_flag=tqdm_flag)
-
-    # dump train recon 
-    dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
-
-    print("train msd : {:.4f}".format(mean_train_recon))
-    print("test msd : {:.4f}".format(mean_test_recon))
-
-    return mean_test_recon, failed, assign
+    return cv_all_rmsd, cv_heavy_rmsd, failed, assign
 
 if __name__ == '__main__':
 
