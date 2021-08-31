@@ -64,6 +64,7 @@ def run_cv(params):
     eta = params['eta']
     kappa = params['kappa']
     mapshuffle = params['mapshuffle']
+    threshold = params['threshold']
     min_lr = 1e-8
 
     if det:
@@ -170,7 +171,7 @@ def run_cv(params):
         optimizer = optim(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=patience, 
                                                                 factor=factor, verbose=True, 
-                                                                threshold=5e-5,  min_lr=min_lr)
+                                                                threshold=threshold,  min_lr=min_lr)
         
         model.train()
 
@@ -430,13 +431,13 @@ if __name__ == '__main__':
     parser.add_argument("-gamma", type=float, default=0.01)
     parser.add_argument("-eta", type=float, default=0.01)
     parser.add_argument("-kappa", type=float, default=0.01)
+    parser.add_argument("-threshold", type=float, default=1e-4)
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("-patience", type=int, default=5)
     parser.add_argument("-factor", type=float, default=0.6)
     parser.add_argument("-mapshuffle", type=float, default=0.0)
     parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
     parser.add_argument("--graph_eval", action='store_true', default=False)
-    #parser.add_argument("--map_shuffle", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
     parser.add_argument("--cg_mp", action='store_true', default=False)
     parser.add_argument("--dir_mp", action='store_true', default=False)
