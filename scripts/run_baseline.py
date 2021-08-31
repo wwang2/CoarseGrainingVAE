@@ -74,9 +74,10 @@ def loop(loader, optimizer, device, model, epoch, train=True, looptext='', tqdm_
         postfix = ['avg. recon loss={:.4f}'.format(mean_recon)]
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
-        else:
-            for result in postfix:
-                print(result)
+
+    if not tqdm_flag:
+        for result in postfix:
+            print(result)
     
     return mean_recon, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
 
@@ -90,6 +91,8 @@ def run(params):
     working_dir = params['logdir']
     lr = params['lr']
     tqdm_flag = params['tqdm_flag']
+    n_data = params['ndata']
+
 
     create_dir(working_dir)
 
@@ -111,8 +114,12 @@ def run(params):
         paritions = get_partition(g, N_cg)
         mapping = parition2mapping(paritions, n_atoms)
         assign_idx = torch.LongTensor( np.array(mapping) ) 
+    elif cg_method == 'random':
+        mapping = get_random_mapping(N_cg, n_atoms)
+        assign_idx = torch.LongTensor( np.array(mapping) )
 
-    props = get_diffpool_data(N_cg, trajs, frame_skip=500)
+
+    props = get_diffpool_data(N_cg, trajs, n_data=n_data)
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(5.0)
@@ -175,6 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-N_cg', type=int, default= 3)
     parser.add_argument('-n_epochs', type=int, default= 50)
+    parser.add_argument('-ndata', type=int, default= 2000)
     parser.add_argument("-cg_method", type=str, default='newman')
     parser.add_argument('-lr', type=float, default=1e-4)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
