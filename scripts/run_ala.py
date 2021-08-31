@@ -68,6 +68,9 @@ def run_cv(params):
 
     if det:
         beta = 0.0
+        print("Recontruction Task")
+    else:
+        print("Sampling Task")
 
     # download data from mdshare 
     mdshare.fetch('pentapeptide-impl-solv.pdb', working_directory='../data')
