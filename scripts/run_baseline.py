@@ -265,7 +265,7 @@ def run(params):
     print("CV results N = {}".format(N_cg))
     print("heavy rmsd {} +- {}".format(cv_heavy_rmsd.mean(), cv_heavy_rmsd.std()) )
     print("all rmsd {} +- {}".format(cv_all_rmsd.mean(), cv_all_rmsd.std()) )
-    print("heavy ged diff {} +- {}".format(cv_all_ged.mean(), cv_all_ged.std()) )
+    print("heavy ged diff {} +- {}".format(cv_heavy_ged.mean(), cv_heavy_ged.std()) )
     print("all ged diff {} +- {}".format(cv_all_ged.mean(), cv_all_ged.std()) )
 
     return cv_all_rmsd, cv_heavy_rmsd, failed, assign
