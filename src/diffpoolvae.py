@@ -47,6 +47,12 @@ class CGpool(nn.Module):
              trainable_weights=False):
         super().__init__()
 
+
+        # fixed assignment, and trainable weights, assign_index, assign_wegiths = None 
+        # fixed assignment, and fixed weights, assign_index, assign_weights 
+        # trainable assignment, and trainable_weights, assign_index = None, assign_weights = None
+
+
         self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
 
         self.update = nn.ModuleList(
@@ -83,10 +89,20 @@ class CGpool(nn.Module):
         adj[bonds[:, 0], bonds[:,2], bonds[:,1]] = 1
 
         if self.assign_idx is not None:
+            for conv in self.update:
+                dh = torch.einsum('bif,bij->bjf', conv(h), adj)
+                h = h + dh 
+
+            if self.assign_weights is None:
+                assign_logits = self.cg_network(h)
+                assign_weights = self.cg_weights(h)
+            else:
+                assign_weights = self.assign_weights
+
             assign = torch.zeros(h.shape[0], h.shape[1], self.n_cgs).to(h.device)
             assign[:, torch.LongTensor(list(range(h.shape[1]))), torch.LongTensor(self.assign_idx)] = 1.
 
-            coord_assign = assign * self.assign_weights.unsqueeze(-1).unsqueeze(0)
+            coord_assign = assign * assign_weights.unsqueeze(-1).unsqueeze(0)
 
             assign_norm = assign / assign.sum(1).unsqueeze(-2) 
 
@@ -327,10 +343,9 @@ class DenseEquivariantDecoder(nn.Module):
         
         cg_nbr_list = (cg_adj > 0.0).nonzero()
         pad_nbr_list = (cg_nbr_list[:, 0] * H.shape[1]).unsqueeze(1) + cg_nbr_list[:, 1:]
-        edge_weights = cg_adj[cg_nbr_list[:,0], cg_nbr_list[:,1], cg_nbr_list[:,2]]
+        #edge_weights = cg_adj[cg_nbr_list[:,0], cg_nbr_list[:,1], cg_nbr_list[:,2]]
     
         r_ij = cg_xyz[cg_nbr_list[:, 0], cg_nbr_list[:, 2]] - cg_xyz[cg_nbr_list[:, 0], cg_nbr_list[:, 1]] 
-        
         
         V_stack = torch.zeros(list(H_stack.shape) + [3]).to(H.device)
         
@@ -344,7 +359,7 @@ class DenseEquivariantDecoder(nn.Module):
                                                    r_ij=r_ij,
                                                    nbrs=pad_nbr_list,
                                                    # normalize by node degree
-                                                   edge_wgt=deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
+                                                   edge_wgt= deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
                                                    )
             H_stack = H_stack + dH_message
             V_stack = V_stack + dV_message
