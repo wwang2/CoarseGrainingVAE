@@ -106,8 +106,10 @@ def get_sample_rmsd(rmsd_samples, axis):
 
         if res not in rmsd_vals.keys():
             rmsd_data = np.loadtxt(path)
-            rmsd_vals[res] = [rmsd_data[:, axis].mean()]
-
+            if len(rmsd_data.shape) != 1:
+                rmsd_vals[res] = [rmsd_data[:, axis].mean()]
+            else:
+                rmsd_vals[res] = []
         else:
             rmsd_vals[res].append(rmsd_data[:, axis].mean())
             
