@@ -45,7 +45,7 @@ class DiffPoolDataset(TorchDataset):
     def __getitem__(self, idx):
         single_item = {key: val[idx] for key, val in self.props.items()}
         # recenter geometry 
-        single_item['xyz'] = single_item['xyz'] - single_item['xyz'].mean(0).unsqueeze(0)
+        #single_item['xyz'] = single_item['xyz'] - single_item['xyz'].mean(0).unsqueeze(0)
         return single_item
     
     def generate_neighbor_list(self, atom_cutoff,  device='cpu',  undirected=False):
