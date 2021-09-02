@@ -88,9 +88,10 @@ def loop(loader, optimizer, device, model, tau, epoch,
                    'tau = {:.4f}'.format(tau)]
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
-        else:
-            for result in postfix:
-                print(result)
+    
+    if not tqdm_flag:
+        for result in postfix:
+            print(result)
     
     return mean_recon, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
 
@@ -151,7 +152,7 @@ def run(params):
     elif cg_method == 'random':
         mapping = get_random_mapping(N_cg, n_atoms)
         assign_idx = torch.LongTensor( np.array(mapping) ) 
-        
+
     elif cg_method == 'diff':
         assign_idx = None
 
