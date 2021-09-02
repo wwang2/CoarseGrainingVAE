@@ -118,10 +118,11 @@ def run(params):
     cg_method = params['cg_method']
     n_data = params['n_data']
     label =params['dataset']
+    tau_min = params['tau_min']
 
     create_dir(working_dir)
     
-    tau_sched = tau_0 * np.exp(-tau_rate * torch.linspace(0, n_epochs-1, n_epochs))
+    tau_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_epochs-1, n_epochs)) + tau_min
 
     # label = 'dipeptide'
     # traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
@@ -213,7 +214,7 @@ def run(params):
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
     model.eval()
     mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched[epoch], epoch, 
-                                gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
+                                gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
     # dump train recon 
     dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
@@ -243,6 +244,7 @@ if __name__ == '__main__':
     parser.add_argument('-n_epochs', type=int, default= 50)
     parser.add_argument('-tau_rate', type=float, default= 0.004 )
     parser.add_argument('-tau_0', type=float, default= 2.36)
+    parser.add_argument('-tau_min', type=float, default= 0.3)
     parser.add_argument('-gamma', type=float, default= 10.0)
     parser.add_argument('-kappa', type=float, default= 0.1)
     parser.add_argument('-lr', type=float, default=1e-4)
