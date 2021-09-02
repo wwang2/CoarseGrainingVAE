@@ -146,7 +146,12 @@ def run(params):
         g = protein_top.to_bondgraph()
         paritions = get_partition(g, N_cg)
         mapping = parition2mapping(paritions, n_atoms)
+
         assign_idx = torch.LongTensor( np.array(mapping) ) 
+    elif cg_method == 'random':
+        mapping = get_random_mapping(N_cg, n_atoms)
+        assign_idx = torch.LongTensor( np.array(mapping) ) 
+        
     elif cg_method == 'diff':
         assign_idx = None
 
@@ -233,7 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('-dec_nconv', type=int, default= 3)
     parser.add_argument('-cutoff', type=float, default= 8.0)
     parser.add_argument('-n_rbf', type=int,  default= 7)
-    parser.add_argument('-activation', type=str,  default= 'ReLU')
+    parser.add_argument('-activation', type=str,  default= 'ELU')
     parser.add_argument('-n_epochs', type=int, default= 50)
     parser.add_argument('-tau_rate', type=float, default= 0.004 )
     parser.add_argument('-tau_0', type=float, default= 2.36)
