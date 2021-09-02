@@ -52,8 +52,6 @@ def get_diffpool_data(N_cg, trajs, n_data):
         bondgraph = traj.top.to_bondgraph()
         edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
 
-        frames = shuffle(frames)
-
         for xyz in frames: 
             z_data.append(torch.Tensor(atomic_nums))
             coord = torch.Tensor(xyz)
@@ -61,7 +59,10 @@ def get_diffpool_data(N_cg, trajs, n_data):
             graph_data.append(edges)
             num_cgs.append(torch.LongTensor([N_cg]))
             num_atoms.append(torch.LongTensor([n_atoms]))
-            
+
+    z_data, xyz_data, num_atoms, num_cgs, graph_data = shuffle( z_data, xyz_data, num_atoms, num_cgs, graph_data)
+
+
     props = {'z': z_data[:n_data],
          'xyz': xyz_data[:n_data],
          'num_atoms': num_atoms[:n_data], 
