@@ -115,7 +115,7 @@ def loop(loader, optimizer, device, model, epoch, train=True, looptext='', tqdm_
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
-    if not tqdm_flag:
+    if not tqdm_flag and epoch % 20 == 0:
         for result in postfix:
             print(result)
     
@@ -185,9 +185,6 @@ def run(params):
 
         trainset = get_subset_by_indices(train_index, dataset)
         testset = get_subset_by_indices(test_index, dataset)
-
-        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True, pin_memory=True)
-        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True, pin_memory=True)
 
         trainset = get_subset_by_indices(train_index, dataset)
         testset = get_subset_by_indices(test_index, dataset)
