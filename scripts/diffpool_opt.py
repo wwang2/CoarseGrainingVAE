@@ -10,9 +10,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-logdir", type=str)
 parser.add_argument("-device", type=int, default=0)
 parser.add_argument("-id", type=int, default=None)
+parser.add_argument('-dataset', type=str, default='dipeptide')
+parser.add_argument('-n_data', type=int, default= 2000)
 parser.add_argument("-batch_size", type=int, default=32)
 parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-n_epochs", type=int, default=60)
+parser.add_argument("-cg_method", type=str, default='diff')
 parser.add_argument("--dry_run", action='store_true', default=False)
 parser.add_argument("--tqdm_flag", action='store_true', default=False)
 params = vars(parser.parse_args())
@@ -67,6 +70,9 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['batch_size'] = params['batch_size']
     trial['device'] = params['device']
     trial['tqdm_flag'] = params['tqdm_flag']
+    trial['cg_method'] = params['cg_method']
+    trial['n_data'] = params['n_data']
+    trial['dataset'] = params['dataset']
 
     print("Suggestion ID: {}".format(suggestion.id))
 
