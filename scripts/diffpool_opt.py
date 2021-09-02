@@ -32,7 +32,7 @@ else:
 create_dir(params['logdir'])
 conn = Connection(client_token=token)
 
-if params['id'] = 0:
+if params['id'] == 0:
     experiment = conn.experiments().create(
         name=params['logdir'],
         metrics=[dict(name='recon', objective='minimize')],
