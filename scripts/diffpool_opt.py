@@ -49,6 +49,7 @@ if params['id'] == None:
             dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.001), transformation="log"),
             dict(name='tau_rate', type='double', bounds=dict(min=0.0001, max=0.1), transformation="log"),
             dict(name='tau_0', type='double', bounds=dict(min=1.0, max=5.0)),
+            dict(name='tau_min', type='double', bounds=dict(min=0.1, max=1.0)),
         ],
         observation_budget=n_obs, # how many iterations to run for the optimization
         parallel_bandwidth=10,
