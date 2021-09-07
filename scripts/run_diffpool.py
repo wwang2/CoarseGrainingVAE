@@ -35,12 +35,13 @@ def plot_map(assign, z, save_path=None):
         
     plt.show()
 
-def loop(loader, optimizer, device, model, tau_sched, epoch, 
+def loop(loader, optimizer, device, model, tau_sched, epoch, beta, 
         gamma, kappa, train=True, looptext='', tqdm_flag=True):
     
     recon_loss = []
     adj_loss = []
     ent_loss = []
+    KL_loss = []
     
     if train:
         model.train()
@@ -70,8 +71,11 @@ def loop(loader, optimizer, device, model, tau_sched, epoch,
         loss_entropy = soft_cg_adj.diagonal(dim1=1, dim2=2).std(-1).mean()# -(assign * torch.log(assign)).sum(-1).mean()
         node_sim_mat = assign.matmul(assign.transpose(1,2))
         loss_adj = (node_sim_mat - adj).pow(2).mean()
+
+        loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
+
         
-        loss = loss_recon + gamma * loss_adj +  kappa * loss_entropy            
+        loss = loss_recon + beta * loss_kl + gamma * loss_adj +  kappa * loss_entropy            
 
         optimizer.zero_grad()
         loss.backward()
@@ -80,14 +84,17 @@ def loop(loader, optimizer, device, model, tau_sched, epoch,
         recon_loss.append(loss_recon.item())
         adj_loss.append(loss_adj.item())
         ent_loss.append(loss_entropy.item())
+        KL_loss.append(loss_kl.item())
 
         mean_recon = np.array(recon_loss).mean()
         mean_adj = np.array(adj_loss).mean()
         mean_ent = np.array(ent_loss).mean()
+        mean_KL = np.array(KL_loss).mean()
         
         del loss_adj, loss_entropy, loss_recon
 
         postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
+                    'avg. KL loss={:.4f}'.format(mean_KL),
                    'avg. adj loss={:.4f}'.format(mean_adj),
                    'avg. entropy loss={:.4f}'.format(mean_ent),
                    'tau = {:.4f}'.format(tau)]
@@ -115,6 +122,7 @@ def run(params):
     tau_0 = params['tau_0']
     tau_rate = params['tau_rate']
     n_epochs = params['n_epochs']
+    beta = params['beta']
     gamma = params['gamma']
     kappa = params['kappa']
     lr = params['lr']
@@ -210,13 +218,13 @@ def run(params):
     for epoch in range(n_epochs):
         model.train()
         mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_sched, epoch, 
-                                        gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
+                                        beta, gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
         # dump recon loss periodically 
         if epoch % 20 == 0: 
             testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
             model.eval()
-            mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, 
+            mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
                             gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
             dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
@@ -237,7 +245,7 @@ def run(params):
 
     # test 
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, 
+    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
                                 gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
     # dump train recon 
@@ -268,6 +276,7 @@ if __name__ == '__main__':
     parser.add_argument('-tau_rate', type=float, default= 0.004 )
     parser.add_argument('-tau_0', type=float, default= 2.36)
     parser.add_argument('-tau_min', type=float, default= 0.3)
+    parser.add_argument('-beta', type=float, default= 0.1)
     parser.add_argument('-gamma', type=float, default= 10.0)
     parser.add_argument('-kappa', type=float, default= 0.1)
     parser.add_argument('-lr', type=float, default=1e-4)
