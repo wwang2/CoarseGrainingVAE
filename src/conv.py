@@ -92,7 +92,8 @@ class ENMessageBlock(nn.Module):
                 s_j,
                 v_j,
                 r_ij,
-                nbrs):
+                nbrs,
+                edge_wgt=None):
 
         dist, unit = preprocess_r(r_ij)
         inv_out = self.inv_message(s_j=s_j,
@@ -106,13 +107,20 @@ class ENMessageBlock(nn.Module):
         delta_v_ij = equi_filter * unit.unsqueeze(1)
         delta_s_ij = inv_filter
 
+        if edge_wgt is not None: 
+            v_edge_wgt = edge_wgt[..., None, None]
+            h_edge_wgt = edge_wgt[..., None]
+        else:
+            v_edge_wgt = 1 
+            h_edge_wgt = 1
+
         graph_size = s_j.shape[0]
-        delta_v_i = scatter_add(src=delta_v_ij,
+        delta_v_i = scatter_add(src=delta_v_ij * v_edge_wgt,
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
 
-        delta_s_i = scatter_add(src=delta_s_ij,
+        delta_s_i = scatter_add(src=delta_s_ij * h_edge_wgt,
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
@@ -320,7 +328,8 @@ class EquiMessageBlock(nn.Module):
                 s_j,
                 v_j,
                 r_ij,
-                nbrs):
+                nbrs,
+                edge_wgt=None):
 
         dist, unit = preprocess_r(r_ij)
         inv_out = self.inv_message(s_j=s_j,
@@ -337,6 +346,13 @@ class EquiMessageBlock(nn.Module):
         unit_add = split_2 * unit.unsqueeze(1)
         delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1]]
         delta_s_ij = split_1
+
+        if edge_wgt is not None: 
+            v_edge_wgt = edge_wgt[..., None, None]
+            h_edge_wgt = edge_wgt[..., None]
+        else:
+            v_edge_wgt = 1 
+            h_edge_wgt = 1
 
         # # add results from neighbors of each node
 
@@ -356,12 +372,12 @@ class EquiMessageBlock(nn.Module):
 
         # v_att_norm_wgt = v_att_wgt / v_att_norm[nbrs[:, 0]]
 
-        delta_v_i = scatter_add(src=delta_v_ij, #* v_att_norm_wgt.unsqueeze(-1),
+        delta_v_i = scatter_add(src=delta_v_ij * v_edge_wgt, #* v_att_norm_wgt.unsqueeze(-1),
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
 
-        delta_s_i = scatter_add(src=delta_s_ij, #* h_att_norm_wgt,
+        delta_s_i = scatter_add(src=delta_s_ij * h_edge_wgt, #* h_att_norm_wgt,
                                 index=nbrs[:, 0],
                                 dim=0,
                                 dim_size=graph_size)
