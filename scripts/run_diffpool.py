@@ -204,6 +204,15 @@ def run(params):
         mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_sched, epoch, 
                                         gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
+        # dump recon loss periodically 
+        if epoch % 20 == 0: 
+            testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+            model.eval()
+            mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, 
+                            gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+
+            dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
+
         if np.isnan(mean_train_recon):
             print("NaN encoutered, exiting...")
             failed = True
@@ -216,25 +225,15 @@ def run(params):
 
         scheduler.step(mean_train_recon)
 
-        # dump recon loss periodically 
-        if epoch % 20 == 0: 
-            testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-            model.eval()
-            mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, 
-                            gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
-
-            dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
-
-
     dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
 
     # test 
+    testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
     mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, 
                                 gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
     # dump train recon 
     dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
-
 
     print("train msd : {:.4f}".format(mean_train_recon))
     print("test msd : {:.4f}".format(mean_test_recon))
