@@ -35,7 +35,7 @@ def plot_map(assign, z, save_path=None):
         
     plt.show()
 
-def loop(loader, optimizer, device, model, tau, epoch, 
+def loop(loader, optimizer, device, model, tau_sched, epoch, 
         gamma, kappa, train=True, looptext='', tqdm_flag=True):
     
     recon_loss = []
@@ -46,7 +46,7 @@ def loop(loader, optimizer, device, model, tau, epoch,
         model.train()
         mode = '{} train'.format(looptext)
     else:
-        model.train() # yes, still set to train when reconstructing
+        model.eval() # yes, still set to train when reconstructing
         mode = '{} valid'.format(looptext)
         
         
@@ -55,9 +55,14 @@ def loop(loader, optimizer, device, model, tau, epoch,
                          leave=True, desc='({} epoch #{})'.format(mode, epoch))
         
         
-    for batch in loader:     
+    for i, batch in enumerate(loader):     
         batch = batch_to(batch, device=device)
         
+        if train: 
+            tau = tau_sched[ len(loader) * epoch +  i]
+        else:
+            tau = tau_sched[ len(loader) * epoch ]
+
         xyz, xyz_recon, assign, adj, soft_cg_adj = model(batch, tau)
         
         # compute loss
@@ -121,8 +126,6 @@ def run(params):
     tau_min = params['tau_min']
 
     create_dir(working_dir)
-    
-    tau_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_epochs-1, n_epochs)) + tau_min
 
     # label = 'dipeptide'
     # traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
@@ -169,6 +172,11 @@ def run(params):
     testset = get_subset_by_indices(test_index, dataset)
 
     trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+
+    n_iters = len(trainloader) * n_epochs + 100
+    tau_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_iters-1, n_iters)) + tau_min
+
+
     pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
     
     encoder = DenseEquiEncoder(n_conv=dec_nconv, 
@@ -193,7 +201,7 @@ def run(params):
     # train     
     for epoch in range(n_epochs):
         model.train()
-        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_sched[epoch], epoch, 
+        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_sched, epoch, 
                                         gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
         if np.isnan(mean_train_recon):
@@ -212,7 +220,7 @@ def run(params):
         if epoch % 20 == 0: 
             testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
             model.eval()
-            mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched[epoch], epoch, 
+            mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, 
                             gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
             dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
@@ -221,7 +229,7 @@ def run(params):
     dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
 
     # test 
-    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched[epoch], epoch, 
+    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, 
                                 gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
     # dump train recon 
