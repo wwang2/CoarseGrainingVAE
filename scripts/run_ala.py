@@ -27,6 +27,31 @@ from datetime import timedelta
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
+def build_split_dataset(traj, params):
+
+    atomic_nums, protein_index = get_atomNum(traj)
+    mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'], mapshuffle=params['mapshuffle'])
+
+    dataset = build_dataset(mapping,
+                        frames, 
+                        params['atom_cutoff'], 
+                        params['cg_cutoff'],
+                        atomic_nums,
+                        traj.top,
+                        cg_traj=cg_coord)
+    # get n_atoms 
+    if params['cg_radius_graph']:
+        dataset.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], cg_cutoff=None, device="cpu", undirected=True)
+    else:
+        dataset.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], cg_cutoff= params['cg_cutoff'], device="cpu", undirected=True)       
+
+    # check CG nbr_list connectivity 
+    if not check_CGgraph(dataset):
+        print("CG graph not connected")
+        return np.NaN, np.NaN, True
+
+    return dataset
+
 def run_cv(params):
     failed = False
     working_dir = params['logdir']
@@ -86,40 +111,14 @@ def run_cv(params):
     else:
         raise ValueError("data label {} not recognized".format(dataset_label))
 
-    # mapping options: alpha carbon, backbone, Girvan-Newman
-    
-    mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'], mapshuffle=mapshuffle)
-    
-    frames = frames[:ndata]
-    if cg_coord is not None:
-        cg_coord = cg_coord[:ndata]
-
-    dataset = build_dataset(mapping,
-                        frames, 
-                        atom_cutoff, 
-                        cg_cutoff,
-                        atomic_nums,
-                        traj.top,
-                        cg_traj=cg_coord)
-    # get n_atoms 
     n_atoms = atomic_nums.shape[0]
-    n_cgs = mapping.max().item() + 1
 
-    if params['cg_radius_graph']:
-        dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=None, device=device, undirected=True)
-    else:
-        dataset.generate_neighbor_list(atom_cutoff=atom_cutoff, cg_cutoff=cg_cutoff, device=device, undirected=True)       
-
-    # check CG nbr_list connectivity 
-
-    if not check_CGgraph(dataset):
-        print("CG graph not connected")
-        return np.NaN, np.NaN, True
-
+    # mapping options: alpha carbon, backbone, Girvan-Newman
     # create subdirectory 
     create_dir(working_dir)
         
     kf = KFold(n_splits=nsplits)
+
     cv_all_rmsd = []
     cv_heavy_rmsd = []
     cv_sample_rmsd = []
@@ -129,7 +128,7 @@ def run_cv(params):
     cv_graph_diff = []
     cv_graph_hh_diff = []
 
-    split_iter = kf.split(list(range(len(dataset))))
+    split_iter = kf.split(list(range(ndata)))
 
     for i, (train_index, test_index) in enumerate(split_iter):
 
@@ -139,8 +138,11 @@ def run_cv(params):
         split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
         create_dir(split_dir)
 
-        trainset = get_subset_by_indices(train_index, dataset)
-        testset = get_subset_by_indices(test_index, dataset)
+        # trainset = get_subset_by_indices(train_index, dataset)
+        # testset = get_subset_by_indices(test_index, dataset)
+
+        trainset = build_split_dataset(traj[train_index], params)
+        testset = build_split_dataset(traj[train_index], params)
 
         trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag, pin_memory=True)
         testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag, pin_memory=True)
