@@ -63,7 +63,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch,
         else:
             tau = tau_sched[ len(loader) * epoch ]
 
-        xyz, xyz_recon, assign, adj, soft_cg_adj = model(batch, tau)
+        xyz, xyz_recon, assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
         
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean()
@@ -124,6 +124,7 @@ def run(params):
     n_data = params['n_data']
     label =params['dataset']
     tau_min = params['tau_min']
+    det = params['det']
 
     create_dir(working_dir)
 
@@ -188,8 +189,15 @@ def run(params):
     decoder = DenseEquivariantDecoder(n_atoms=n_atoms, n_atom_basis=num_features,
                                       n_rbf=n_rbf, cutoff=cutoff, 
                                       num_conv=dec_nconv, activation=activation)
+
+    prior = DenseCGPrior(n_atoms=n_atoms, n_atom_basis=num_features,
+                                      n_rbf=n_rbf, cutoff=cutoff, 
+                                      num_conv=dec_nconv, activation=activation)
+
+    atom_mu = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
+    atom_sigma = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
     
-    model = DiffPoolVAE(encoder=encoder,decoder=decoder, pooler=pooler).to(device)
+    model = DiffPoolVAE(encoder=encoder,decoder=decoder, pooler=pooler, atom_munet=atom_mu, atom_sigmanet=atom_sigma, prior=prior, det=det).to(device)
     
     optimizer = torch.optim.Adam(model.parameters(),lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
@@ -264,6 +272,7 @@ if __name__ == '__main__':
     parser.add_argument('-kappa', type=float, default= 0.1)
     parser.add_argument('-lr', type=float, default=1e-4)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
+    parser.add_argument("--det", action='store_true', default=True)
     parser.add_argument("-cg_method", type=str, default='diff')
 
     params = vars(parser.parse_args())
