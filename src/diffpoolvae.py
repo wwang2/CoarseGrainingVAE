@@ -34,7 +34,7 @@ class DiffPoolVAE(nn.Module):
                                                                    batch['bonds'], 
                                                                    tau=tau,
                                                                    gumbel=True)
-
+        cg_adj = (soft_cg_adj > 0.01).to(torch.float).to(device)
         H_prior_mu, H_prior_sigma = self.prior(H_chem, cg_adj, cg_xyz)
 
         # sample 
