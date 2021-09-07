@@ -46,7 +46,7 @@ if params['id'] == 0:
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
-            dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.001), transformation="log"),
+            dict(name='lr', type='double', bounds=dict(min=0.00002, max=0.0002), transformation="log"),
             dict(name='tau_rate', type='double', bounds=dict(min=0.0001, max=0.1), transformation="log"),
             dict(name='tau_0', type='double', bounds=dict(min=1.0, max=5.0)),
             dict(name='tau_min', type='double', bounds=dict(min=0.1, max=1.0)),
