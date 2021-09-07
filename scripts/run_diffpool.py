@@ -35,6 +35,70 @@ def plot_map(assign, z, save_path=None):
         
     plt.show()
 
+
+# sampling code 
+
+def sample(loader, device, model, tqdm_flag=True, working_dir=None):
+
+    model.eval()
+
+    if tqdm_flag:
+        loader = tqdm(loader, position=0, file=sys.stdout,
+                         leave=True, desc='sampling')
+
+    xyz_samples = []
+
+    for i, batch in enumerate(loader):     
+        batch = batch_to(batch, device=device)
+        xyz = model.sample(batch, 0.05)
+
+        xyz_samples.append(xyz.detach().cpu().numpy())
+
+    xyz_samples = np.concatenate(xyz_samples)
+    # get atoms object 
+
+    atomic_nums = batch['z'][0].detach().cpu().numpy()
+
+    ref_atoms = Atoms(numbers=atomic_nums, positions=batch['xyz'][0].detach().cpu().numpy())
+
+    # compute graph metrics 
+    heavy_valid_rmsds = []
+    all_valid_rmsds = []
+    heavy_geds = []
+    all_geds = []
+
+
+    for xyz_sample in xyz_samples:
+        sample_atoms = Atoms(positions=xyz_samples[0], numbers=atomic_nums)
+        # all_sample_atoms.append(sample_atoms)
+
+        # compute ged 
+        heavy_valid_ids, heavy_valid_ratio, heavy_ged = count_valid_graphs(ref_atoms, [sample_atoms], heavy_only=True)
+        all_valid_ids, all_valid_ratio, all_ged = count_valid_graphs(ref_atoms, [sample_atoms], heavy_only=False)
+
+        heavy_rmsds = compute_rmsd([sample_atoms], ref_atoms, heavy_valid_ids)
+        all_rmsds = compute_rmsd([sample_atoms], ref_atoms, all_valid_ids) 
+
+        if heavy_rmsds is not None:
+            heavy_valid_rmsds += heavy_rmsds[:, 1].tolist()
+        if all_rmsds is not None:
+            all_valid_rmsds += all_rmsds[:, 0].tolist()
+
+        heavy_geds += heavy_ged
+        all_geds += all_ged
+
+    if working_dir is not None:
+        np.savetxt(os.path.join(working_dir, 'heavy_geds.txt'),  np.array(heavy_geds))
+        np.savetxt(os.path.join(working_dir, 'all_geds.txt'),  np.array(all_geds))
+        if len(heavy_valid_rmsds) != 0 :
+            np.savetxt(os.path.join(working_dir, 'heavy_rmsds.txt'),  np.array(heavy_valid_rmsds))
+        if len(all_valid_rmsds) != 0 :    
+            np.savetxt(os.path.join(working_dir, 'all_rmsds.txt'),  np.array(all_valid_rmsds))
+
+
+    return all_rmsds, heavy_rmsds, all_geds, heavy_geds
+
+
 def loop(loader, optimizer, device, model, tau_sched, epoch, beta, 
         gamma, kappa, train=True, looptext='', tqdm_flag=True):
     
@@ -136,17 +200,6 @@ def run(params):
 
     create_dir(working_dir)
 
-    # label = 'dipeptide'
-    # traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
-    # pdb_file = PROTEINFILES[label]['pdb_path']
-    # file_type = PROTEINFILES[label]['file_type']
-
-    # trajs = [md.load_xtc(file,
-    #             top=pdb_file) for file in traj_files]
-
-    # atomic_nums, protein_index = get_atomNum(trajs[0])
-    # n_atoms = len(atomic_nums)
-
     if label in PROTEINFILES.keys():
         traj = load_protein_traj(label)
         atomic_nums, protein_index = get_atomNum(traj)
@@ -247,6 +300,10 @@ def run(params):
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
     mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
                                 gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+
+
+    # sampling 
+    x_sample = sample(testloader,  device, model, tqdm_flag=True, working_dir=working_dir)
 
     # dump train recon 
     dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
