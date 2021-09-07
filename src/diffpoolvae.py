@@ -4,11 +4,47 @@ from conv import *
 from torch_scatter import scatter_mean, scatter_add
 
 class DiffPoolVAE(nn.Module):
-    def __init__(self, encoder, decoder, pooler):
+    def __init__(self, encoder, decoder, pooler, atom_munet, atom_sigmanet, prior, det):
         nn.Module.__init__(self)
         self.encoder = encoder
         self.decoder = decoder
         self.pooler = pooler 
+        self.prior = prior 
+        
+        self.atom_munet = atom_munet
+        self.atom_sigmanet = atom_sigmanet
+        self.det = det
+
+    def reparametrize(self, mu, sigma):
+        eps = torch.randn_like(sigma)
+        H = eps.mul(sigma).add_(mu)
+
+        return H
+
+    def sample(self, batch, tau=0.05):
+
+        xyz = batch['xyz']        
+        device = xyz.device
+        
+        z = batch['z'] # torch.ones_like( batch['z'] ) 
+        nbr_list = batch['nbr_list']
+
+        soft_assign, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+                                                                   batch['xyz'], 
+                                                                   batch['bonds'], 
+                                                                   tau=tau,
+                                                                   gumbel=True)
+
+        H_prior_mu, H_prior_sigma = self.prior(H_chem, cg_adj, cg_xyz)
+
+        # sample 
+        H_sample = self.reparametrize(H_prior_mu, H_prior_sigma) 
+
+        H, V = self.decoder(H_sample, cg_adj, cg_xyz)
+        dx = torch.einsum('bcae,bac->bae', V, soft_assign)
+        x_sample = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) + dx
+
+        return x_sample
         
     def forward(self, batch, tau):
     
@@ -18,7 +54,7 @@ class DiffPoolVAE(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=tau,
@@ -26,14 +62,24 @@ class DiffPoolVAE(nn.Module):
 
         cg_adj = (soft_cg_adj > 0.01).to(torch.float).to(device)
 
-        H, V = self.encoder(h, H, xyz, cg_xyz, soft_assign, nbr_list, cg_adj)
-        H, V = self.decoder(H, cg_adj, cg_xyz)
+        H_z, V = self.encoder(h, H_chem, xyz, cg_xyz, soft_assign, nbr_list, cg_adj)
 
+        H_prior_mu, H_prior_sigma = self.prior(H_chem, cg_adj, cg_xyz)
+
+        H_mu = self.atom_munet(H_z)
+        H_logvar = self.atom_sigmanet(H_z)
+        H_sigma = 1e-12 + torch.exp(H_logvar / 2)
+
+        if self.det:
+            H_repar = H_mu 
+        else:
+            H_repar = self.reparametrize(H_mu, H_sigma) 
+
+        H, V = self.decoder(H_repar, cg_adj, cg_xyz)
         dx = torch.einsum('bcae,bac->bae', V, soft_assign)
-
         x_recon = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) + dx
         
-        return xyz, x_recon, soft_assign, adj, soft_cg_adj
+        return xyz, x_recon, soft_assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma
 
 class CGpool(nn.Module):
     
@@ -291,6 +337,82 @@ class DenseEquiEncoder(nn.Module):
             H = H + dH
             
         return H, V
+
+
+class DenseCGPrior(nn.Module):
+    def __init__(self, n_atoms, n_atom_basis, n_rbf, cutoff, num_conv, activation):   
+        
+        nn.Module.__init__(self)
+        # distance transform
+        self.dist_embed = DistanceEmbed(n_rbf=n_rbf,
+                                  cutoff=cutoff,
+                                  feat_dim=n_atom_basis,
+                                  dropout=0.0)
+
+        self.message_blocks = nn.ModuleList(
+                [EquiMessageBlock(feat_dim=n_atom_basis,
+                              activation=activation,
+                              n_rbf=n_rbf,
+                              cutoff=cutoff,
+                              dropout=0.0)
+                 for _ in range(num_conv)]
+            )
+
+        self.update_blocks = nn.ModuleList(
+            [UpdateBlock(feat_dim=n_atom_basis,
+                         activation=activation,
+                         dropout=0.0)
+             for _ in range(num_conv)]
+        )
+
+        self.mu = nn.Sequential(nn.Linear(n_atom_basis, n_atom_basis), nn.Tanh(), nn.Linear(n_atom_basis, n_atom_basis))
+        self.sigma = nn.Sequential(nn.Linear(n_atom_basis, n_atom_basis), nn.Tanh(), nn.Linear(n_atom_basis, n_atom_basis))
+
+    
+    def forward(self, H, cg_adj, cg_xyz):
+        
+        H_stack = H.view(-1, H.shape[2])
+        
+        deg = cg_adj.sum(-1)
+        deg_stack = deg.view(-1)
+        deg_inv_sqrt = deg_stack.reciprocal().sqrt()
+        
+        cg_nbr_list = (cg_adj > 0.0).nonzero()
+        pad_nbr_list = (cg_nbr_list[:, 0] * H.shape[1]).unsqueeze(1) + cg_nbr_list[:, 1:]
+        #edge_weights = cg_adj[cg_nbr_list[:,0], cg_nbr_list[:,1], cg_nbr_list[:,2]]
+    
+        r_ij = cg_xyz[cg_nbr_list[:, 0], cg_nbr_list[:, 2]] - cg_xyz[cg_nbr_list[:, 0], cg_nbr_list[:, 1]] 
+        
+        V_stack = torch.zeros(list(H_stack.shape) + [3]).to(H.device)
+
+        for i, message_block in enumerate(self.message_blocks):
+            
+            # message block
+            dH_message, dV_message = message_block(s_j=H_stack,
+                                                   v_j=V_stack,
+                                                   r_ij=r_ij,
+                                                   nbrs=pad_nbr_list,
+                                                   # normalize by node degree
+                                                   edge_wgt= deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
+                                                   )
+            H_stack = H_stack + dH_message
+            V_stack = V_stack + dV_message
+
+            # update block
+            dH_update, dV_update = self.update_blocks[i](s_i=H_stack,
+                                                v_i=V_stack)
+            H_stack = H_stack + dH_update
+            V_stack = V_stack + dV_update
+            
+            H_unpack = H_stack.reshape(H.shape[0], H.shape[1], -1) 
+            V_unpack = V_stack.reshape(H.shape[0], H.shape[1], H.shape[2], 3)
+
+        # get mu and sigma
+        H_mu = self.mu(H_unpack)
+        H_logvar = self.sigma(H_unpack)
+        H_sigma = 1e-9 + torch.exp(H_logvar / 2)
+
+        return H_mu, H_sigma
 
 
 class DenseEquivariantDecoder(nn.Module):
