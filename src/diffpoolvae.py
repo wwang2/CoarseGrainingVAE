@@ -34,7 +34,11 @@ class DiffPoolVAE(nn.Module):
                                                                    batch['bonds'], 
                                                                    tau=tau,
                                                                    gumbel=True)
-        cg_adj = (soft_cg_adj > 0.01).to(torch.float).to(device)
+        cg_adj = (soft_cg_adj > 0.0001).to(torch.float).to(device)
+
+        diag = torch.stack(  [torch.diag(torch.ones(H_chem.shape[1]))] * H_chem.shape[0] ).to(device)
+        cg_adj = cg_adj - diag 
+
         H_prior_mu, H_prior_sigma = self.prior(H_chem, cg_adj, cg_xyz)
 
         # sample 
@@ -44,7 +48,7 @@ class DiffPoolVAE(nn.Module):
         dx = torch.einsum('bcae,bac->bae', V, soft_assign)
         x_sample = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) + dx
 
-        return x_sample
+        return x_sample, H_prior_mu, H_prior_sigma
         
     def forward(self, batch, tau):
     
@@ -60,12 +64,15 @@ class DiffPoolVAE(nn.Module):
                                                                    tau=tau,
                                                                    gumbel=True)
 
-        cg_adj = (soft_cg_adj > 0.01).to(torch.float).to(device)
+        cg_adj = (soft_cg_adj > 0.0001).to(torch.float).to(device)
 
-        H_z, V = self.encoder(h, H_chem, xyz, cg_xyz, soft_assign, nbr_list, cg_adj)
+        diag = torch.stack(  [torch.diag(torch.ones(H_chem.shape[1]))] * H_chem.shape[0] ).to(device)
+        cg_adj = cg_adj - diag 
 
         H_prior_mu, H_prior_sigma = self.prior(H_chem, cg_adj, cg_xyz)
 
+
+        H_z, V = self.encoder(h, H_chem, xyz, cg_xyz, soft_assign, nbr_list, cg_adj)
         H_mu = self.atom_munet(H_z)
         H_logvar = self.atom_sigmanet(H_z)
         H_sigma = 1e-12 + torch.exp(H_logvar / 2)
@@ -393,7 +400,7 @@ class DenseCGPrior(nn.Module):
                                                    r_ij=r_ij,
                                                    nbrs=pad_nbr_list,
                                                    # normalize by node degree
-                                                   edge_wgt= deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
+                                                   # edge_wgt= deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
                                                    )
             H_stack = H_stack + dH_message
             V_stack = V_stack + dV_message
