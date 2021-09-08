@@ -50,13 +50,13 @@ def sample(loader, device, model, tqdm_flag=True, working_dir=None):
 
     for i, batch in enumerate(loader):     
         batch = batch_to(batch, device=device)
-        xyz = model.sample(batch, 0.05)
+        xyz, H_mu, H_sigma = model.sample(batch, 0.05)
 
         xyz_samples.append(xyz.detach().cpu().numpy())
 
     xyz_samples = np.concatenate(xyz_samples)
     # get atoms object 
-
+    import ipdb; ipdb.set_trace()
     atomic_nums = batch['z'][0].detach().cpu().numpy()
 
     ref_atoms = Atoms(numbers=atomic_nums, positions=batch['xyz'][0].detach().cpu().numpy())
@@ -69,9 +69,8 @@ def sample(loader, device, model, tqdm_flag=True, working_dir=None):
 
 
     for xyz_sample in xyz_samples:
-        sample_atoms = Atoms(positions=xyz_samples[0], numbers=atomic_nums)
+        sample_atoms = Atoms(positions=xyz_sample, numbers=atomic_nums)
         # all_sample_atoms.append(sample_atoms)
-
         # compute ged 
         heavy_valid_ids, heavy_valid_ratio, heavy_ged = count_valid_graphs(ref_atoms, [sample_atoms], heavy_only=True)
         all_valid_ids, all_valid_ratio, all_ged = count_valid_graphs(ref_atoms, [sample_atoms], heavy_only=False)
@@ -95,17 +94,21 @@ def sample(loader, device, model, tqdm_flag=True, working_dir=None):
         if len(all_valid_rmsds) != 0 :    
             np.savetxt(os.path.join(working_dir, 'all_rmsds.txt'),  np.array(all_valid_rmsds))
 
+    # print out something 
+    dump_numpy2xyz(xyz_samples[:50], atomic_nums, os.path.join(working_dir, 'test_samples.xyz'))
+
 
     return all_rmsds, heavy_rmsds, all_geds, heavy_geds
 
 
-def loop(loader, optimizer, device, model, tau_sched, epoch, beta, 
+def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         gamma, kappa, train=True, looptext='', tqdm_flag=True):
     
     recon_loss = []
     adj_loss = []
     ent_loss = []
     KL_loss = []
+    graph_loss = []
     
     if train:
         model.train()
@@ -126,7 +129,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta,
         if train: 
             tau = tau_sched[ len(loader) * epoch +  i]
         else:
-            tau = tau_sched[ len(loader) * epoch ]
+            tau = tau_sched[-1]
 
         xyz, xyz_recon, assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
         
@@ -138,19 +141,30 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta,
 
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
 
+        prior_reg = KL(H_prior_mu, H_prior_sigma, None, None)
         
-        loss = loss_recon + beta * loss_kl + gamma * loss_adj +  kappa * loss_entropy            
+        nbr_list = batch['nbr_list']
+        gen_dist = (xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1)#.sqrt()
+        data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1)#.sqrt()
+        loss_graph = (gen_dist - data_dist).pow(2).mean()
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        loss = loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj +  kappa * loss_entropy + 0.0001 * prior_reg
+
+        #if epoch % 5 == 0:
+        #    print(H_prior_mu.mean().item(), H_prior_sigma.mean().item(), H_mu.mean().item(), H_sigma.mean().item())
+        if train:
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         recon_loss.append(loss_recon.item())
         adj_loss.append(loss_adj.item())
         ent_loss.append(loss_entropy.item())
         KL_loss.append(loss_kl.item())
+        graph_loss.append(loss_graph.item())
 
         mean_recon = np.array(recon_loss).mean()
+        mean_graph = np.array(graph_loss).mean()
         mean_adj = np.array(adj_loss).mean()
         mean_ent = np.array(ent_loss).mean()
         mean_KL = np.array(KL_loss).mean()
@@ -158,6 +172,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta,
         del loss_adj, loss_entropy, loss_recon
 
         postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
+                    'avg. graph loss={:.4f}'.format(mean_graph),
                     'avg. KL loss={:.4f}'.format(mean_KL),
                    'avg. adj loss={:.4f}'.format(mean_adj),
                    'avg. entropy loss={:.4f}'.format(mean_ent),
@@ -187,6 +202,7 @@ def run(params):
     tau_rate = params['tau_rate']
     n_epochs = params['n_epochs']
     beta = params['beta']
+    eta = params['eta']
     gamma = params['gamma']
     kappa = params['kappa']
     lr = params['lr']
@@ -241,7 +257,7 @@ def run(params):
 
     pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
     
-    encoder = DenseEquiEncoder(n_conv=dec_nconv, 
+    encoder = DenseEquiEncoder(n_conv=enc_nconv, 
                            n_atom_basis=num_features,
                            n_rbf=n_rbf, 
                            activation=activation, 
@@ -253,7 +269,7 @@ def run(params):
 
     prior = DenseCGPrior(n_atoms=n_atoms, n_atom_basis=num_features,
                                       n_rbf=n_rbf, cutoff=cutoff, 
-                                      num_conv=dec_nconv, activation=activation)
+                                      num_conv=enc_nconv, activation=activation)
 
     atom_mu = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
     atom_sigma = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
@@ -271,14 +287,14 @@ def run(params):
     for epoch in range(n_epochs):
         model.train()
         mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_sched, epoch, 
-                                        beta, gamma, kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
+                                        beta, gamma, eta,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
         # dump recon loss periodically 
         if epoch % 20 == 0: 
             testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
             model.eval()
             mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
-                            gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+                            gamma, eta, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
             dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
 
@@ -299,7 +315,7 @@ def run(params):
     # test 
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
     mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
-                                gamma, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+                                gamma, eta, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
 
     # sampling 
@@ -334,11 +350,12 @@ if __name__ == '__main__':
     parser.add_argument('-tau_0', type=float, default= 2.36)
     parser.add_argument('-tau_min', type=float, default= 0.3)
     parser.add_argument('-beta', type=float, default= 0.1)
-    parser.add_argument('-gamma', type=float, default= 10.0)
+    parser.add_argument('-gamma', type=float, default= 0.1)
+    parser.add_argument('-eta', type=float, default= 0.1)
     parser.add_argument('-kappa', type=float, default= 0.1)
     parser.add_argument('-lr', type=float, default=1e-4)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
-    parser.add_argument("--det", action='store_true', default=True)
+    parser.add_argument("--det", action='store_true', default=False)
     parser.add_argument("-cg_method", type=str, default='diff')
 
     params = vars(parser.parse_args())
