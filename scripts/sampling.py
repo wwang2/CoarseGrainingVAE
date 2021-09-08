@@ -168,7 +168,6 @@ def get_bond_graphs(atoms):
 
 def count_valid_graphs(ref_atoms, atoms_list, heavy_only=True):
     
-
     if heavy_only:
         ref_atoms = dropH(ref_atoms)
     
@@ -187,7 +186,7 @@ def count_valid_graphs(ref_atoms, atoms_list, heavy_only=True):
         ref_graph = get_bond_graphs(ref_atoms)
 
         graph_diff_ratio = (ref_graph - gen_graph).sum().abs() / ref_graph.sum()
-        graph_diff_ratio_list.append(graph_diff_ratio)
+        graph_diff_ratio_list.append(graph_diff_ratio.item())
 
     valid_ratio = len(valid_ids)/len(atoms_list)
     
