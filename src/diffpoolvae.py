@@ -34,10 +34,11 @@ class DiffPoolVAE(nn.Module):
                                                                    batch['bonds'], 
                                                                    tau=tau,
                                                                    gumbel=True)
-        cg_adj = (soft_cg_adj > 0.0001).to(torch.float).to(device)
+        #cg_adj = (soft_cg_adj > 0.0001).to(torch.float).to(device)
+        cg_adj = soft_cg_adj
 
-        diag = torch.stack(  [torch.diag(torch.ones(H_chem.shape[1]))] * H_chem.shape[0] ).to(device)
-        cg_adj = cg_adj - diag 
+        # diag = torch.stack(  [torch.diag(torch.ones(H_chem.shape[1]))] * H_chem.shape[0] ).to(device)
+        # cg_adj = cg_adj - diag 
 
         H_prior_mu, H_prior_sigma = self.prior(H_chem, cg_adj, cg_xyz)
 
@@ -64,10 +65,11 @@ class DiffPoolVAE(nn.Module):
                                                                    tau=tau,
                                                                    gumbel=True)
 
-        cg_adj = (soft_cg_adj > 0.0001).to(torch.float).to(device)
+        #cg_adj = (soft_cg_adj > 0.0001).to(torch.float).to(device)
+        cg_adj = soft_cg_adj
 
-        diag = torch.stack(  [torch.diag(torch.ones(H_chem.shape[1]))] * H_chem.shape[0] ).to(device)
-        cg_adj = cg_adj - diag 
+        # diag = torch.stack(  [torch.diag(torch.ones(H_chem.shape[1]))] * H_chem.shape[0] ).to(device)
+        # cg_adj = cg_adj - diag 
 
         H_prior_mu, H_prior_sigma = self.prior(H_chem, cg_adj, cg_xyz)
 
@@ -317,7 +319,6 @@ class DenseEquiEncoder(nn.Module):
         pad_nbr_list = (nbr_list[:, 0] * h.shape[1]).unsqueeze(1) + nbr_list[:, 1:]
 
         r_ij = xyz[nbr_list[:, 0], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]
-        
         
         # intialize H, V
         V = torch.zeros(list(H.shape) + [3]).to(H.device)
