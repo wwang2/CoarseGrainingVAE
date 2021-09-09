@@ -38,7 +38,7 @@ def plot_map(assign, z, save_path=None):
 
 # sampling code 
 
-def sample(loader, device, model, tqdm_flag=True, working_dir=None):
+def sample(loader, device, model, tau_min, tqdm_flag=True, working_dir=None):
 
     model.eval()
 
@@ -50,13 +50,12 @@ def sample(loader, device, model, tqdm_flag=True, working_dir=None):
 
     for i, batch in enumerate(loader):     
         batch = batch_to(batch, device=device)
-        xyz, H_mu, H_sigma = model.sample(batch, 0.05)
+        xyz, H_mu, H_sigma = model.sample(batch, tau_min)
 
         xyz_samples.append(xyz.detach().cpu().numpy())
 
     xyz_samples = np.concatenate(xyz_samples)
     # get atoms object 
-    import ipdb; ipdb.set_trace()
     atomic_nums = batch['z'][0].detach().cpu().numpy()
 
     ref_atoms = Atoms(numbers=atomic_nums, positions=batch['xyz'][0].detach().cpu().numpy())
@@ -102,7 +101,7 @@ def sample(loader, device, model, tqdm_flag=True, working_dir=None):
 
 
 def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
-        gamma, kappa, train=True, looptext='', tqdm_flag=True):
+        gamma, kappa, train=True, looptext='', tqdm_flag=True, recon_weight=1.0, tau_min=None):
     
     recon_loss = []
     adj_loss = []
@@ -126,10 +125,10 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
     for i, batch in enumerate(loader):     
         batch = batch_to(batch, device=device)
         
-        if train: 
+        if tau_min == None:
             tau = tau_sched[ len(loader) * epoch +  i]
         else:
-            tau = tau_sched[-1]
+            tau = tau_min
 
         xyz, xyz_recon, assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
         
@@ -140,15 +139,13 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_adj = (node_sim_mat - adj).pow(2).mean()
 
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
-
-        prior_reg = KL(H_prior_mu, H_prior_sigma, None, None)
         
         nbr_list = batch['nbr_list']
         gen_dist = (xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1)#.sqrt()
         data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1)#.sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
-        loss = loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj +  kappa * loss_entropy + 0.0001 * prior_reg
+        loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj +  kappa * loss_entropy #+ 0.0001 * prior_reg
 
         #if epoch % 5 == 0:
         #    print(H_prior_mu.mean().item(), H_prior_sigma.mean().item(), H_mu.mean().item(), H_sigma.mean().item())
@@ -245,15 +242,19 @@ def run(params):
 
     # split train, test index 
     train_index, test_index = train_test_split(list(range(len(dataset))),test_size=0.2)
+    train_index, val_index = train_test_split(list(range(len(train_index))),test_size=0.1)
 
     trainset = get_subset_by_indices(train_index, dataset)
+    valset = get_subset_by_indices(val_index, dataset)
     testset = get_subset_by_indices(test_index, dataset)
 
     trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+    valloader = DataLoader(valset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
 
-    n_iters = len(trainloader) * n_epochs + 100
-    tau_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_iters-1, n_iters)) + tau_min
-
+    n_train_iters = len(trainloader) * n_epochs + 10
+    n_val_iters = len(valloader) * n_epochs + 10
+    tau_train_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_train_iters)) + tau_min
+    tau_val_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_val_iters)) + tau_min
 
     pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
     
@@ -283,20 +284,41 @@ def run(params):
     
     failed = False 
 
+    for epoch in range(params['n_pretrain']):
+        model.train()
+        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
+                                    beta=0.0, gamma=0.0, eta=eta, kappa=gamma, train=True, looptext='pretrain',
+                                    tqdm_flag=tqdm_flag, recon_weight=0.0)
+
+        if np.isnan(mean_train_recon):
+            print("NaN encoutered, exiting...")
+            failed = True
+            break 
+
+        if epoch % 5 == 0:
+            map_save_path = os.path.join(working_dir, 'pretrain_map_{}.png'.format(epoch) )
+            plot_map(assign[0], props['z'][0].numpy(), map_save_path)
+
+    loss_log = []
     # train     
     for epoch in range(n_epochs):
         model.train()
-        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_sched, epoch, 
+        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
                                         beta, gamma, eta,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
-        # dump recon loss periodically 
-        if epoch % 20 == 0: 
-            testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-            model.eval()
-            mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
-                            gamma, eta, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+        mean_val_recon, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
+                                        beta, gamma, eta,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
-            dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
+        # # dump recon loss periodically 
+        # if epoch % 20 == 0: 
+        #     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+        #     model.eval()
+        #     mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
+        #                     gamma, eta, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+
+        #     dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
+
+        # validation for each epoch 
 
         if np.isnan(mean_train_recon):
             print("NaN encoutered, exiting...")
@@ -307,19 +329,26 @@ def run(params):
             map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
             plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
+        scheduler.step(mean_val_recon)
+        loss_log.append([mean_train_recon, mean_val_recon])
 
-        scheduler.step(mean_train_recon)
+        # early stopping 
+        if optimizer.param_groups[0]['lr'] <= 1e-7:
+            break
+
+    # dump log 
+    np.savetxt(os.path.join(working_dir, 'train_val_recon.txt'),  np.array(loss_log))
 
     dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
 
     # test 
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
-                                gamma, eta, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_val_sched, epoch, beta, 
+                                gamma, eta, kappa, train=False, looptext='testing', tqdm_flag=tqdm_flag, tau_min=tau_min)
 
 
     # sampling 
-    x_sample = sample(testloader,  device, model, tqdm_flag=True, working_dir=working_dir)
+    all_rmsds, heavy_rmsds, all_geds, heavy_geds = sample(testloader,  device, model, tau_min, tqdm_flag=True, working_dir=working_dir)
 
     # dump train recon 
     dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
@@ -327,7 +356,7 @@ def run(params):
     print("train msd : {:.4f}".format(mean_train_recon))
     print("test msd : {:.4f}".format(mean_test_recon))
 
-    return mean_test_recon, failed, assign
+    return mean_test_recon, np.array(all_geds).mean(), failed, assign
 
 if __name__ == '__main__':
 
@@ -346,6 +375,7 @@ if __name__ == '__main__':
     parser.add_argument('-n_rbf', type=int,  default= 7)
     parser.add_argument('-activation', type=str,  default= 'ELU')
     parser.add_argument('-n_epochs', type=int, default= 50)
+    parser.add_argument("-n_pretrain", type=int, default= 10)
     parser.add_argument('-tau_rate', type=float, default= 0.004 )
     parser.add_argument('-tau_0', type=float, default= 2.36)
     parser.add_argument('-tau_min', type=float, default= 0.3)
