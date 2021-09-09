@@ -18,6 +18,7 @@ parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("-cg_method", type=str, default='diff')
 parser.add_argument("--dry_run", action='store_true', default=False)
 parser.add_argument("--tqdm_flag", action='store_true', default=False)
+parser.add_argument("--det", action='store_true', default=False)
 params = vars(parser.parse_args())
 
 if params['dry_run']:
@@ -44,8 +45,11 @@ if params['id'] == 0:
             dict(name='nconv_pool', type='int', bounds=dict(min=2, max=7)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
+            dict(name='n_pretrain', type='int', bounds=dict(min=0, max=20)),
+            dict(name='beta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
+            dict(name='eta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.00002, max=0.0002), transformation="log"),
             dict(name='tau_rate', type='double', bounds=dict(min=0.00001, max=0.01), transformation="log"),
             dict(name='tau_0', type='double', bounds=dict(min=1.0, max=5.0)),
@@ -74,15 +78,21 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['cg_method'] = params['cg_method']
     trial['n_data'] = params['n_data']
     trial['dataset'] = params['dataset']
+    trial['det'] = params['det']
 
     print("Suggestion ID: {}".format(suggestion.id))
 
-    test_recon, failed, assign = run(trial)
+    test_recon, all_geds, failed, assign = run(trial)
+
+    if params['det']:
+        value = test_recon
+    else:
+        value = all_geds
 
     if not failed:
         conn.experiments(experiment.id).observations().create(
           suggestion=suggestion.id,
-          value=test_recon,
+          value=value,
         )
     elif failed:
         conn.experiments(experiment.id).observations().create(
