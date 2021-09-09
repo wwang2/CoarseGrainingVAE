@@ -337,7 +337,7 @@ class EquiMessageBlock(nn.Module):
                                    nbrs=nbrs)
         graph_size = s_j.shape[0]
 
-        inv_out = inv_out.reshape(inv_out.shape[0], 3, -1)
+        inv_out = inv_out.reshape(inv_out.shape[0], 3, s_j.shape[-1])
 
         split_0 = inv_out[:, 0, :].unsqueeze(-1)
         split_1 = inv_out[:, 1, :]
