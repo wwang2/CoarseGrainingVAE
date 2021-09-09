@@ -27,10 +27,13 @@ from datetime import timedelta
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
-def build_split_dataset(traj, params):
+def build_split_dataset(traj, params, mapping=None):
 
     atomic_nums, protein_index = get_atomNum(traj)
-    mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'], mapshuffle=params['mapshuffle'])
+    new_mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'], mapshuffle=params['mapshuffle'])
+
+    if mapping is None:
+        mapping = new_mapping
 
     dataset = build_dataset(mapping,
                         frames, 
@@ -50,7 +53,12 @@ def build_split_dataset(traj, params):
         print("CG graph not connected")
         return np.NaN, np.NaN, True
 
-    return dataset
+    return dataset, mapping
+
+def shuffle_traj(traj):
+    full_idx = list(range(len(traj)))
+    full_idx = shuffle(full_idx)
+    return traj[full_idx]
 
 def run_cv(params):
     failed = False
@@ -106,8 +114,8 @@ def run_cv(params):
 
     if dataset_label in PROTEINFILES.keys():
         traj = load_protein_traj(dataset_label)
+        traj = shuffle_traj(traj)
         atomic_nums, protein_index = get_atomNum(traj)
-
     else:
         raise ValueError("data label {} not recognized".format(dataset_label))
 
@@ -117,7 +125,7 @@ def run_cv(params):
     # create subdirectory 
     create_dir(working_dir)
         
-    kf = KFold(n_splits=nsplits)
+    kf = KFold(n_splits=nsplits, shuffle=True)
 
     cv_all_rmsd = []
     cv_heavy_rmsd = []
@@ -138,13 +146,16 @@ def run_cv(params):
         split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
         create_dir(split_dir)
 
-        # trainset = get_subset_by_indices(train_index, dataset)
-        # testset = get_subset_by_indices(test_index, dataset)
+        # build validation set for early stopping 
+        train_index, val_index = train_test_split(train_index, test_size=0.1)
 
-        trainset = build_split_dataset(traj[train_index], params)
-        testset = build_split_dataset(traj[train_index], params)
+        trainset, mapping = build_split_dataset(traj[train_index], params, mapping=None)
+        valset, mapping = build_split_dataset(traj[val_index], params, mapping)
+        testset, mapping = build_split_dataset(traj[test_index], params, mapping)
+
 
         trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag, pin_memory=True)
+        valloader = DataLoader(valset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag, pin_memory=True)
         testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=shuffle_flag, pin_memory=True)
         
         # initialize model 
@@ -152,7 +163,6 @@ def run_cv(params):
         atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
 
         # register encoder 
-
         decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
                                       cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, 
                                       atomwise_z=atom_decode_flag)
@@ -183,23 +193,32 @@ def run_cv(params):
 
         for epoch in range(nepochs):
             # train
-            mean_kl, mean_recon, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
+            mean_kl_train, mean_recon_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                        model, beta, epoch, 
                                                        train=True,
                                                         gamma=gamma,
                                                         eta=eta,
                                                         kappa=kappa,
-                                                        looptext='Ncg {} Fold {}'.format(n_cgs, i),
+                                                        looptext='Ncg {} Fold {} train'.format(n_cgs, i),
+                                                        tqdm_flag=tqdm_flag)
+
+            mean_kl_val, mean_recon_val, xyz_val, xyz_val_recon = loop(valloader, optimizer, device,
+                                                       model, beta, epoch, 
+                                                       train=False,
+                                                        gamma=gamma,
+                                                        eta=eta,
+                                                        kappa=kappa,
+                                                        looptext='Ncg {} Fold {} test'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
             
-            scheduler.step(mean_recon)
+            scheduler.step(mean_recon_val)
 
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
-            kl_loss_hist.append(mean_kl)
-            recon_loss_hist.append(mean_recon)
+            kl_loss_hist.append(mean_kl_train)
+            recon_loss_hist.append(mean_recon_train)
 
             # check NaN
-            if np.isnan(mean_recon):
+            if np.isnan(mean_recon_val):
                 print("NaN encoutered, exiting...")
                 break 
 
@@ -207,7 +226,8 @@ def run_cv(params):
                 print('converged')
                 break
 
-            del mean_kl, mean_recon, xyz_train, xyz_train_recon
+            del mean_kl_train, mean_recon_train, xyz_train, xyz_train_recon
+            del mean_kl_val, mean_recon_val, xyz_val, xyz_val_recon
 
         # dump model hyperparams 
         with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
