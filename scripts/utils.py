@@ -153,7 +153,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
-        del loss, loss_graph, loss_kl
+        del loss, loss_graph, loss_kl, loss_recon, loss_dx_orient, loss_dx_norm
 
     for result in postfix:
         print(result)
