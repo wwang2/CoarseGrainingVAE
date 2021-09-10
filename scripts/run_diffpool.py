@@ -101,6 +101,37 @@ def sample(loader, device, model, tau_min, tqdm_flag=True, working_dir=None):
     return all_rmsds, heavy_rmsds, all_geds, heavy_geds
 
 
+def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
+
+    natoms = target_mapping.shape[0]
+    target = torch.zeros(natoms, target_mapping.max() + 1)
+    target[list(range(natoms)), target_mapping] = 1. # n X N
+    target = target.to(device)
+
+    if tqdm_flag:
+        loader = tqdm(loader, position=0, file=sys.stdout,
+                         leave=True, desc='(pretrain epoch)')
+
+    all_loss = []
+    for i, batch in enumerate(loader):     
+        batch = batch_to(batch, device=device)
+        xyz, xyz_recon, assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
+
+        loss = (assign - target[None, ...]).pow(2).mean()
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        all_loss.append(loss.item())
+
+        postfix = ['avg. newman loss={:.4f}'.format(np.array(all_loss).mean())]
+
+        if tqdm_flag:
+            loader.set_postfix_str(' '.join(postfix))
+
+    return np.array(all_loss).mean(), assign
+    
 def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         gamma, kappa, train=True, looptext='', tqdm_flag=True, recon_weight=1.0, tau_min=None):
     
@@ -142,8 +173,8 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
         
         nbr_list = batch['nbr_list']
-        gen_dist = (xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1)#.sqrt()
-        data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1)#.sqrt()
+        gen_dist = (xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
+        data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj +  kappa * loss_entropy #+ 0.0001 * prior_reg
@@ -213,6 +244,7 @@ def run(params):
     label =params['dataset']
     tau_min = params['tau_min']
     det = params['det']
+    cg_cutoff = params['cg_cutoff']
 
     create_dir(working_dir)
 
@@ -224,13 +256,15 @@ def run(params):
         raise ValueError("data label {} not recognized".format(label))
 
     # get cg_map 
-    if cg_method == 'newman':
-        protein_top = traj.top.subset(protein_index)
-        g = protein_top.to_bondgraph()
-        paritions = get_partition(g, N_cg)
-        mapping = parition2mapping(paritions, n_atoms)
 
-        assign_idx = torch.LongTensor( np.array(mapping) ) 
+    # compute mapping using Girvan Newman 
+    protein_top = traj.top.subset(protein_index)
+    g = protein_top.to_bondgraph()
+    paritions = get_partition(g, N_cg)
+    newman_mapping = parition2mapping(paritions, n_atoms)
+
+    if cg_method == 'newman':
+        assign_idx = torch.LongTensor( np.array(newman_mapping) ) 
     elif cg_method == 'random':
         mapping = get_random_mapping(N_cg, n_atoms)
         assign_idx = torch.LongTensor( np.array(mapping) ) 
@@ -268,11 +302,11 @@ def run(params):
                            cutoff=cutoff)
     
     decoder = DenseEquivariantDecoder(n_atoms=n_atoms, n_atom_basis=num_features,
-                                      n_rbf=n_rbf, cutoff=cutoff, 
+                                      n_rbf=n_rbf, cutoff=cg_cutoff, 
                                       num_conv=dec_nconv, activation=activation)
 
     prior = DenseCGPrior(n_atoms=n_atoms, n_atom_basis=num_features,
-                                      n_rbf=n_rbf, cutoff=cutoff, 
+                                      n_rbf=n_rbf, cutoff=cg_cutoff, 
                                       num_conv=enc_nconv, activation=activation)
 
     atom_mu = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
@@ -289,11 +323,13 @@ def run(params):
 
     for epoch in range(params['n_pretrain']):
         model.train()
-        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
-                                    beta=0.0, gamma=0.0, eta=eta, kappa=gamma, train=True, looptext='pretrain',
-                                    tqdm_flag=tqdm_flag, recon_weight=0.0)
+        # mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
+        #                             beta=0.0, gamma=0.0, eta=eta, kappa=gamma, train=True, looptext='pretrain',
+        #                             tqdm_flag=tqdm_flag, recon_weight=0.0)
 
-        if np.isnan(mean_train_recon):
+        graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_min, newman_mapping, tqdm_flag=tqdm_flag)
+
+        if np.isnan(graph_loss):
             print("NaN encoutered, exiting...")
             failed = True
             break 
@@ -375,6 +411,7 @@ if __name__ == '__main__':
     parser.add_argument('-enc_nconv', type=int, default= 4)
     parser.add_argument('-dec_nconv', type=int, default= 3)
     parser.add_argument('-cutoff', type=float, default= 8.0)
+    parser.add_argument('-cg_cutoff', type=float, default=8.0)
     parser.add_argument('-n_rbf', type=int,  default= 7)
     parser.add_argument('-activation', type=str,  default= 'ELU')
     parser.add_argument('-n_epochs', type=int, default= 50)
