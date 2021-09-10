@@ -124,6 +124,9 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
             optimizer.step()
 
+        else:
+            loss.backward()
+
         # logging 
         recon_loss.append(loss_recon.item())
         kl_loss.append(loss_kl.item())
