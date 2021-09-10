@@ -64,7 +64,7 @@ class InvariantMessage(nn.Module):
                 dist,
                 nbrs):
 
-        phi = self.inv_dense(s_j)[nbrs[:, 1]]
+        phi = self.inv_dense(s_j)[nbrs[:, 1].cpu()]
         w_s = self.dist_embed(dist)
         # expanded_dist = (-(dist.unsqueeze(-1) - self.offset.to(phi.device)).pow(2)).exp()
         # w_s = self.dist_filter(expanded_dist)
@@ -198,7 +198,7 @@ class EquiMessageCross(nn.Module):
         split_3 = inv_out[:, 3, :].unsqueeze(-1)
 
         unit_add = split_2 * unit.unsqueeze(1)
-        delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1]] + split_3 * torch.cross( v_j[nbrs[:, 0]],  v_j[nbrs[:, 1]])
+        delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1].cpu()] + split_3 * torch.cross( v_j[nbrs[:, 0]],  v_j[nbrs[:, 1].cpu()])
         delta_s_ij = split_1
 
         # add results from neighbors of each node
@@ -344,7 +344,7 @@ class EquiMessageBlock(nn.Module):
         split_2 = inv_out[:, 2, :].unsqueeze(-1)
 
         unit_add = split_2 * unit.unsqueeze(1)
-        delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1]]
+        delta_v_ij = unit_add + split_0 * v_j[nbrs[:, 1].cpu()]
         delta_s_ij = split_1
 
         if edge_wgt is not None: 
@@ -356,7 +356,7 @@ class EquiMessageBlock(nn.Module):
 
         # # add results from neighbors of each node
 
-        # h_att_wgt = torch.exp(-self.h_att(s_j[nbrs[:, 1]]) )
+        # h_att_wgt = torch.exp(-self.h_att(s_j[nbrs[:, 1].cpu()]) )
         # h_att_norm = scatter_add(h_att_wgt, 
         #                         index=nbrs[:, 0],
         #                          dim=0,
@@ -364,7 +364,7 @@ class EquiMessageBlock(nn.Module):
 
         # h_att_norm_wgt = h_att_wgt / h_att_norm[nbrs[:, 0]]
 
-        # v_att_wgt = torch.exp(-self.v_att(s_j[nbrs[:, 1]]) )
+        # v_att_wgt = torch.exp(-self.v_att(s_j[nbrs[:, 1].cpu()]) )
         # v_att_norm = scatter_add(v_att_wgt, 
         #                         index=nbrs[:, 0],
         #                          dim=0,
@@ -558,7 +558,7 @@ class EquivariantMPlayer(nn.Module):
     def forward(self, h_i, v_i, d_ij, unit_r_ij, nbrs):
         
         phi = self.layers(h_i)
-        edge_inv = (phi[nbrs[:, 1]] *  phi[nbrs[:, 0]]) * self.dist_embed(d_ij)
+        edge_inv = (phi[nbrs[:, 1].cpu()] *  phi[nbrs[:, 0]]) * self.dist_embed(d_ij)
         #filter1, filter2, filter3 = self.edgefilters(edge_inv)
         
         edge_inv = edge_inv.reshape(edge_inv.shape[0], 3, -1)
@@ -570,7 +570,7 @@ class EquivariantMPlayer(nn.Module):
         filter3 = edge_inv[:, 2 ]
 
         dv = filter1.unsqueeze(-1) * unit_r_ij.unsqueeze(1) + \
-            filter2.unsqueeze(-1) * v_i[nbrs[:, 1]]
+            filter2.unsqueeze(-1) * v_i[nbrs[:, 1].cpu()]
 
         dh = filter3
            
