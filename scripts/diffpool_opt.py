@@ -42,7 +42,7 @@ if params['id'] == 0:
             dict(name='n_rbf', type='int', bounds=dict(min=5, max=20)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
             dict(name='cutoff', type='double', bounds=dict(min=4.0, max=9.0)),
-            dict(name='cg_cutoff', type='double', bounds=dict(min=4.0, max=10.0)),
+            dict(name='cg_cutoff', type='double', bounds=dict(min=5.0, max=20.0)),
             dict(name='nconv_pool', type='int', bounds=dict(min=2, max=7)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
