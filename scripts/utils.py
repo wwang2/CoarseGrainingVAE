@@ -6,6 +6,7 @@ import numpy as np
 from ase import Atoms, io 
 import networkx as nx
 from datetime import date
+import torch.autograd.profiler as profiler
 
 def annotate_job(task, job_name, N_cg):
     today = date.today().strftime('%m-%d')
@@ -68,6 +69,13 @@ def loop(loader, optimizer, device, model, beta, epoch,
     for i, batch in enumerate(loader):
 
         batch = batch_to(batch, device)
+
+        # batch['bond_edge_list'] =  batch['bond_edge_list'].cpu()
+        # batch['nbr_list'] =  batch['nbr_list'].cpu()
+        # batch['CG_nbr_list'] =  batch['CG_nbr_list'].cpu()
+        # batch['CG_mapping'] = batch['CG_mapping'].cpu()
+
+        #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True, use_cuda=True) as prof:
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
 
         # loss
@@ -79,8 +87,8 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # add graph loss 
         nbr_list = batch['nbr_list']
         xyz = batch['nxyz'][:, 1:]
-        gen_dist = (xyz_recon[nbr_list[:, 0 ]] - xyz_recon[nbr_list[:, 1 ]]).pow(2).sum(-1)#.sqrt()
-        data_dist = (xyz[nbr_list[:, 0 ]] - xyz[nbr_list[:, 1 ]]).pow(2).sum(-1)#.sqrt()
+        gen_dist = (xyz_recon[nbr_list[:, 0 ]] - xyz_recon[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
+        data_dist = (xyz[nbr_list[:, 0 ]] - xyz[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         # add orientation loss 
