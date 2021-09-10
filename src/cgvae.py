@@ -395,8 +395,6 @@ class CGequiVAE(nn.Module):
     def forward(self, batch):
 
         atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
-
-        #import ipdb; ipdb.set_trace()
         
         S_I, s_i = self.encoder(atomic_nums, xyz, cg_xyz, mapping, nbr_list, CG_nbr_list)
 
