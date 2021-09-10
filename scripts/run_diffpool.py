@@ -23,6 +23,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt 
 from tqdm import tqdm 
 from sklearn.model_selection import train_test_split
+import torch.autograd.profiler as profiler
 
 def plot_map(assign, z, save_path=None):
     mapping = assign.detach().cpu().numpy().transpose()
@@ -153,6 +154,8 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        else:
+            loss.backward()
 
         recon_loss.append(loss_recon.item())
         adj_loss.append(loss_adj.item())
