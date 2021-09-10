@@ -245,6 +245,7 @@ def run(params):
     tau_min = params['tau_min']
     det = params['det']
     cg_cutoff = params['cg_cutoff']
+    tau_pre = params['tau_pre']
 
     create_dir(working_dir)
 
@@ -327,7 +328,7 @@ def run(params):
         #                             beta=0.0, gamma=0.0, eta=eta, kappa=gamma, train=True, looptext='pretrain',
         #                             tqdm_flag=tqdm_flag, recon_weight=0.0)
 
-        graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_min, newman_mapping, tqdm_flag=tqdm_flag)
+        graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
 
         if np.isnan(graph_loss):
             print("NaN encoutered, exiting...")
@@ -419,6 +420,7 @@ if __name__ == '__main__':
     parser.add_argument('-tau_rate', type=float, default= 0.004 )
     parser.add_argument('-tau_0', type=float, default= 2.36)
     parser.add_argument('-tau_min', type=float, default= 0.3)
+    parser.add_argument('-tau_pre', type=float, default= 0.3)
     parser.add_argument('-beta', type=float, default= 0.1)
     parser.add_argument('-gamma', type=float, default= 0.1)
     parser.add_argument('-eta', type=float, default= 0.1)

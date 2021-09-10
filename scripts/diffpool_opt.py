@@ -46,7 +46,7 @@ if params['id'] == 0:
             dict(name='nconv_pool', type='int', bounds=dict(min=2, max=7)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
-            dict(name='n_pretrain', type='int', bounds=dict(min=0, max=20)),
+            dict(name='n_pretrain', type='int', bounds=dict(min=0, max=10)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
@@ -54,7 +54,8 @@ if params['id'] == 0:
             dict(name='lr', type='double', bounds=dict(min=0.00002, max=0.0002), transformation="log"),
             dict(name='tau_rate', type='double', bounds=dict(min=0.00001, max=0.01), transformation="log"),
             dict(name='tau_0', type='double', bounds=dict(min=1.0, max=5.0)),
-            dict(name='tau_min', type='double', bounds=dict(min=0.1, max=1.0)),
+            dict(name='tau_min', type='double', bounds=dict(min=0.01, max=1.0)),
+            dict(name='tau_pre', type='double', bounds=dict(min=0.01, max=5.0))
         ],
         observation_budget=n_obs, # how many iterations to run for the optimization
         parallel_bandwidth=10,
