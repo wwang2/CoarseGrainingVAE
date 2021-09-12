@@ -158,7 +158,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
     for result in postfix:
         print(result)
     
-    return mean_kl, mean_recon, xyz, xyz_recon 
+    return mean_kl, mean_recon, mean_graph, xyz, xyz_recon 
 
 def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True):
 

@@ -24,6 +24,7 @@ from sklearn.model_selection import KFold
 import json
 import time
 from datetime import timedelta
+import pandas as pd
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
@@ -190,10 +191,16 @@ def run_cv(params):
         recon_loss_hist = []
         kl_loss_hist = []
         recon_hist = []
+        graph_his = []
+        lr_hist = []
+
+        # intialize training log 
+        train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_recon': [], 'val_recon': [],
+                   'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
 
         for epoch in range(nepochs):
             # train
-            mean_kl_train, mean_recon_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
+            mean_kl_train, mean_recon_train, mean_graph_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                        model, beta, epoch, 
                                                        train=True,
                                                         gamma=gamma,
@@ -202,7 +209,7 @@ def run_cv(params):
                                                         looptext='Ncg {} Fold {} train'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
 
-            mean_kl_val, mean_recon_val, xyz_val, xyz_val_recon = loop(valloader, optimizer, device,
+            mean_kl_val, mean_recon_val, mean_graph_val, xyz_val, xyz_val_recon = loop(valloader, optimizer, device,
                                                        model, beta, epoch, 
                                                        train=False,
                                                         gamma=gamma,
@@ -210,12 +217,16 @@ def run_cv(params):
                                                         kappa=kappa,
                                                         looptext='Ncg {} Fold {} test'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
-            
-            scheduler.step(mean_recon_val)
 
+            stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+                    'train_recon': mean_recon_train, 'val_recon': mean_recon_val,
+                   'train_KL': mean_kl_train, 'val_KL': mean_kl_val, 
+                   'train_graph': mean_graph_train, 'val_graph': mean_graph_val}
+
+            train_log = train_log.append(stats, ignore_index=True)
+
+            scheduler.step(mean_recon_val)
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
-            kl_loss_hist.append(mean_kl_train)
-            recon_loss_hist.append(mean_recon_train)
 
             # check NaN
             if np.isnan(mean_recon_val):
@@ -226,15 +237,12 @@ def run_cv(params):
                 print('converged')
                 break
 
-            del mean_kl_train, mean_recon_train, xyz_train, xyz_train_recon
-            del mean_kl_val, mean_recon_val, xyz_val, xyz_val_recon
-
         # dump model hyperparams 
         with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
             json.dump(params, outfile)
 
         # dump training curve 
-        np.savetxt(os.path.join(split_dir, 'train_loss_curve.txt'), np.vstack((np.array([recon_loss_hist]), np.array([kl_loss_hist]))))
+        train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
 
         # dump learning trajectory 
         recon_hist = np.concatenate(recon_hist)
