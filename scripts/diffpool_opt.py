@@ -4,7 +4,7 @@ import sys
 import os
 from run_diffpool import * 
 import shutil
-
+import copy 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-logdir", type=str)
@@ -84,7 +84,18 @@ while experiment.progress.observation_count < experiment.observation_budget:
 
     print("Suggestion ID: {}".format(suggestion.id))
 
-    test_recon, all_geds, failed, assign = run(trial)
+    exp_param = copy.deepcopy(trial)
+    baseline_param = copy.deepcopy(trial) 
+    exp_param['logdir'] = os.path.join(trial['logdir'], 'exp')
+
+    baseline_param['logdir'] = os.path.join(trial['logdir'], 'baseline')
+    baseline_param['cg_method'] = 'newman'
+
+    create_dir(trial['logdir'])
+    print("run experiments")
+    test_recon, all_geds, failed, assign = run(exp_param)
+    print("run baseline")
+    test_recon, all_geds, failed, assign = run(baseline_param)
 
     if params['det']:
         value = test_recon
