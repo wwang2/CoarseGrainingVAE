@@ -202,7 +202,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         mean_ent = np.array(ent_loss).mean()
         mean_KL = np.array(KL_loss).mean()
         
-        del loss_recon, loss_kl, loss_adj, loss_entropy, loss_recon
+        del loss_recon, loss_kl, loss_adj, loss_entropy
 
         postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
                     'avg. graph loss={:.4f}'.format(mean_graph),
