@@ -324,19 +324,20 @@ def run(params):
     
     failed = False 
 
-    for epoch in range(params['n_pretrain']):
-        model.train()
+    if cg_method = 'diff':
+        for epoch in range(params['n_pretrain']):
+            model.train()
 
-        graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
+            graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
 
-        if np.isnan(graph_loss):
-            print("NaN encoutered, exiting...")
-            failed = True
-            break 
+            if np.isnan(graph_loss):
+                print("NaN encoutered, exiting...")
+                failed = True
+                break 
 
-        if epoch % 5 == 0:
-            map_save_path = os.path.join(working_dir, 'pretrain_map_{}.png'.format(epoch) )
-            plot_map(assign[0], props['z'][0].numpy(), map_save_path)
+            if epoch % 5 == 0:
+                map_save_path = os.path.join(working_dir, 'pretrain_map_{}.png'.format(epoch) )
+                plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
     loss_log = []
 
