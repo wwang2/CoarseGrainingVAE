@@ -18,6 +18,7 @@ parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("-cg_method", type=str, default='diff')
 parser.add_argument("--dry_run", action='store_true', default=False)
 parser.add_argument("--tqdm_flag", action='store_true', default=False)
+parser.add_argument("--pretrain", action='store_true', default=False)
 parser.add_argument("--det", action='store_true', default=False)
 params = vars(parser.parse_args())
 
@@ -81,6 +82,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['n_data'] = params['n_data']
     trial['dataset'] = params['dataset']
     trial['det'] = params['det']
+    if params['pretrain'] == False:
+        trial['n_pretrain'] = 0
 
     print("Suggestion ID: {}".format(suggestion.id))
 
