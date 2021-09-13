@@ -114,6 +114,7 @@ def get_sample_rmsd(rmsd_samples, axis):
             rmsd_vals[res].append(rmsd_data[:, axis].mean())
             
     rmsd_mean = [np.array(val).mean() for val in list( rmsd_vals.values() )]
+    rmsd_std = [np.array(val).std() for val in list( rmsd_vals.values() )]
     cg_res = list( rmsd_vals.keys() )
 
     reorder = np.argsort(cg_res)
@@ -121,7 +122,7 @@ def get_sample_rmsd(rmsd_samples, axis):
 
     rmsd_mean = np.array(rmsd_mean)[reorder]
             
-    return cg_res, rmsd_mean
+    return cg_res, rmsd_mean, rmsd_std
 
 
 def get_cv(files, mask=None):
