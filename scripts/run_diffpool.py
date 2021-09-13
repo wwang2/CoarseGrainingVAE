@@ -23,6 +23,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt 
 from tqdm import tqdm 
 from sklearn.model_selection import train_test_split
+import json
+import pandas as pd 
 import torch.autograd.profiler as profiler
 
 def plot_map(assign, z, save_path=None):
@@ -98,7 +100,7 @@ def sample(loader, device, model, tau_min, tqdm_flag=True, working_dir=None):
     dump_numpy2xyz(xyz_samples[:50], atomic_nums, os.path.join(working_dir, 'test_samples.xyz'))
 
 
-    return all_rmsds, heavy_rmsds, all_geds, heavy_geds
+    return all_valid_rmsds, heavy_valid_rmsds, all_geds, heavy_geds
 
 
 def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
@@ -215,7 +217,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         for result in postfix:
             print(result)
     
-    return mean_recon, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
+    return mean_recon, mean_graph, mean_KL, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
 
 def run(params):
 
@@ -324,9 +326,6 @@ def run(params):
 
     for epoch in range(params['n_pretrain']):
         model.train()
-        # mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
-        #                             beta=0.0, gamma=0.0, eta=eta, kappa=gamma, train=True, looptext='pretrain',
-        #                             tqdm_flag=tqdm_flag, recon_weight=0.0)
 
         graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
 
@@ -340,25 +339,26 @@ def run(params):
             plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
     loss_log = []
+
+    train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_recon': [], 'val_recon': [],
+               'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
+
     # train     
     for epoch in range(n_epochs):
         model.train()
-        mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
+        mean_train_recon, mean_train_graph, mean_train_KL, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
                                         beta, gamma, eta,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
-        mean_val_recon, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
+        mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
                                         beta, gamma, eta,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
-        # # dump recon loss periodically 
-        # if epoch % 20 == 0: 
-        #     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-        #     model.eval()
-        #     mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_sched, epoch, beta, 
-        #                     gamma, eta, kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
-        #     dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon_{}.xyz'.format(epoch)))
+        stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+                'train_recon': mean_train_recon, 'val_recon': mean_val_recon,
+                'train_KL': mean_train_KL, 'val_KL': mean_val_KL, 
+                'train_graph': mean_train_graph, 'val_graph': mean_val_graph}
 
-        # validation for each epoch 
+        train_log = train_log.append(stats, ignore_index=True)
 
         if np.isnan(mean_train_recon):
             print("NaN encoutered, exiting...")
@@ -377,18 +377,40 @@ def run(params):
             break
 
     # dump log 
-    np.savetxt(os.path.join(working_dir, 'train_val_recon.txt'),  np.array(loss_log))
+#    np.savetxt(os.path.join(working_dir, 'train_val_recon.txt'),  np.array(loss_log))
+    train_log.to_csv(os.path.join(working_dir, 'train_log.csv'),  index=False)
 
     dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
 
     # test 
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_val_sched, epoch, beta, 
+    mean_test_recon, mean_test_graph, mean_test_KL, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_val_sched, epoch, beta, 
                                 gamma, eta, kappa, train=False, looptext='testing', tqdm_flag=tqdm_flag, tau_min=tau_min)
 
 
+    test_stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+            'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
+            'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
+            'train_graph': mean_train_graph, 'test_graph': mean_test_graph}
+
+    with open(os.path.join(working_dir, 'train_test_stats.json'), 'w') as f:
+        json.dump(test_stats, f)
+
     # sampling 
     all_rmsds, heavy_rmsds, all_geds, heavy_geds = sample(testloader,  device, model, tau_min, tqdm_flag=True, working_dir=working_dir)
+
+    mean_all_ged = np.array(all_geds).mean()
+    mean_heavy_ged = np.array(heavy_geds).mean()
+
+    if len(all_rmsds) != 0:
+        mean_all_rmsd = np.array(all_rmsds).mean()
+    else:
+        mean_all_rmsd = None
+
+    if len(heavy_rmsds) != 0:
+        mean_heavy_rmsd = np.array(heavy_rmsds).mean()
+    else:
+        mean_heavy_rmsd = None
 
     # dump train recon 
     dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
@@ -396,7 +418,17 @@ def run(params):
     print("train msd : {:.4f}".format(mean_train_recon))
     print("test msd : {:.4f}".format(mean_test_recon))
 
-    return mean_test_recon, np.array(all_geds).mean(), failed, assign
+
+    test_stats = { 'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
+            'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
+            'train_graph': mean_train_graph, 'test_graph': mean_test_graph,
+            'all atom ged': mean_all_ged, 'heavy atom ged': mean_heavy_ged, 
+            'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd}
+
+    with open(os.path.join(working_dir, 'train_test_stats.json'), 'w') as f:
+        json.dump(test_stats, f)
+
+    return mean_test_recon, mean_all_ged, failed, assign
 
 if __name__ == '__main__':
 
