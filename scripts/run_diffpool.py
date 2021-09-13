@@ -324,7 +324,7 @@ def run(params):
     
     failed = False 
 
-    if cg_method = 'diff':
+    if cg_method == 'diff':
         for epoch in range(params['n_pretrain']):
             model.train()
 
