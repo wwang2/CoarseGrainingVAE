@@ -99,7 +99,7 @@ def run_cv(params):
     kappa = params['kappa']
     mapshuffle = params['mapshuffle']
     threshold = params['threshold']
-    min_lr = 1e-8
+    min_lr = 5e-8
 
     if det:
         beta = 0.0
