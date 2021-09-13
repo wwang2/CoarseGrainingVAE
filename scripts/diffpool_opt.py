@@ -93,14 +93,16 @@ while experiment.progress.observation_count < experiment.observation_budget:
 
     create_dir(trial['logdir'])
     print("run experiments")
-    test_recon, all_geds, failed, assign = run(exp_param)
+    exp_recon, exp_geds, failed, assign = run(exp_param)
     print("run baseline")
-    test_recon, all_geds, failed, assign = run(baseline_param)
+
+    if not failed:
+        base_recon, base_geds, failed, assign = run(baseline_param)
 
     if params['det']:
-        value = test_recon
+        value = exp_recon
     else:
-        value = all_geds
+        value = exp_geds
 
     if not failed:
         conn.experiments(experiment.id).observations().create(
