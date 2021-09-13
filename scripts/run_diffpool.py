@@ -202,7 +202,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         mean_ent = np.array(ent_loss).mean()
         mean_KL = np.array(KL_loss).mean()
         
-        del loss_adj, loss_entropy, loss_recon
+        del loss_recon, loss_kl, loss_adj, loss_entropy, loss_recon
 
         postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
                     'avg. graph loss={:.4f}'.format(mean_graph),
@@ -320,7 +320,7 @@ def run(params):
     optimizer = torch.optim.Adam(model.parameters(),lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
                                                             factor=0.6, verbose=True, 
-                                                            threshold=1e-4,  min_lr=1e-7)
+                                                            threshold=1e-4,  min_lr=1e-8)
     
     failed = False 
 
@@ -374,7 +374,7 @@ def run(params):
         loss_log.append([mean_train_recon, mean_val_recon])
 
         # early stopping 
-        if optimizer.param_groups[0]['lr'] <= 1e-7:
+        if optimizer.param_groups[0]['lr'] <= 5e-8:
             break
 
     # dump log 
