@@ -233,7 +233,7 @@ def run_cv(params):
                 print("NaN encoutered, exiting...")
                 break 
 
-            if optimizer.param_groups[0]['lr'] <= min_lr:
+            if optimizer.param_groups[0]['lr'] <= min_lr * 1.5:
                 print('converged')
                 break
 
