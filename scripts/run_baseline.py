@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm 
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
+import re 
 
 def plot_map(assign, z, save_path=None):
     mapping = assign.detach().cpu().numpy().transpose()
@@ -83,13 +84,13 @@ def dist_loss(xyz, xyz_recon, nbr_list):
     
     return loss_dist 
 
-def get_methyl_idx(traj):   
+def get_methyl_idx(traj, graph):   
     methyl_index = {}
 
     for atom_name in list( traj.top.atoms): 
         if re.search('^(H)([A-Z]?)[1-3]', atom_name.name) is not None:
-            node = np.array(list(g.nodes()))[atom_name.index]
-            C_idx = [n.index for n in g.neighbors(node)][0]
+            node = np.array(list(graph.nodes()))[atom_name.index]
+            C_idx = [n.index for n in graph.neighbors(node)][0]
             if C_idx not in methyl_index.keys():  
                 methyl_index[C_idx] = [node.index]
             else:
@@ -108,9 +109,11 @@ def compute_HCH(xyz, methyl_index):
     return (HCH - (-0.333) ).pow(2).mean()
 
 
-def loop(loader, optimizer, device, model, epoch, train=True, looptext='', tqdm_flag=True):
+def loop(loader, optimizer, device, model, epoch, gamma, kappa, methyl_index, train=True, looptext='', tqdm_flag=True):
     
-    recon_loss = []
+    epoch_recon_loss = []
+    epoch_dist_loss = []
+    epoch_methyl_loss = []
     
     if train:
         model.train()
@@ -127,23 +130,33 @@ def loop(loader, optimizer, device, model, epoch, train=True, looptext='', tqdm_
         
     for batch in loader:     
         batch = batch_to(batch, device=device)
-        
+        nbr_list = batch['nbr_list']
         assign, xyz, xyz_recon = model(batch)
         
         # compute loss
-        loss_recon = (xyz_recon - xyz).pow(2).mean()
-        loss = loss_recon 
+        loss_recon = (xyz_recon - xyz).pow(2).mean() # recon loss
+        loss_dist = dist_loss(xyz, xyz_recon, nbr_list) # distance loss 
+        loss_methyl = compute_HCH(xyz_recon, methyl_index) # methyl cap loss 
+
+        loss = loss_recon + gamma * loss_dist + kappa * loss_methyl
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        recon_loss.append(loss_recon.item())
-        mean_recon = np.array(recon_loss).mean()
-        
-        del loss_recon
+        epoch_recon_loss.append(loss_recon.item())
+        epoch_dist_loss.append(loss_dist.item())
+        epoch_methyl_loss.append(loss_methyl.item())
 
-        postfix = ['avg. recon loss={:.4f}'.format(mean_recon)]
+        mean_recon = np.array(epoch_recon_loss).mean()
+        mean_dist = np.array(epoch_dist_loss).mean()
+        mean_methyl = np.array(epoch_methyl_loss).mean()
+        
+        del loss, loss_dist, loss_methyl
+
+        postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
+                    'avg. dist loss={:.4f}'.format(mean_dist),
+                    'avg. methyl loss={:.4f}'.format(mean_methyl)]
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
@@ -164,14 +177,15 @@ def run(params):
     lr = params['lr']
     tqdm_flag = params['tqdm_flag']
     n_data = params['ndata']
-
-
+    kappa = params['kappa']
+    gamma = params['gamma']
+    dataset_label = params['dataset']
+    cutoff = params['cutoff']
     create_dir(working_dir)
 
-    label = 'dipeptide'
-    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
-    pdb_file = PROTEINFILES[label]['pdb_path']
-    file_type = PROTEINFILES[label]['file_type']
+    traj_files = glob.glob(PROTEINFILES[dataset_label]['traj_paths'])[:200]
+    pdb_file = PROTEINFILES[dataset_label]['pdb_path']
+    file_type = PROTEINFILES[dataset_label]['file_type']
 
     trajs = [md.load_xtc(file,
                 top=pdb_file) for file in traj_files]
@@ -194,13 +208,14 @@ def run(params):
     props = get_diffpool_data(N_cg, trajs, n_data=n_data)
 
     dataset = DiffPoolDataset(props)
-    dataset.generate_neighbor_list(5.0)
+    dataset.generate_neighbor_list(cutoff)
 
     nsplits = 3
     kf = KFold(n_splits=nsplits)
 
     split_iter = kf.split(list(range(len(dataset))))
 
+    methyl_index = get_methyl_idx(trajs[0], g)
 
     cv_heavy_rmsd = []
     cv_all_rmsd = []
@@ -224,7 +239,9 @@ def run(params):
         trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
         pooler = CGpool(1, 16, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
         
-        model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
+        #model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
+
+        model = EquiLinear(pooler, N_cg, n_atoms).to(device)
         
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
@@ -236,7 +253,9 @@ def run(params):
         # train     
         for epoch in range(n_epochs):
         
-            mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model,  epoch, train=True, looptext='', tqdm_flag=tqdm_flag)
+            mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, 
+                                                                        epoch, gamma, kappa, methyl_index, 
+                                                                        train=True, looptext='', tqdm_flag=tqdm_flag)
 
             if np.isnan(mean_train_recon):
                 print("NaN encoutered, exiting...")
@@ -250,7 +269,7 @@ def run(params):
 
             scheduler.step(mean_train_recon)
 
-        dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
+        dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(split_dir, 'train_recon.xyz'))
 
         # test 
         testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
@@ -269,7 +288,7 @@ def run(params):
         test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
 
         # dump train recon 
-        dump_numpy2xyz(all_test_xyz_recon[:32], props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
+        dump_numpy2xyz(all_test_xyz_recon[:32], props['z'][0].numpy(), os.path.join(split_dir, 'test_recon.xyz'))
 
         print("split {}".format(i))
         print("test rmsd (all atoms): {:.4f}".format(test_all_rmsd))
@@ -302,13 +321,17 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-logdir', type=str)
+    parser.add_argument("-dataset", type=str, default='dipeptide')
     parser.add_argument('-device', type=int)
+    parser.add_argument('-cutoff', type=float, default=2.5)
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-N_cg', type=int, default= 3)
     parser.add_argument('-n_epochs', type=int, default= 50)
     parser.add_argument('-ndata', type=int, default= 2000)
     parser.add_argument("-cg_method", type=str, default='newman')
-    parser.add_argument('-lr', type=float, default=1e-4)
+    parser.add_argument('-lr', type=float, default=1e-3)
+    parser.add_argument('-gamma', type=float, default=0.0)
+    parser.add_argument('-kappa', type=float, default=0.0)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
 
     params = vars(parser.parse_args())
