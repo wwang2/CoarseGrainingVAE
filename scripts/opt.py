@@ -17,6 +17,7 @@ parser.add_argument("-nevals", type=int, default=24)
 parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-cg_method", type=str)
 parser.add_argument("-mapshuffle", type=float, default=0.0)
+parser.add_argument("-threshold", type=float, default=1e-4)
 parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("-n_splits", type=int, default=3)
 # parser.add_argument("-rmsd_wgt", type=float, default=1.0)
@@ -65,11 +66,11 @@ if params['id'] == 0:
             dict(name='atom_cutoff', type='double', bounds=dict(min=7.0, max=9.5)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=4)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
-            dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.01), transformation="log"),
-            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
+            dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.1), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=10.0), transformation="log"),
             # dict(name='eta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             # dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
-            dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.001), transformation="log"),
+            dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.0001), transformation="log"),
             dict(name='factor', type='double', bounds=dict(min=0.1, max=0.9), transformation="log"),
             dict(name='patience', type='int', bounds=dict(min=1, max=10)),
             #dict(name='n_epochs', type='int', bounds=dict(min=30, max=150)),
@@ -122,6 +123,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['eta'] = 0.0 
     trial['kappa'] = 0.0
     trial['mapshuffle'] = params['mapshuffle']
+    trial['threshold'] = params['threshold']
 
     print("Suggestion ID: {}".format(suggestion.id))
 
