@@ -75,6 +75,38 @@ def retrive_recon_structures(loader, device, model, tqdm_flag=True):
 
     return np.concatenate(all_xyz_data), np.concatenate(all_xyz_recon), np.array(heavy_ged).mean(), np.array(all_ged).mean()
 
+def dist_loss(xyz, xyz_recon, nbr_list):
+
+    gen_dist = (xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
+    data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
+    loss_dist = (gen_dist - data_dist).pow(2).mean()
+    
+    return loss_dist 
+
+def get_methyl_idx(traj):   
+    methyl_index = {}
+
+    for atom_name in list( traj.top.atoms): 
+        if re.search('^(H)([A-Z]?)[1-3]', atom_name.name) is not None:
+            node = np.array(list(g.nodes()))[atom_name.index]
+            C_idx = [n.index for n in g.neighbors(node)][0]
+            if C_idx not in methyl_index.keys():  
+                methyl_index[C_idx] = [node.index]
+            else:
+                methyl_index[C_idx] += [node.index]
+    
+    return methyl_index
+
+
+def compute_HCH(xyz, methyl_index):
+    ch_pair = torch.LongTensor( [[0, 1], [1, 2], [2,0]] )
+
+    for methyl in methyl_index.keys():
+        dCH = xyz[:, [methyl], :] - xyz[:, methyl_index[methyl], :]
+        HCH = (dCH[:, ch_pair[:,0 ]] * dCH[:, ch_pair[:,1]]).sum(-1)
+        
+    return (HCH - (-0.333) ).pow(2).mean()
+
 
 def loop(loader, optimizer, device, model, epoch, train=True, looptext='', tqdm_flag=True):
     
@@ -223,7 +255,6 @@ def run(params):
         # test 
         testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
         model.eval()
-    #    mean_test_recon, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model,  epoch, train=True, looptext='', tqdm_flag=tqdm_flag)
 
         all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged = retrive_recon_structures(testloader, device, model, tqdm_flag=True)
 

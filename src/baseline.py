@@ -33,9 +33,11 @@ class EquiLinear(nn.Module):
     def __init__(self, pooler, n_cgs, n_atoms):
         nn.Module.__init__(self)
         self.pooler = pooler 
-        self.B = nn.Parameter(torch.zeros(n_atoms, n_cgs ** 2))
+        self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs ** 2 + (n_cgs ** 2)**2 ) )
         
-    def forward(self, batch):
+        #self.B = nn.Parameter(torch.zeros(n_atoms, n_cgs ** 2 ) )
+        
+    def forward(self, batch, tau):
     
         xyz = batch['xyz']        
         device = xyz.device
@@ -46,16 +48,23 @@ class EquiLinear(nn.Module):
         soft_assign, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
-                                                                   tau=0.0,
+                                                                   tau=tau,
                                                                    gumbel=True)
-    
-    
         basis = cg_xyz.unsqueeze(1) - cg_xyz.unsqueeze(2)
+        B = basis.reshape(h.shape[0], -1, 3)
         
-        basis = basis.reshape(h.shape[0], -1, 3)
+        npair = B.shape[1]
+        nbatch = B.shape[0]
         
+        Bij = B.unsqueeze(1).expand(-1, npair, -1, -1).reshape(nbatch, -1,  3)
+        Bjk = B.unsqueeze(2).expand(-1, -1, npair, -1).reshape(nbatch, -1, 3)
+        
+        cross_basis = torch.cross(Bij, Bjk, dim=-1)
+        B = torch.cat((B, cross_basis), dim=1)
+
         dx = xyz - cg_xyz[:, self.pooler.assign_idx, :]
         
-        dx_recon = torch.einsum("ije,nj->ine", basis, self.B )
-        
-        return dx, dx_recon 
+        dx_recon = torch.einsum("ije,nj->ine", B, self.B )
+        xyz_recon = cg_xyz[:, self.pooler.assign_idx, :] + dx_recon
+    
+        return soft_assign, xyz, xyz_recon
