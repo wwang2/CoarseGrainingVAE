@@ -16,6 +16,7 @@ parser.add_argument("-ndata", type=int, default=3000)
 parser.add_argument("-nevals", type=int, default=24)
 parser.add_argument("-n_cgs", type=int)
 parser.add_argument("-cg_method", type=str)
+parser.add_argument("-mapshuffle", type=float)
 parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("-n_splits", type=int, default=3)
 # parser.add_argument("-rmsd_wgt", type=float, default=1.0)
@@ -120,6 +121,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['det'] = params['det'] 
     trial['eta'] = 0.0 
     trial['kappa'] = 0.0
+    trial['mapshuffle'] = params['mapshuffle']
 
     print("Suggestion ID: {}".format(suggestion.id))
 
