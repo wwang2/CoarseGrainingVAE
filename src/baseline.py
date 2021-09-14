@@ -8,7 +8,7 @@ class Baseline(nn.Module):
     def __init__(self, pooler, n_cgs, n_atoms):
         nn.Module.__init__(self)
         self.pooler = pooler 
-        self.B = nn.Parameter(torch.zeros(n_cgs, n_atoms))
+        self.B = nn.Parameter(0.01 * torch.randn(n_cgs, n_atoms))
         
     def forward(self, batch):
     
@@ -37,7 +37,7 @@ class EquiLinear(nn.Module):
         
         #self.B = nn.Parameter(torch.zeros(n_atoms, n_cgs ** 2 ) )
         
-    def forward(self, batch, tau):
+    def forward(self, batch):
     
         xyz = batch['xyz']        
         device = xyz.device
@@ -48,7 +48,7 @@ class EquiLinear(nn.Module):
         soft_assign, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
-                                                                   tau=tau,
+                                                                   tau=0.0,
                                                                    gumbel=True)
         basis = cg_xyz.unsqueeze(1) - cg_xyz.unsqueeze(2)
         B = basis.reshape(h.shape[0], -1, 3)
