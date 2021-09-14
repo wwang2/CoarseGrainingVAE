@@ -39,7 +39,7 @@ if params['id'] == 0:
         name=params['logdir'],
         metrics=[dict(name='recon', objective='minimize')],
         parameters=[
-            dict(name='num_features', type='int', bounds=dict(min=128, max=600)),
+            dict(name='num_features', type='int', bounds=dict(min=64, max=600)),
             dict(name='n_rbf', type='int', bounds=dict(min=5, max=20)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
             dict(name='cutoff', type='double', bounds=dict(min=4.0, max=9.0)),
