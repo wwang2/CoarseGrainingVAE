@@ -208,10 +208,10 @@ def run_cv(params):
                             atomwise_z=atom_decode_flag, det=det).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=patience, 
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=int(patience//2), 
                                                                 factor=factor, verbose=True, 
                                                                 threshold=threshold,  min_lr=min_lr)
-        early_stopping = EarlyStopping(patience=10)
+        early_stopping = EarlyStopping(patience=patience)
         
         model.train()
 
