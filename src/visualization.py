@@ -40,7 +40,7 @@ def xyz_grid_view(xyzs, atomic_nums, num_atoms, n_w, n_h, grid_scale=1.5, grid_d
     
     return atoms 
 
-def rotate_grid(allatoms, nsamples, axis='x', skip=3):
+def rotate_grid(allatoms, nsamples, axis='x', skip=10):
 
     rotate_trajs = []
     start_frame = allatoms.positions.reshape(nsamples, -1, 3)
