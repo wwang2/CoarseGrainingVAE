@@ -124,6 +124,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['kappa'] = 0.0
     trial['mapshuffle'] = params['mapshuffle']
     trial['threshold'] = params['threshold']
+    trial['savemodel'] = False
 
     print("Suggestion ID: {}".format(suggestion.id))
 

@@ -125,6 +125,7 @@ def run_cv(params):
     kappa = params['kappa']
     mapshuffle = params['mapshuffle']
     threshold = params['threshold']
+    savemodel = params['savemodel']
     min_lr = 5e-8
 
     if det:
@@ -334,8 +335,9 @@ def run_cv(params):
         cv_heavy_rmsd.append(unaligned_test_heavy_rmsd)
 
         # save model 
-        model = model.to('cpu')
-        torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
+        if savemodel:
+            model = model.to('cpu')
+            torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
 
         ##### generate rotating movies for visualization #####
         n_w = 3
@@ -509,7 +511,9 @@ if __name__ == '__main__':
     parser.add_argument("--cg_radius_graph", action='store_true', default=False)
 
 
+
     params = vars(parser.parse_args())
+    params['savemodel'] = True
 
     # add more info about this job 
     if params['det']:
