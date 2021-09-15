@@ -366,7 +366,7 @@ def run(params):
             failed = True
             break 
             
-        if epoch % 5 == 0:
+        if epoch % 50 == 0:
             map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
             plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
