@@ -84,32 +84,34 @@ def dist_loss(xyz, xyz_recon, nbr_list):
     
     return loss_dist 
 
-def get_methyl_idx(traj, graph):   
-    methyl_index = {}
+def get_tetra_idx(traj, g):   
+    tetra_index = {}
 
-    for atom_name in list( traj.top.atoms): 
-        if re.search('^(H)([A-Z]?)[1-3]', atom_name.name) is not None:
-            node = np.array(list(graph.nodes()))[atom_name.index]
-            C_idx = [n.index for n in graph.neighbors(node)][0]
-            if C_idx not in methyl_index.keys():  
-                methyl_index[C_idx] = [node.index]
-            else:
-                methyl_index[C_idx] += [node.index]
-    
-    return methyl_index
+    for atom in list(traj.top.atoms):
+        if atom.element.atomic_number == 6:
+            nbr_list = []
+            for n in g.neighbors(atom):
+                #if n.element.atomic_number == 1:
+                    nbr_list.append(n.index)
+            if len(nbr_list) == 4: 
+                tetra_index[atom.index] = nbr_list
+    return tetra_index
 
 
-def compute_HCH(xyz, methyl_index):
-    ch_pair = torch.LongTensor( [[0, 1], [1, 2], [2,0]] )
 
-    for methyl in methyl_index.keys():
-        dCH = xyz[:, [methyl], :] - xyz[:, methyl_index[methyl], :]
-        HCH = (dCH[:, ch_pair[:,0 ]] * dCH[:, ch_pair[:,1]]).sum(-1)
+def compute_HCH(xyz, tetra_index):
+    ch_pair = torch.triu(torch.ones(4, 4), diagonal=1).nonzero()
+
+    for methyl in tetra_index.keys():
+        dCH = xyz[:, [methyl], :] - xyz[:, tetra_index[methyl], :]
+        norm = dCH.pow(2).sum(-1).sqrt()
+        dCH = dCH / norm.unsqueeze(-1)
+        HCH = (dCH[:, ch_pair[:,0 ]] * dCH[:, ch_pair[:,1]]).sum(-1) 
         
     return (HCH - (-0.333) ).pow(2).mean()
 
 
-def loop(loader, optimizer, device, model, epoch, gamma, kappa, methyl_index, train=True, looptext='', tqdm_flag=True):
+def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, train=True, looptext='', tqdm_flag=True):
     
     epoch_recon_loss = []
     epoch_dist_loss = []
@@ -136,7 +138,7 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, methyl_index, tr
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean() # recon loss
         loss_dist = dist_loss(xyz, xyz_recon, nbr_list) # distance loss 
-        loss_methyl = compute_HCH(xyz_recon, methyl_index) # methyl cap loss 
+        loss_methyl = compute_HCH(xyz_recon, tetra_index) # methyl cap loss 
 
         loss = loss_recon + gamma * loss_dist + kappa * loss_methyl
 
@@ -181,6 +183,7 @@ def run(params):
     gamma = params['gamma']
     dataset_label = params['dataset']
     cutoff = params['cutoff']
+    cross = params['cross']
     create_dir(working_dir)
 
     traj_files = glob.glob(PROTEINFILES[dataset_label]['traj_paths'])[:200]
@@ -215,7 +218,8 @@ def run(params):
 
     split_iter = kf.split(list(range(len(dataset))))
 
-    methyl_index = get_methyl_idx(trajs[0], g)
+    tetra_index = get_tetra_idx(trajs[0], g)
+
 
     cv_heavy_rmsd = []
     cv_all_rmsd = []
@@ -241,7 +245,7 @@ def run(params):
         
         #model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
 
-        model = EquiLinear(pooler, N_cg, n_atoms).to(device)
+        model = EquiLinear(pooler, N_cg, n_atoms, cross=cross).to(device)
         
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
@@ -254,7 +258,7 @@ def run(params):
         for epoch in range(n_epochs):
         
             mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, 
-                                                                        epoch, gamma, kappa, methyl_index, 
+                                                                        epoch, gamma, kappa, tetra_index, 
                                                                         train=True, looptext='', tqdm_flag=tqdm_flag)
 
             if np.isnan(mean_train_recon):
@@ -333,6 +337,7 @@ if __name__ == '__main__':
     parser.add_argument('-gamma', type=float, default=0.0)
     parser.add_argument('-kappa', type=float, default=0.0)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
+    parser.add_argument("--cross", action='store_true', default=False)
 
     params = vars(parser.parse_args())
 
