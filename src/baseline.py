@@ -8,7 +8,7 @@ class Baseline(nn.Module):
     def __init__(self, pooler, n_cgs, n_atoms):
         nn.Module.__init__(self)
         self.pooler = pooler 
-        self.B = nn.Parameter(0.01 * torch.randn(n_cgs, n_atoms))
+        self.B = nn.Parameter(0.0 * torch.randn(n_cgs, n_atoms))
         
     def forward(self, batch):
     
@@ -30,12 +30,15 @@ class Baseline(nn.Module):
 
 
 class EquiLinear(nn.Module):
-    def __init__(self, pooler, n_cgs, n_atoms):
+    def __init__(self, pooler, n_cgs, n_atoms, cross):
         nn.Module.__init__(self)
         self.pooler = pooler 
-        self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs ** 2 + (n_cgs ** 2)**2 ) )
-        
-        #self.B = nn.Parameter(torch.zeros(n_atoms, n_cgs ** 2 ) )
+        if cross:
+            self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs ** 2 + (n_cgs ** 2)**2 ) )
+        else:
+            self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs ** 2 ) )
+
+        self.cross = cross
         
     def forward(self, batch):
     
@@ -53,16 +56,18 @@ class EquiLinear(nn.Module):
         basis = cg_xyz.unsqueeze(1) - cg_xyz.unsqueeze(2)
         B = basis.reshape(h.shape[0], -1, 3)
         
-        npair = B.shape[1]
-        nbatch = B.shape[0]
-        
-        Bij = B.unsqueeze(1).expand(-1, npair, -1, -1).reshape(nbatch, -1,  3)
-        Bjk = B.unsqueeze(2).expand(-1, -1, npair, -1).reshape(nbatch, -1, 3)
-        
-        cross_basis = torch.cross(Bij, Bjk, dim=-1)
-        B = torch.cat((B, cross_basis), dim=1)
 
-        dx = xyz - cg_xyz[:, self.pooler.assign_idx, :]
+        if self.cross:
+            npair = B.shape[1]
+            nbatch = B.shape[0]
+            
+            Bij = B.unsqueeze(1).expand(-1, npair, -1, -1).reshape(nbatch, -1,  3)
+            Bjk = B.unsqueeze(2).expand(-1, -1, npair, -1).reshape(nbatch, -1, 3)
+            
+            cross_basis = torch.cross(Bij, Bjk, dim=-1)
+            B = torch.cat((B, cross_basis), dim=1)
+
+        #dx = xyz - cg_xyz[:, self.pooler.assign_idx, :]
         
         dx_recon = torch.einsum("ije,nj->ine", B, self.B )
         xyz_recon = cg_xyz[:, self.pooler.assign_idx, :] + dx_recon
