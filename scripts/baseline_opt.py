@@ -37,7 +37,7 @@ if params['id'] == 0:
         name=params['logdir'],
         metrics=[dict(name='recon', objective='minimize')],
         parameters=[
-            dict(name='cutoff', type='double', bounds=dict(min=4.0, max=9.0)),
+            dict(name='cutoff', type='double', bounds=dict(min=2.0, max=9.0)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='kappa', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
