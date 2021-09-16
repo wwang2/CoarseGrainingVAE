@@ -223,12 +223,12 @@ def run_cv(params):
         lr_hist = []
 
         # intialize training log 
-        train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_recon': [], 'val_recon': [],
+        train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 'train_recon': [], 'val_recon': [],
                    'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
 
         for epoch in range(nepochs):
             # train
-            mean_kl_train, mean_recon_train, mean_graph_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
+            train_loss, mean_kl_train, mean_recon_train, mean_graph_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                        model, beta, epoch, 
                                                        train=True,
                                                         gamma=gamma,
@@ -237,7 +237,7 @@ def run_cv(params):
                                                         looptext='Ncg {} Fold {} train'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
 
-            mean_kl_val, mean_recon_val, mean_graph_val, xyz_val, xyz_val_recon = loop(valloader, optimizer, device,
+            val_loss, mean_kl_val, mean_recon_val, mean_graph_val, xyz_val, xyz_val_recon = loop(valloader, optimizer, device,
                                                        model, beta, epoch, 
                                                        train=False,
                                                         gamma=gamma,
@@ -247,13 +247,14 @@ def run_cv(params):
                                                         tqdm_flag=tqdm_flag)
 
             stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+                    'train_loss': train_loss, 'val_loss': val_loss, 
                     'train_recon': mean_recon_train, 'val_recon': mean_recon_val,
                    'train_KL': mean_kl_train, 'val_KL': mean_kl_val, 
                    'train_graph': mean_graph_train, 'val_graph': mean_graph_val}
 
             train_log = train_log.append(stats, ignore_index=True)
 
-            scheduler.step(mean_recon_val)
+            scheduler.step(val_loss)
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
 
             # check NaN
@@ -265,8 +266,7 @@ def run_cv(params):
                 print('converged')
                 break
 
-
-            early_stopping(mean_recon_val + mean_graph_val * gamma)
+            early_stopping(val_loss)
             if early_stopping.early_stop:
                 break
 

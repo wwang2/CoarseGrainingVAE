@@ -49,6 +49,7 @@ def batch_to(batch, device):
 def loop(loader, optimizer, device, model, beta, epoch, 
         gamma, eta=0.0, kappa=0.0, train=True, looptext='', tqdm_flag=True):
     
+    total_loss = []
     recon_loss = []
     orient_loss = []
     norm_loss = []
@@ -133,16 +134,19 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # orient_loss.append(loss_dx_orient.item())
         # norm_loss.append(loss_dx_norm.item())
         graph_loss.append(loss_graph.item())
+        total_loss.append(loss.item())
         
         mean_kl = np.array(kl_loss).mean()
         mean_recon = np.array(recon_loss).mean()
         # mean_orient = np.array(orient_loss).mean()
         # mean_norm = np.array(norm_loss).mean()
         mean_graph = np.array(graph_loss).mean()
+        mean_total_loss = np.array(total_loss).mean()
         
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
-        postfix = ['KL={:.4f}'.format(mean_kl) , 
+        postfix = ['total={:.3f}'.format(mean_total_loss),
+                    'KL={:.4f}'.format(mean_kl) , 
                    'recon={:.4f}'.format(mean_recon),
                    # 'norm={:.4f}'.format(mean_norm) , 
                    # 'orient={:.4f}'.format(mean_orient),
@@ -158,7 +162,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
     for result in postfix:
         print(result)
     
-    return mean_kl, mean_recon, mean_graph, xyz, xyz_recon 
+    return mean_total_loss, mean_kl, mean_recon, mean_graph, xyz, xyz_recon 
 
 def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True):
 
