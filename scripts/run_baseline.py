@@ -213,7 +213,7 @@ def run(params):
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
 
-    nsplits = 3
+    nsplits = 2
     kf = KFold(n_splits=nsplits)
 
     split_iter = kf.split(list(range(len(dataset))))
@@ -319,7 +319,7 @@ def run(params):
     print("heavy ged diff {} +- {}".format(cv_heavy_ged.mean(), cv_heavy_ged.std()) )
     print("all ged diff {} +- {}".format(cv_all_ged.mean(), cv_all_ged.std()) )
 
-    return cv_all_rmsd, cv_heavy_rmsd, failed, assign
+    return cv_all_rmsd, cv_all_ged, failed, assign
 
 if __name__ == '__main__':
 
