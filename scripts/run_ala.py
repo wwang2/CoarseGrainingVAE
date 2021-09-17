@@ -12,6 +12,7 @@ from utils import *
 from visualization import xyz_grid_view, rotate_grid
 #from plots import *
 from sampling import * 
+from utils import * 
 import torch
 from torch import nn
 from torch.nn import Sequential 
@@ -60,32 +61,6 @@ def shuffle_traj(traj):
     full_idx = list(range(len(traj)))
     full_idx = shuffle(full_idx)
     return traj[full_idx]
-
-class EarlyStopping():
-    '''from https://debuggercafe.com/using-learning-rate-scheduler-and-early-stopping-with-pytorch/'''
-    def __init__(self, patience=5, min_delta=0):
-        """
-        :param patience: how many epochs to wait before stopping when loss is
-               not improving
-        :param min_delta: minimum difference between new loss and old loss for
-               new loss to be considered as an improvement
-        """
-        self.patience = patience
-        self.min_delta = min_delta
-        self.counter = 0
-        self.best_loss = None
-        self.early_stop = False
-    def __call__(self, val_loss):
-        if self.best_loss == None:
-            self.best_loss = val_loss
-        elif self.best_loss - val_loss > self.min_delta:
-            self.best_loss = val_loss
-        elif self.best_loss - val_loss < self.min_delta:
-            self.counter += 1
-            print(f"INFO: Early stopping counter {self.counter} of {self.patience}")
-            if self.counter >= self.patience:
-                print('INFO: Early stopping')
-                self.early_stop = True
 
 def run_cv(params):
     failed = False

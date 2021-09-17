@@ -137,6 +137,7 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
 def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         gamma, kappa, train=True, looptext='', tqdm_flag=True, recon_weight=1.0, tau_min=None):
     
+    all_loss = []
     recon_loss = []
     adj_loss = []
     ent_loss = []
@@ -190,6 +191,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         else:
             loss.backward()
 
+        all_loss.append(loss.item())
         recon_loss.append(loss_recon.item())
         adj_loss.append(loss_adj.item())
         ent_loss.append(loss_entropy.item())
@@ -201,10 +203,12 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         mean_adj = np.array(adj_loss).mean()
         mean_ent = np.array(ent_loss).mean()
         mean_KL = np.array(KL_loss).mean()
+        mean_loss = np.array(all_loss).mean()
         
         del loss_recon, loss_kl, loss_adj, loss_entropy
 
-        postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
+        postfix = ['avg. total loss={:.4f}'.format(mean_loss),
+                    'avg. recon loss={:.4f}'.format(mean_recon),
                     'avg. graph loss={:.4f}'.format(mean_graph),
                     'avg. KL loss={:.4f}'.format(mean_KL),
                    'avg. adj loss={:.4f}'.format(mean_adj),
@@ -217,7 +221,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         for result in postfix:
             print(result)
     
-    return mean_recon, mean_graph, mean_KL, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
+    return mean_loss, mean_recon, mean_graph, mean_KL, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
 
 def run(params):
 
@@ -321,6 +325,8 @@ def run(params):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
                                                             factor=0.6, verbose=True, 
                                                             threshold=1e-4,  min_lr=1e-8)
+
+    early_stopping = EarlyStopping(patience=10)
     
     failed = False 
 
@@ -341,20 +347,22 @@ def run(params):
 
     loss_log = []
 
-    train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_recon': [], 'val_recon': [],
+    train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 
+                'train_recon': [], 'val_recon': [],
                'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
 
     # train     
     for epoch in range(n_epochs):
         model.train()
-        mean_train_recon, mean_train_graph, mean_train_KL, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
+        mean_train_loss, mean_train_recon, mean_train_graph, mean_train_KL, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
                                         beta, gamma, eta,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
-        mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
+        mean_val_loss, mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
                                         beta, gamma, eta,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
 
         stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+                'train_loss': mean_train_loss, 'val_loss': mean_val_loss, 
                 'train_recon': mean_train_recon, 'val_recon': mean_val_recon,
                 'train_KL': mean_train_KL, 'val_KL': mean_val_KL, 
                 'train_graph': mean_train_graph, 'val_graph': mean_val_graph}
@@ -370,11 +378,15 @@ def run(params):
             map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
             plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
-        scheduler.step(mean_val_recon)
+        scheduler.step(mean_val_loss)
         loss_log.append([mean_train_recon, mean_val_recon])
 
         # early stopping 
         if optimizer.param_groups[0]['lr'] <= 5e-8:
+            break
+
+        early_stopping(mean_val_loss)
+        if early_stopping.early_stop:
             break
 
     # dump log 
