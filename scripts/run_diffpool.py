@@ -397,7 +397,7 @@ def run(params):
 
     # test 
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    mean_test_recon, mean_test_graph, mean_test_KL, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_val_sched, epoch, beta, 
+    mean_test_loss, mean_test_recon, mean_test_graph, mean_test_KL, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_val_sched, epoch, beta, 
                                 gamma, eta, kappa, train=False, looptext='testing', tqdm_flag=tqdm_flag, tau_min=tau_min)
 
 
