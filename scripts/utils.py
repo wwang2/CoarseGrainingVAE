@@ -112,10 +112,10 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
 
         # add graph loss 
-        nbr_list = batch['nbr_list']
+        edge_list = batch['edge_list']
         xyz = batch['nxyz'][:, 1:]
-        gen_dist = (xyz_recon[nbr_list[:, 0 ]] - xyz_recon[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
-        data_dist = (xyz[nbr_list[:, 0 ]] - xyz[nbr_list[:, 1 ]]).pow(2).sum(-1).sqrt()
+        gen_dist = (xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
+        data_dist = (xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         # add orientation loss 
