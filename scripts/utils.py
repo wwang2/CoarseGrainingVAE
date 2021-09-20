@@ -112,7 +112,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
 
         # add graph loss 
-        edge_list = batch['edge_list']
+        edge_list = batch['bond_edge_list']
         xyz = batch['nxyz'][:, 1:]
         gen_dist = (xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
         data_dist = (xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()

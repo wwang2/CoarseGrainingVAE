@@ -141,15 +141,15 @@ class CGDataset(TorchDataset):
     def generate_neighbor_list(self, atom_cutoff, cg_cutoff, device='cpu', undirected=True):
 
         # todo : create progress bar
-        edge_list = []
+        #edge_list = []
         nbr_list = []
         cg_nbr_list = []
 
         for nxyz in tqdm(self.props['nxyz'], desc='building nbr list', file=sys.stdout):
             nbr_list.append(get_neighbor_list(nxyz[:, 1:4], device, atom_cutoff, undirected).to("cpu"))
 
-        for nxyz in tqdm(self.props['nxyz'], desc='building edge list', file=sys.stdout):
-            edge_list.append(get_neighbor_list(nxyz[:, 1:4], device, 3.0, undirected).to("cpu"))
+        # for nxyz in tqdm(self.props['nxyz'], desc='building edge list', file=sys.stdout):
+        #     edge_list.append(get_neighbor_list(nxyz[:, 1:4], device, 3.0, undirected).to("cpu"))
 
         if cg_cutoff is not None:    
             for nxyz in tqdm(self.props['CG_nxyz'], desc='building CG nbr list', file=sys.stdout):
@@ -180,7 +180,7 @@ class CGDataset(TorchDataset):
 
         self.props['nbr_list'] = nbr_list
         self.props['CG_nbr_list'] = cg_nbr_list
-        self.props['edge_list'] = edge_list
+        #self.props['edge_list'] = edge_list
 
 
 def CG_collate(dicts):
@@ -193,7 +193,7 @@ def CG_collate(dicts):
     for n, d in zip(cumulative_atoms, dicts):
         #if 'nbr_list' in d:
         d['nbr_list'] = d['nbr_list'] + int(n)
-        d['edge_list'] = d['edge_list'] + int(n)
+        d['bond_edge_list'] = d['bond_edge_list'] + int(n)
             
     for n, d in zip(cumulative_CGs, dicts):
        # if 'CGmapping' in d:

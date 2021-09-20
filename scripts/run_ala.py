@@ -43,6 +43,7 @@ def build_split_dataset(traj, params, mapping=None):
                         params['cg_cutoff'],
                         atomic_nums,
                         traj.top,
+                        order=params['edgeorder'] ,
                         cg_traj=cg_coord)
     # get n_atoms 
     if params['cg_radius_graph']:
@@ -466,6 +467,7 @@ if __name__ == '__main__':
     parser.add_argument("-nsamples", type=int, default=200)
     parser.add_argument("-n_ensemble", type=int, default=16)
     parser.add_argument("-nevals", type=int, default=36)
+    parser.add_argument("-edgeorder", type=int, default=2)
     parser.add_argument("-beta", type=float, default=0.001)
     parser.add_argument("-gamma", type=float, default=0.01)
     parser.add_argument("-eta", type=float, default=0.01)
