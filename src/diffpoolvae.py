@@ -29,7 +29,7 @@ class DiffPoolVAE(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=tau,
@@ -47,7 +47,11 @@ class DiffPoolVAE(nn.Module):
 
         H, V = self.decoder(H_sample, cg_adj, cg_xyz)
         dx = torch.einsum('bcae,bac->bae', V, soft_assign)
-        x_sample = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) + dx
+        # re-centering 
+        cg_offset = torch.einsum("bin,bij->bjn", dx, assign_norm)
+        cg_offset_lift = torch.einsum('bce,bac->bae', cg_offset, soft_assign)
+
+        x_sample = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) - cg_offset_lift + dx
 
         return x_sample, H_prior_mu, H_prior_sigma
         
@@ -59,7 +63,7 @@ class DiffPoolVAE(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=tau,
@@ -87,9 +91,7 @@ class DiffPoolVAE(nn.Module):
         H, V = self.decoder(H_repar, cg_adj, cg_xyz)
         dx = torch.einsum('bcae,bac->bae', V, soft_assign)
         # re-centering 
-
-        _, _, _, _, cg_offset, _ = self.pooler(z, dx, batch['bonds'], tau=tau, gumbel=True)
-
+        cg_offset = torch.einsum("bin,bij->bjn", dx, assign_norm)
         cg_offset_lift = torch.einsum('bce,bac->bae', cg_offset, soft_assign)
 
         x_recon = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) - cg_offset_lift + dx
@@ -192,7 +194,7 @@ class CGpool(nn.Module):
         # compute weighted adjacency 
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
 
-        return assign, h, H, adj, cg_xyz, cg_adj
+        return assign, assign_norm,  h, H, adj, cg_xyz, cg_adj
 
 
 class DenseContract(nn.Module):

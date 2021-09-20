@@ -48,7 +48,7 @@ class EquiLinear(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=0.0,
@@ -70,6 +70,11 @@ class EquiLinear(nn.Module):
         #dx = xyz - cg_xyz[:, self.pooler.assign_idx, :]
         
         dx_recon = torch.einsum("ije,nj->ine", B, self.B )
-        xyz_recon = cg_xyz[:, self.pooler.assign_idx, :] + dx_recon
+
+        # recentering 
+        cg_offset = torch.einsum("bin,bij->bjn", dx, assign_norm)
+        cg_offset_lift = cg_offset[:, self.pooler.assign_idx, :]
+
+        xyz_recon = cg_xyz[:, self.pooler.assign_idx, :] - cg_offset_lift + dx_recon
     
         return soft_assign, xyz, xyz_recon
