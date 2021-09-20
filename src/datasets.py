@@ -34,7 +34,7 @@ PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-1144
                             }}
 
 
-def get_diffpool_data(N_cg, trajs, n_data):
+def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1):
     props = {}
 
     num_cgs = []
@@ -42,7 +42,8 @@ def get_diffpool_data(N_cg, trajs, n_data):
 
     z_data = []
     xyz_data = []
-    graph_data = []
+    bond_data = []
+    hyperedge_data = []
 
     for traj in trajs:
         atomic_nums, protein_index = get_atomNum(traj)
@@ -50,24 +51,27 @@ def get_diffpool_data(N_cg, trajs, n_data):
         frames = traj.xyz[:, protein_index, :] * 10.0 # from nm to Angstrom
 
         bondgraph = traj.top.to_bondgraph()
-        edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
+        bond_edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
+        hyper_edges = get_high_order_edge(bond_edges, edgeorder, n_atoms)
 
         for xyz in frames: 
             z_data.append(torch.Tensor(atomic_nums))
             coord = torch.Tensor(xyz)
             xyz_data.append(coord)
-            graph_data.append(edges)
+            bond_data.append(bond_edges)
+            hyperedge_data.append(hyper_edges)
             num_cgs.append(torch.LongTensor([N_cg]))
             num_atoms.append(torch.LongTensor([n_atoms]))
 
-    z_data, xyz_data, num_atoms, num_cgs, graph_data = shuffle( z_data, xyz_data, num_atoms, num_cgs, graph_data)
+    z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data = shuffle( z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data)
 
 
     props = {'z': z_data[:n_data],
          'xyz': xyz_data[:n_data],
          'num_atoms': num_atoms[:n_data], 
          'num_CGs':num_cgs[:n_data],
-         'bond_edge_list': graph_data[:n_data]
+         'bond': bond_data[:n_data],
+         'hyperedge': hyperedge_data[:n_data]
         }
 
     return props
@@ -262,6 +266,18 @@ def get_traj(pdb, files, n_frames, shuffle=False):
 # need a function to get mapping, and CG coordinates simultanesouly. We can have alpha carbon as the CG site
 
 
+def get_high_order_edge(edges, order, natoms):
+
+    # get adj 
+    adj = torch.zeros(natoms, natoms)
+    adj[edges[:,0], edges[:,1]] = 1
+    adj[edges[:,1], edges[:,0]] = 1
+
+    # get higher edges 
+    edges = torch.triu(get_higher_order_adj_matrix(adj, order=order)).nonzero()
+
+    return edges 
+
 def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, order=1, cg_traj=None):
     
     CG_nxyz_data = []
@@ -274,14 +290,15 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, order
     bondgraph = top.to_bondgraph()
 
     edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
+    edges = get_high_order_edge(edges, order, atomic_nums.shape[0])
 
-    # get adj 
-    adj = torch.ones(atomic_nums.shape[0], atomic_nums.shape[0])
-    adj[edges[:,0], edges[:,1]] = 1
-    adj[edges[:,1], edges[:,0]] = 1
+    # # get adj 
+    # adj = torch.ones(atomic_nums.shape[0], atomic_nums.shape[0])
+    # adj[edges[:,0], edges[:,1]] = 1
+    # adj[edges[:,1], edges[:,0]] = 1
 
-    # get higher edges 
-    edges = torch.triu(get_higher_order_adj_matrix(adj, order=order)).nonzero()
+    # # get higher edges 
+    # edges = torch.triu(get_higher_order_adj_matrix(adj, order=order)).nonzero()
 
     for xyz in traj:
         nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)

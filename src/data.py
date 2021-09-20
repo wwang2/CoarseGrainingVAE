@@ -87,13 +87,19 @@ def DiffPool_collate(dicts):
     zs, z_pad = padding_tensor([dict['z'] for dict in dicts])
     
     bonds_batch = []
-    bonds = [dict['bond_edge_list'] for dict in dicts]
+    bonds = [dict['bond'] for dict in dicts]
+    hyperedge_batch = []
+    hyperedges = [dict['hyperedge'] for dict in dicts]
     nbrs_batch = []
     nbrs = [dict['nbr_list'] for dict in dicts]
     
     for i, bond in enumerate(bonds):
         batch_index = torch.LongTensor([i] * bond.shape[0])        
         bonds_batch.append((torch.cat( (batch_index.unsqueeze(-1), bond),dim=-1 ) )) 
+
+    for i, bond in enumerate(hyperedges):
+        batch_index = torch.LongTensor([i] * bond.shape[0])        
+        hyperedge_batch.append((torch.cat( (batch_index.unsqueeze(-1), bond),dim=-1 ) )) 
         
     for i, nbr in enumerate(nbrs):
         batch_index = torch.LongTensor([i] * nbr.shape[0])        
@@ -101,8 +107,9 @@ def DiffPool_collate(dicts):
         
     nbrs_batch = torch.cat(nbrs_batch)
     bonds_batch = torch.cat(bonds_batch)
+    hyperedge_batch = torch.cat(hyperedge_batch)
         
-    return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch, 'pad': z_pad}
+    return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch, 'hyperedges': hyperedge_batch,  'pad': z_pad}
 
 
 def padding_tensor(sequences):

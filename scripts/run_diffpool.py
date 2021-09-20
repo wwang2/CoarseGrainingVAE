@@ -175,7 +175,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
 
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
         
-        nbr_list = batch['nbr_list']
+        nbr_list = batch['hyperedges']
         gen_dist = (xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
         data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
@@ -279,7 +279,7 @@ def run(params):
     elif cg_method == 'diff':
         assign_idx = None
 
-    props = get_diffpool_data(N_cg, [traj], n_data=n_data)
+    props = get_diffpool_data(N_cg, [traj], n_data=n_data, edgeorder=params['edgeorder'])
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
@@ -461,6 +461,7 @@ if __name__ == '__main__':
     parser.add_argument('-n_rbf', type=int,  default= 7)
     parser.add_argument('-activation', type=str,  default= 'ELU')
     parser.add_argument('-n_epochs', type=int, default= 50)
+    parser.add_argument('-edgeorder', type=int, default= 2)
     parser.add_argument("-n_pretrain", type=int, default= 10)
     parser.add_argument('-tau_rate', type=float, default= 0.004 )
     parser.add_argument('-tau_0', type=float, default= 2.36)
