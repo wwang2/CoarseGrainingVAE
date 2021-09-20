@@ -86,8 +86,14 @@ class DiffPoolVAE(nn.Module):
 
         H, V = self.decoder(H_repar, cg_adj, cg_xyz)
         dx = torch.einsum('bcae,bac->bae', V, soft_assign)
-        x_recon = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) + dx
-        
+        # re-centering 
+
+        _, _, _, _, cg_offset, _ = self.pooler(z, dx, batch['bonds'], tau=tau, gumbel=True)
+
+        cg_offset_lift = torch.einsum('bce,bac->bae', cg_offset, soft_assign)
+
+        x_recon = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) - cg_offset_lift + dx
+
         return xyz, x_recon, soft_assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma
 
 class CGpool(nn.Module):
