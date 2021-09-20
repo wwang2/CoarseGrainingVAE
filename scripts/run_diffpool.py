@@ -14,6 +14,7 @@ from visualization import xyz_grid_view, rotate_grid
 from sampling import * 
 import torch
 from torch import nn
+from sklearn.model_selection import KFold
 from torch.nn import Sequential 
 import numpy as np
 import copy
@@ -252,6 +253,7 @@ def run(params):
     det = params['det']
     cg_cutoff = params['cg_cutoff']
     tau_pre = params['tau_pre']
+    nsplits = params['nsplits']
 
     create_dir(working_dir)
 
@@ -284,162 +286,187 @@ def run(params):
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
 
+    cv_stats_pd = pd.DataFrame( { 'train_recon': [], 'test_recon': [],
+                'train_KL': [], 'test_KL': [], 
+                'train_graph': [], 'test_graph': [],
+                'all atom ged': [], 'heavy atom ged': [], 
+                'all atom rmsd': [], 'heavy atom rmsd':[]} )
+
     # split train, test index 
-    train_index, test_index = train_test_split(list(range(len(dataset))),test_size=0.2)
-    train_index, val_index = train_test_split(list(range(len(train_index))),test_size=0.1)
+    # train_index, test_index = train_test_split(list(range(len(dataset))),test_size=0.2)
+    # train_index, val_index = train_test_split(list(range(len(train_index))),test_size=0.1)
 
-    trainset = get_subset_by_indices(train_index, dataset)
-    valset = get_subset_by_indices(val_index, dataset)
-    testset = get_subset_by_indices(test_index, dataset)
+    if nsplits == 1:
+        split_iter = [ train_test_split(list(range(len(dataset))),test_size=0.2) ]
+    else:
+        kf = KFold(n_splits=nsplits, shuffle=True)
+        split_iter = kf.split(list(range(n_data)))
 
-    trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    valloader = DataLoader(valset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+    for i, (train_index, test_index) in enumerate(split_iter):
 
-    n_train_iters = len(trainloader) * n_epochs + 10
-    n_val_iters = len(valloader) * n_epochs + 10
-    tau_train_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_train_iters)) + tau_min
-    tau_val_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_val_iters)) + tau_min
+        split_dir = os.path.join(working_dir, 'fold{}'.format(i))
+        create_dir(split_dir)
 
-    pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
-    
-    encoder = DenseEquiEncoder(n_conv=enc_nconv, 
-                           n_atom_basis=num_features,
-                           n_rbf=n_rbf, 
-                           activation=activation, 
-                           cutoff=cutoff)
-    
-    decoder = DenseEquivariantDecoder(n_atoms=n_atoms, n_atom_basis=num_features,
-                                      n_rbf=n_rbf, cutoff=cg_cutoff, 
-                                      num_conv=dec_nconv, activation=activation)
+        train_index, val_index = train_test_split(list(range(len(train_index))),test_size=0.1)
 
-    prior = DenseCGPrior(n_atoms=n_atoms, n_atom_basis=num_features,
-                                      n_rbf=n_rbf, cutoff=cg_cutoff, 
-                                      num_conv=enc_nconv, activation=activation)
+        trainset = get_subset_by_indices(train_index, dataset)
+        valset = get_subset_by_indices(val_index, dataset)
+        testset = get_subset_by_indices(test_index, dataset)
 
-    atom_mu = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
-    atom_sigma = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
-    
-    model = DiffPoolVAE(encoder=encoder,decoder=decoder, pooler=pooler, atom_munet=atom_mu, atom_sigmanet=atom_sigma, prior=prior, det=det).to(device)
-    
-    optimizer = torch.optim.Adam(model.parameters(),lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
-                                                            factor=0.6, verbose=True, 
-                                                            threshold=1e-4,  min_lr=1e-8)
+        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+        valloader = DataLoader(valset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
 
-    early_stopping = EarlyStopping(patience=10)
-    
-    failed = False 
+        n_train_iters = len(trainloader) * n_epochs + 10
+        n_val_iters = len(valloader) * n_epochs + 10
+        tau_train_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_train_iters)) + tau_min
+        tau_val_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_val_iters)) + tau_min
 
-    if cg_method == 'diff':
-        for epoch in range(params['n_pretrain']):
+        pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
+        
+        encoder = DenseEquiEncoder(n_conv=enc_nconv, 
+                               n_atom_basis=num_features,
+                               n_rbf=n_rbf, 
+                               activation=activation, 
+                               cutoff=cutoff)
+        
+        decoder = DenseEquivariantDecoder(n_atoms=n_atoms, n_atom_basis=num_features,
+                                          n_rbf=n_rbf, cutoff=cg_cutoff, 
+                                          num_conv=dec_nconv, activation=activation)
+
+        prior = DenseCGPrior(n_atoms=n_atoms, n_atom_basis=num_features,
+                                          n_rbf=n_rbf, cutoff=cg_cutoff, 
+                                          num_conv=enc_nconv, activation=activation)
+
+        atom_mu = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
+        atom_sigma = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU(), nn.Linear(num_features, num_features))
+        
+        model = DiffPoolVAE(encoder=encoder,decoder=decoder, pooler=pooler, atom_munet=atom_mu, atom_sigmanet=atom_sigma, prior=prior, det=det).to(device)
+        
+        optimizer = torch.optim.Adam(model.parameters(),lr=lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
+                                                                factor=0.6, verbose=True, 
+                                                                threshold=1e-4,  min_lr=1e-8)
+
+        early_stopping = EarlyStopping(patience=10)
+        
+        failed = False 
+
+        if cg_method == 'diff':
+            for epoch in range(params['n_pretrain']):
+                model.train()
+
+                graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
+
+                if np.isnan(graph_loss):
+                    print("NaN encoutered, exiting...")
+                    failed = True
+                    break 
+
+                if epoch % 5 == 0:
+                    map_save_path = os.path.join(split_dir, 'pretrain_map_{}.png'.format(epoch) )
+                    plot_map(assign[0], props['z'][0].numpy(), map_save_path)
+
+        loss_log = []
+
+        train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 
+                    'train_recon': [], 'val_recon': [],
+                   'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
+
+        # train     
+        for epoch in range(n_epochs):
             model.train()
+            mean_train_loss, mean_train_recon, mean_train_graph, mean_train_KL, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
+                                            beta, gamma, eta,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
-            graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
+            mean_val_loss, mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
+                                            beta, gamma, eta,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
-            if np.isnan(graph_loss):
+
+            stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+                    'train_loss': mean_train_loss, 'val_loss': mean_val_loss, 
+                    'train_recon': mean_train_recon, 'val_recon': mean_val_recon,
+                    'train_KL': mean_train_KL, 'val_KL': mean_val_KL, 
+                    'train_graph': mean_train_graph, 'val_graph': mean_val_graph}
+
+            train_log = train_log.append(stats, ignore_index=True)
+
+            if np.isnan(mean_train_recon):
                 print("NaN encoutered, exiting...")
                 failed = True
                 break 
-
-            if epoch % 5 == 0:
-                map_save_path = os.path.join(working_dir, 'pretrain_map_{}.png'.format(epoch) )
+                
+            if epoch % 50 == 0:
+                map_save_path = os.path.join(split_dir, 'map_{}.png'.format(epoch) )
                 plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
-    loss_log = []
+            scheduler.step(mean_val_loss)
+            loss_log.append([mean_train_recon, mean_val_recon])
 
-    train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 
-                'train_recon': [], 'val_recon': [],
-               'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
+            # early stopping 
+            if optimizer.param_groups[0]['lr'] <= 5e-8:
+                break
 
-    # train     
-    for epoch in range(n_epochs):
-        model.train()
-        mean_train_loss, mean_train_recon, mean_train_graph, mean_train_KL, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
-                                        beta, gamma, eta,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
+            early_stopping(mean_val_loss)
+            if early_stopping.early_stop:
+                break
 
-        mean_val_loss, mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
-                                        beta, gamma, eta,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+        # dump log 
+    #    np.savetxt(os.path.join(split_dir, 'train_val_recon.txt'),  np.array(loss_log))
+        train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
 
+        dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(split_dir, 'train_recon.xyz'))
 
-        stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
-                'train_loss': mean_train_loss, 'val_loss': mean_val_loss, 
-                'train_recon': mean_train_recon, 'val_recon': mean_val_recon,
-                'train_KL': mean_train_KL, 'val_KL': mean_val_KL, 
-                'train_graph': mean_train_graph, 'val_graph': mean_val_graph}
-
-        train_log = train_log.append(stats, ignore_index=True)
-
-        if np.isnan(mean_train_recon):
-            print("NaN encoutered, exiting...")
-            failed = True
-            break 
-            
-        if epoch % 50 == 0:
-            map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
-            plot_map(assign[0], props['z'][0].numpy(), map_save_path)
-
-        scheduler.step(mean_val_loss)
-        loss_log.append([mean_train_recon, mean_val_recon])
-
-        # early stopping 
-        if optimizer.param_groups[0]['lr'] <= 5e-8:
-            break
-
-        early_stopping(mean_val_loss)
-        if early_stopping.early_stop:
-            break
-
-    # dump log 
-#    np.savetxt(os.path.join(working_dir, 'train_val_recon.txt'),  np.array(loss_log))
-    train_log.to_csv(os.path.join(working_dir, 'train_log.csv'),  index=False)
-
-    dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'train_recon.xyz'))
-
-    # test 
-    testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-    mean_test_loss, mean_test_recon, mean_test_graph, mean_test_KL, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_val_sched, epoch, beta, 
-                                gamma, eta, kappa, train=False, looptext='testing', tqdm_flag=tqdm_flag, tau_min=tau_min)
+        # test 
+        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+        mean_test_loss, mean_test_recon, mean_test_graph, mean_test_KL, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, tau_val_sched, epoch, beta, 
+                                    gamma, eta, kappa, train=False, looptext='testing', tqdm_flag=tqdm_flag, tau_min=tau_min)
 
 
-    test_stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
-            'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
-            'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
-            'train_graph': mean_train_graph, 'test_graph': mean_test_graph}
+        test_stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+                'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
+                'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
+                'train_graph': mean_train_graph, 'test_graph': mean_test_graph}
 
-    with open(os.path.join(working_dir, 'train_test_stats.json'), 'w') as f:
-        json.dump(test_stats, f)
+        with open(os.path.join(split_dir, 'train_test_stats.json'), 'w') as f:
+            json.dump(test_stats, f)
 
-    # sampling 
-    all_rmsds, heavy_rmsds, all_geds, heavy_geds = sample(testloader,  device, model, tau_min, tqdm_flag=True, working_dir=working_dir)
+        # sampling 
+        all_rmsds, heavy_rmsds, all_geds, heavy_geds = sample(testloader,  device, model, tau_min, tqdm_flag=True, working_dir=split_dir)
 
-    mean_all_ged = np.array(all_geds).mean()
-    mean_heavy_ged = np.array(heavy_geds).mean()
+        mean_all_ged = np.array(all_geds).mean()
+        mean_heavy_ged = np.array(heavy_geds).mean()
 
-    if len(all_rmsds) != 0:
-        mean_all_rmsd = np.array(all_rmsds).mean()
-    else:
-        mean_all_rmsd = None
+        if len(all_rmsds) != 0:
+            mean_all_rmsd = np.array(all_rmsds).mean()
+        else:
+            mean_all_rmsd = None
 
-    if len(heavy_rmsds) != 0:
-        mean_heavy_rmsd = np.array(heavy_rmsds).mean()
-    else:
-        mean_heavy_rmsd = None
+        if len(heavy_rmsds) != 0:
+            mean_heavy_rmsd = np.array(heavy_rmsds).mean()
+        else:
+            mean_heavy_rmsd = None
 
-    # dump train recon 
-    dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(working_dir, 'test_recon.xyz'))
+        # dump train recon 
+        dump_numpy2xyz(test_xyz_recon, props['z'][0].numpy(), os.path.join(split_dir, 'test_recon.xyz'))
 
-    print("train msd : {:.4f}".format(mean_train_recon))
-    print("test msd : {:.4f}".format(mean_test_recon))
+        print("train msd : {:.4f}".format(mean_train_recon))
+        print("test msd : {:.4f}".format(mean_test_recon))
 
 
-    test_stats = { 'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
-            'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
-            'train_graph': mean_train_graph, 'test_graph': mean_test_graph,
-            'all atom ged': mean_all_ged, 'heavy atom ged': mean_heavy_ged, 
-            'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd}
+        test_stats = { 'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
+                'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
+                'train_graph': mean_train_graph, 'test_graph': mean_test_graph,
+                'all atom ged': mean_all_ged, 'heavy atom ged': mean_heavy_ged, 
+                'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd}
 
-    with open(os.path.join(working_dir, 'train_test_stats.json'), 'w') as f:
-        json.dump(test_stats, f)
+        cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
+
+        cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)
+
+        with open(os.path.join(split_dir, 'train_test_stats.json'), 'w') as f:
+            json.dump(test_stats, f)
+
+    # dump cv stats 
 
     return mean_test_recon, mean_all_ged, failed, assign
 
@@ -453,6 +480,7 @@ if __name__ == '__main__':
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-n_data', type=int, default= 1000)
     parser.add_argument('-N_cg', type=int, default= 3)
+    parser.add_argument('-nsplits', type=int, default=1)
     parser.add_argument('-nconv_pool', type=int, default= 7)
     parser.add_argument('-enc_nconv', type=int, default= 4)
     parser.add_argument('-dec_nconv', type=int, default= 3)
