@@ -132,7 +132,7 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         
     for batch in loader:     
         batch = batch_to(batch, device=device)
-        nbr_list = batch['nbr_list']
+        nbr_list = batch['hyperedges']
         assign, xyz, xyz_recon = model(batch)
         
         # compute loss
@@ -196,10 +196,12 @@ def run(params):
     atomic_nums, protein_index = get_atomNum(trajs[0])
     n_atoms = len(atomic_nums)
 
+    # get protin graph
+    protein_top = trajs[0].top.subset(protein_index)
+    g = protein_top.to_bondgraph()
+
     # get cg_map 
     if cg_method == 'newman':
-        protein_top = trajs[0].top.subset(protein_index)
-        g = protein_top.to_bondgraph()
         paritions = get_partition(g, N_cg)
         mapping = parition2mapping(paritions, n_atoms)
         assign_idx = torch.LongTensor( np.array(mapping) ) 
