@@ -141,6 +141,14 @@ def run_cv(params):
     cv_graph_hh_diff = []
 
     split_iter = kf.split(list(range(ndata)))
+     
+    cv_stats_pd = pd.DataFrame( { 'train_recon': [], 'test_recon': [],
+                'train_KL': [], 'test_KL': [], 
+                'train_graph': [], 'test_graph': [],
+                'all atom ged': [], 'heavy atom ged': [], 
+                'all atom graph valid ratio': [], 
+                'heavy atom graph valid ratio': [],
+                'all atom rmsd': [], 'heavy atom rmsd':[]} )
 
     for i, (train_index, test_index) in enumerate(split_iter):
 
@@ -286,6 +294,15 @@ def run_cv(params):
                                                                                              atomwise_z=atom_decode_flag,
                                                                                              tqdm_flag=tqdm_flag)
 
+        test_loss, mean_kl_test, mean_recon_test, mean_graph_test, xyz_test, xyz_test_recon = loop(valloader, optimizer, device,
+                                                   model, beta, epoch, 
+                                                   train=False,
+                                                    gamma=gamma,
+                                                    eta=eta,
+                                                    kappa=kappa,
+                                                    looptext='Ncg {} Fold {} test'.format(n_cgs, i),
+                                                    tqdm_flag=tqdm_flag)
+
         # sample geometries 
         test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
@@ -359,6 +376,17 @@ def run_cv(params):
             print("sample graph difference ratio (all atoms): {}".format(mean_graph_hh_diff))
 
 
+        test_stats = { 'train_recon': mean_recon_train, 'test_recon': mean_recon_test,
+                'train_KL': mean_kl_train, 'test_KL': mean_kl_test, 
+                'train_graph': mean_graph_train,  'test_graph': mean_graph_test,
+                'all atom ged': mean_graph_hh_diff, 'heavy atom ged': mean_graph_diff, 
+                'all atom graph valid ratio': sample_hh_valid, 
+                'heavy atom graph valid ratio': sample_valid,
+                'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd} 
+
+        cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
+        cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)
+
         # compute maxium dimension
         ref_xyz = data_xyzs[0]
         ref_xyz = ref_xyz - ref_xyz.mean(0)
@@ -392,7 +420,6 @@ def run_cv(params):
         io.write(os.path.join(split_dir, 'rotate_test_data.xyz'), rotate_data)
         io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
         io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
-        #io.write(os.path.join(split_dir, 'rotate_test_ensemble.xyz'), rotate_ensemble)
 
         # dump rmsd distributions 
         if graph_eval:
