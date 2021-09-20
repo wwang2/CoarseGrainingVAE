@@ -72,7 +72,7 @@ class EquiLinear(nn.Module):
         dx_recon = torch.einsum("ije,nj->ine", B, self.B )
 
         # recentering 
-        cg_offset = torch.einsum("bin,bij->bjn", dx, assign_norm)
+        cg_offset = torch.einsum("bin,bij->bjn", dx_recon, assign_norm)
         cg_offset_lift = cg_offset[:, self.pooler.assign_idx, :]
 
         xyz_recon = cg_xyz[:, self.pooler.assign_idx, :] - cg_offset_lift + dx_recon
