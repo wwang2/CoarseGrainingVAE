@@ -69,6 +69,8 @@ def sample(loader, device, model, tau_min, tqdm_flag=True, working_dir=None):
     all_valid_rmsds = []
     heavy_geds = []
     all_geds = []
+    all_valid_ratios = []
+    heavy_valid_ratios = []
 
 
     for xyz_sample in xyz_samples:
@@ -89,6 +91,9 @@ def sample(loader, device, model, tau_min, tqdm_flag=True, working_dir=None):
         heavy_geds += heavy_ged
         all_geds += all_ged
 
+        all_valid_ratios.append(all_valid_ratio)
+        heavy_valid_ratios.append(heavy_valid_ratio)
+
     if working_dir is not None:
         np.savetxt(os.path.join(working_dir, 'heavy_geds.txt'),  np.array(heavy_geds))
         np.savetxt(os.path.join(working_dir, 'all_geds.txt'),  np.array(all_geds))
@@ -100,8 +105,10 @@ def sample(loader, device, model, tau_min, tqdm_flag=True, working_dir=None):
     # print out something 
     dump_numpy2xyz(xyz_samples[:50], atomic_nums, os.path.join(working_dir, 'test_samples.xyz'))
 
+    all_valid_ratio = np.array(all_valid_ratios).mean()
+    heavy_valid_ratio = np.array(heavy_valid_ratio).mean()
 
-    return all_valid_rmsds, heavy_valid_rmsds, all_geds, heavy_geds
+    return all_valid_rmsds, heavy_valid_rmsds, all_geds, heavy_geds, all_valid_ratio, heavy_valid_ratio
 
 
 def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
@@ -290,8 +297,10 @@ def run(params):
                 'train_KL': [], 'test_KL': [], 
                 'train_graph': [], 'test_graph': [],
                 'all atom ged': [], 'heavy atom ged': [], 
+                'all atom graph valid ratio': [], 
+                'heavy atom graph valid ratio': [],
                 'all atom rmsd': [], 'heavy atom rmsd':[]} )
-
+    
     # split train, test index 
     # train_index, test_index = train_test_split(list(range(len(dataset))),test_size=0.2)
     # train_index, val_index = train_test_split(list(range(len(train_index))),test_size=0.1)
@@ -431,7 +440,7 @@ def run(params):
             json.dump(test_stats, f)
 
         # sampling 
-        all_rmsds, heavy_rmsds, all_geds, heavy_geds = sample(testloader,  device, model, tau_min, tqdm_flag=True, working_dir=split_dir)
+        all_rmsds, heavy_rmsds, all_geds, heavy_geds, all_valid_ratio, heavy_valid_ratio = sample(testloader,  device, model, tau_min, tqdm_flag=True, working_dir=split_dir)
 
         mean_all_ged = np.array(all_geds).mean()
         mean_heavy_ged = np.array(heavy_geds).mean()
@@ -457,10 +466,11 @@ def run(params):
                 'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
                 'train_graph': mean_train_graph, 'test_graph': mean_test_graph,
                 'all atom ged': mean_all_ged, 'heavy atom ged': mean_heavy_ged, 
+                'all atom graph valid ratio': all_valid_ratio, 
+                'heavy atom graph valid ratio': heavy_valid_ratio,
                 'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd}
 
         cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
-
         cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)
 
         with open(os.path.join(split_dir, 'train_test_stats.json'), 'w') as f:
