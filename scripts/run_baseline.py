@@ -198,6 +198,7 @@ def run(params):
     cutoff = params['cutoff']
     cross = params['cross']
     edgeorder = params['edgeorder']
+    n_splits = params['n_splits']
     create_dir(working_dir)
 
     traj_files = glob.glob(PROTEINFILES[dataset_label]['traj_paths'])[:200]
@@ -229,8 +230,7 @@ def run(params):
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
 
-    nsplits = 2
-    kf = KFold(n_splits=nsplits)
+    kf = KFold(n_splits=n_splits)
 
     split_iter = kf.split(list(range(len(dataset))))
 
@@ -367,6 +367,7 @@ if __name__ == '__main__':
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-N_cg', type=int, default= 3)
     parser.add_argument('-edgeorder', type=int, default= 2)
+    parser.add_argument('-n_splits', type=int, default= 3)
     parser.add_argument('-n_epochs', type=int, default= 50)
     parser.add_argument('-ndata', type=int, default= 2000)
     parser.add_argument("-cg_method", type=str, default='newman')
