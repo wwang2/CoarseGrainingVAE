@@ -26,6 +26,7 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 import re 
+import pandas as pd
 
 def plot_map(assign, z, save_path=None):
     mapping = assign.detach().cpu().numpy().transpose()
@@ -48,6 +49,9 @@ def retrive_recon_structures(loader, device, model, tqdm_flag=True):
 
     heavy_ged = []
     all_ged = []
+
+    all_valid_ratios = []
+    heavy_valid_ratios = []
 
     model.eval()
 
@@ -74,7 +78,13 @@ def retrive_recon_structures(loader, device, model, tqdm_flag=True):
             heavy_ged.append(graph_val_ratio)
             all_ged.append(graph_hh_val_ratio)
 
-    return np.concatenate(all_xyz_data), np.concatenate(all_xyz_recon), np.array(heavy_ged).mean(), np.array(all_ged).mean()
+            all_valid_ratios.append(valid_hh_ratio)
+            heavy_valid_ratios.append(valid_ratio)
+
+    all_valid_ratio = np.array(all_valid_ratios).mean()
+    heavy_valid_ratio = np.array(heavy_valid_ratios).mean()
+
+    return np.concatenate(all_xyz_data), np.concatenate(all_xyz_recon), np.array(heavy_ged).mean(), np.array(all_ged).mean(), heavy_valid_ratio, all_valid_ratio
 
 def dist_loss(xyz, xyz_recon, nbr_list):
 
@@ -139,12 +149,15 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         loss_recon = (xyz_recon - xyz).pow(2).mean() # recon loss
         loss_dist = dist_loss(xyz, xyz_recon, nbr_list) # distance loss 
         loss_methyl = compute_HCH(xyz_recon, tetra_index) # methyl cap loss 
-
         loss = loss_recon + gamma * loss_dist + kappa * loss_methyl
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        if train:
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        else:
+            optimizer.zero_grad()
+            loss.backward()
 
         epoch_recon_loss.append(loss_recon.item())
         epoch_dist_loss.append(loss_dist.item())
@@ -166,7 +179,7 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         for result in postfix:
             print(result)
     
-    return mean_recon, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
+    return mean_recon, mean_dist, mean_methyl, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
 
 def run(params):
 
@@ -184,6 +197,7 @@ def run(params):
     dataset_label = params['dataset']
     cutoff = params['cutoff']
     cross = params['cross']
+    edgeorder = params['edgeorder']
     create_dir(working_dir)
 
     traj_files = glob.glob(PROTEINFILES[dataset_label]['traj_paths'])[:200]
@@ -210,7 +224,7 @@ def run(params):
         assign_idx = torch.LongTensor( np.array(mapping) )
 
 
-    props = get_diffpool_data(N_cg, trajs, n_data=n_data)
+    props = get_diffpool_data(N_cg, trajs, n_data=n_data, edgeorder=edgeorder)
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
@@ -228,6 +242,12 @@ def run(params):
     cv_heavy_ged = []
     cv_all_ged = []
 
+    cv_stats_pd = pd.DataFrame( { 'train_recon': [], 'test_recon': [],
+            'train_graph': [], 'test_graph': [],
+            'train_tetra': [], 'test_tetra': [],
+            'all atom ged': [], 'heavy atom ged': [], 
+            'all atom graph valid ratio': [], 
+            'heavy atom graph valid ratio': []} )
 
     for i, (train_index, test_index) in enumerate(split_iter):
 
@@ -259,7 +279,7 @@ def run(params):
         # train     
         for epoch in range(n_epochs):
         
-            mean_train_recon, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, 
+            mean_train_recon, mean_train_graph, mean_train_tetra, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, 
                                                                         epoch, gamma, kappa, tetra_index, 
                                                                         train=True, looptext='', tqdm_flag=tqdm_flag)
 
@@ -281,7 +301,11 @@ def run(params):
         testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
         model.eval()
 
-        all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged = retrive_recon_structures(testloader, device, model, tqdm_flag=True)
+        mean_test_recon, mean_test_graph, mean_test_tetra, assign, test_xyz, test_xyz_recon = loop(testloader, optimizer, device, model, 
+                                                                    epoch, gamma, kappa, tetra_index, 
+                                                                    train=False, looptext='', tqdm_flag=tqdm_flag)
+
+        all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged, heavy_valid_ratio, all_valid_ratio = retrive_recon_structures(testloader, device, model, tqdm_flag=True)
 
         # compute rmsd 
         atomic_nums = props['z'][0].numpy()
@@ -306,6 +330,16 @@ def run(params):
         cv_heavy_rmsd.append(test_heavy_rmsd)
         cv_all_ged.append(all_ged)
         cv_heavy_ged.append(heavy_ged)
+
+        test_stats = { 'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
+            'train_graph': mean_train_graph, 'test_graph': mean_test_graph,
+            'train_tetra': mean_train_tetra, 'test_tetra': mean_test_tetra,
+            'all atom ged': all_ged, 'heavy atom ged': heavy_ged, 
+            'all atom graph valid ratio': all_valid_ratio, 
+            'heavy atom graph valid ratio': heavy_valid_ratio} 
+
+        cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
+        cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)
 
         if failed:
             break 
@@ -332,6 +366,7 @@ if __name__ == '__main__':
     parser.add_argument('-cutoff', type=float, default=2.5)
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-N_cg', type=int, default= 3)
+    parser.add_argument('-edgeorder', type=int, default= 2)
     parser.add_argument('-n_epochs', type=int, default= 50)
     parser.add_argument('-ndata', type=int, default= 2000)
     parser.add_argument("-cg_method", type=str, default='newman')
