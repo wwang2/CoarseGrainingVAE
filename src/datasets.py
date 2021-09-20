@@ -262,7 +262,7 @@ def get_traj(pdb, files, n_frames, shuffle=False):
 # need a function to get mapping, and CG coordinates simultanesouly. We can have alpha carbon as the CG site
 
 
-def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, cg_traj=None):
+def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, order=1, cg_traj=None):
     
     CG_nxyz_data = []
     nxyz_data = []
@@ -272,9 +272,18 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, cg_tr
     CG_mapping_list = []
     bond_edge_list = []
     bondgraph = top.to_bondgraph()
+
     edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
 
-    for xyz in traj:   
+    # get adj 
+    adj = torch.ones(atomic_nums.shape[0], atomic_nums.shape[0])
+    adj[edges[:,0], edges[:,1]] = 1
+    adj[edges[:,1], edges[:,0]] = 1
+
+    # get higher edges 
+    edges = torch.triu(get_higher_order_adj_matrix(adj, order=order)).nonzero()
+
+    for xyz in traj:
         nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)
         nxyz_data.append(nxyz)
         num_atoms_list.append(torch.LongTensor( [len(nxyz)]))
