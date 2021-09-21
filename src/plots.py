@@ -15,6 +15,31 @@ import numpy.ma as ma
 import itertools
 import re
 
+import math
+def get_cv_stats( csvs, column, k ):
+    
+    cg_res = []
+    
+    all_mean = []
+    all_error = []
+
+    for path in all_cvs:
+        res = int(re.search('(?<=N)[0-9]+', path).group(0))
+        cv_data = pd.read_csv(path)
+        cg_res.append(res)
+        mean = cv_data[column].mean()
+        error = cv_data[column].mean() / math.sqrt(k)
+        
+        all_mean.append(mean)
+        all_error.append(error)
+    
+    reorder = np.argsort(cg_res)
+    cg_res = np.array(cg_res)[reorder]
+
+    all_mean = np.array(all_mean)[reorder]
+    all_error = np.array(all_error)[reorder]
+    
+    return cg_res, all_mean, all_error
 
 def kernel_density_plot(data, xlabel, ylabel, label='kT', figsize=(6,6)):
     k = gaussian_kde(np.vstack([data[:,0], data[:,1]]))
