@@ -199,6 +199,7 @@ def run(params):
     cross = params['cross']
     edgeorder = params['edgeorder']
     n_splits = params['n_splits']
+    mapshuffle = params['mapshuffle']
     create_dir(working_dir)
 
     traj_files = glob.glob(PROTEINFILES[dataset_label]['traj_paths'])[:200]
@@ -214,16 +215,6 @@ def run(params):
     # get protin graph
     protein_top = trajs[0].top.subset(protein_index)
     g = protein_top.to_bondgraph()
-
-    # get cg_map 
-    if cg_method == 'newman':
-        paritions = get_partition(g, N_cg)
-        mapping = parition2mapping(paritions, n_atoms)
-        assign_idx = torch.LongTensor( np.array(mapping) ) 
-    elif cg_method == 'random':
-        mapping = get_random_mapping(N_cg, n_atoms)
-        assign_idx = torch.LongTensor( np.array(mapping) )
-
 
     props = get_diffpool_data(N_cg, trajs, n_data=n_data, edgeorder=edgeorder)
 
@@ -252,8 +243,6 @@ def run(params):
 
     for i, (train_index, test_index) in enumerate(split_iter):
 
-        split_iter = kf.split(list(range(len(dataset))))
-
         split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
         create_dir(split_dir)
 
@@ -264,6 +253,23 @@ def run(params):
         testset = get_subset_by_indices(test_index, dataset)
 
         trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+
+        # get cg_map 
+        if cg_method == 'newman':
+            paritions = get_partition(g, N_cg)
+            mapping = parition2mapping(paritions, n_atoms)
+            assign_idx = torch.LongTensor( np.array(mapping) ) 
+
+        elif cg_method == 'random':
+            mapping = get_random_mapping(N_cg, n_atoms)
+            assign_idx = torch.LongTensor( np.array(mapping) )
+
+        # shuffle if mapshuffle is on 
+        if mapshuffle > 0.0:
+            ran_idx = random.sample(range(assign_idx.shape[0]), int(mapshuffle * assign_idx.shape[0])  )
+            idx2map = assign_idx[ran_idx]
+            assign_idx[ran_idx] = idx2map
+
         pooler = CGpool(1, 16, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
         
         #model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
@@ -373,6 +379,7 @@ if __name__ == '__main__':
     parser.add_argument('-n_epochs', type=int, default= 50)
     parser.add_argument('-ndata', type=int, default= 2000)
     parser.add_argument("-cg_method", type=str, default='newman')
+    parser.add_argument("-mapshuffle", type=float, default=0.0)
     parser.add_argument('-lr', type=float, default=1e-3)
     parser.add_argument('-gamma', type=float, default=0.0)
     parser.add_argument('-kappa', type=float, default=0.0)
