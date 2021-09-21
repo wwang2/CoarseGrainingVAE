@@ -143,6 +143,8 @@ def run_cv(params):
     split_iter = kf.split(list(range(ndata)))
      
     cv_stats_pd = pd.DataFrame( { 'train_recon': [], 'test_recon': [],
+                'test_all_recon': [], 
+                'test_heavy_recon': [], 
                 'train_KL': [], 'test_KL': [], 
                 'train_graph': [], 'test_graph': [],
                 'all atom ged': [], 'heavy atom ged': [], 
@@ -376,7 +378,9 @@ def run_cv(params):
             print("sample graph difference ratio (all atoms): {}".format(mean_graph_hh_diff))
 
 
-        test_stats = { 'train_recon': mean_recon_train, 'test_recon': mean_recon_test,
+        test_stats = { 'train_recon': mean_recon_train,
+                'test_all_recon': unaligned_test_all_rmsd,
+                'test_heavy_recon': unaligned_test_heavy_rmsd,
                 'train_KL': mean_kl_train, 'test_KL': mean_kl_test, 
                 'train_graph': mean_graph_train,  'test_graph': mean_graph_test,
                 'all atom ged': mean_graph_hh_diff, 'heavy atom ged': mean_graph_diff, 

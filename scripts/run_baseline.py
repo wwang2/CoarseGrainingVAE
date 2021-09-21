@@ -242,7 +242,8 @@ def run(params):
     cv_heavy_ged = []
     cv_all_ged = []
 
-    cv_stats_pd = pd.DataFrame( { 'train_recon': [], 'test_recon': [],
+    cv_stats_pd = pd.DataFrame({'train_recon': [], 
+            'test_all_recon': [],  'test_heavy_recon': [],
             'train_graph': [], 'test_graph': [],
             'train_tetra': [], 'test_tetra': [],
             'all atom ged': [], 'heavy atom ged': [], 
@@ -331,7 +332,8 @@ def run(params):
         cv_all_ged.append(all_ged)
         cv_heavy_ged.append(heavy_ged)
 
-        test_stats = { 'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
+        test_stats = { 'train_recon': mean_train_recon, 
+            'test_all_recon': test_all_rmsd,  'test_heavy_recon': test_heavy_rmsd,
             'train_graph': mean_train_graph, 'test_graph': mean_test_graph,
             'train_tetra': mean_train_tetra, 'test_tetra': mean_test_tetra,
             'all atom ged': all_ged, 'heavy atom ged': heavy_ged, 
