@@ -274,7 +274,11 @@ def run(params):
         
         #model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
 
-        model = EquiLinear(pooler, N_cg, n_atoms, cross=cross).to(device)
+
+        if params['model'] == 'equilinear':
+            model = EquiLinear(pooler, N_cg, n_atoms, cross=cross).to(device)
+        elif params['model'] == 'linear': 
+            model = Baseline(pooler, N_cg, n_atoms).to(device)
         
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
@@ -369,6 +373,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-logdir', type=str)
+    parser.add_argument('-model', type=str, default='equilinear')
     parser.add_argument("-dataset", type=str, default='dipeptide')
     parser.add_argument('-device', type=int)
     parser.add_argument('-cutoff', type=float, default=2.5)
