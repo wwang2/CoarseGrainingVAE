@@ -23,7 +23,7 @@ def get_cv_stats( csvs, column, k ):
     all_mean = []
     all_error = []
 
-    for path in all_cvs:
+    for path in csvs:
         res = int(re.search('(?<=N)[0-9]+', path).group(0))
         cv_data = pd.read_csv(path)
         cg_res.append(res)
