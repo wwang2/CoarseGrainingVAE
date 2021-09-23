@@ -14,6 +14,7 @@ import matplotlib
 import numpy.ma as ma
 import itertools
 import re
+import pandas as pd
 
 import math
 def get_cv_stats( csvs, column, k ):
