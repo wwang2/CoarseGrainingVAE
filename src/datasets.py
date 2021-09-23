@@ -138,7 +138,7 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
         if mapshuffle > 0.0:
             ran_idx = random.sample(range(mapping.shape[0]), int(perm_percent * mapping.shape[0])  )
             idx2map = mapping[ran_idx]
-            mapping[ran_idx] = idx2map
+            mapping[ran_idx] = shuffle(idx2map)
 
         frames = shuffle(frames)
 
