@@ -41,6 +41,7 @@ if params['id'] == 0:
         parameters=[
             dict(name='num_features', type='int', bounds=dict(min=64, max=600)),
             dict(name='n_rbf', type='int', bounds=dict(min=5, max=20)),
+            dict(name='edgeorder', type='int', bounds=dict(min=1, max=4)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
             dict(name='cutoff', type='double', bounds=dict(min=4.0, max=9.0)),
             dict(name='cg_cutoff', type='double', bounds=dict(min=5.0, max=20.0)),
@@ -49,13 +50,13 @@ if params['id'] == 0:
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='n_pretrain', type='int', bounds=dict(min=0, max=10)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
-            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=30.0), transformation="log"),
             dict(name='kappa', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='eta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.00002, max=0.0002), transformation="log"),
             dict(name='tau_rate', type='double', bounds=dict(min=0.00001, max=0.01), transformation="log"),
             dict(name='tau_0', type='double', bounds=dict(min=1.0, max=5.0)),
-            dict(name='tau_min', type='double', bounds=dict(min=0.01, max=1.0)),
+            dict(name='tau_min', type='double', bounds=dict(min=0.01, max=0.6)),
             dict(name='tau_pre', type='double', bounds=dict(min=0.01, max=5.0))
         ],
         observation_budget=n_obs, # how many iterations to run for the optimization
@@ -82,6 +83,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['n_data'] = params['n_data']
     trial['dataset'] = params['dataset']
     trial['det'] = params['det']
+    trial['mapsavefreq'] = 15
+    trial['nsplits'] = 1
     if params['pretrain'] == False:
         trial['n_pretrain'] = 0
 
