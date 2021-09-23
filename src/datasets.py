@@ -236,9 +236,7 @@ def get_random_mapping(n_cg, n_atoms):
     mapping = torch.LongTensor(n_atoms).random_(0, n_cg)
     i = 1
     while len(mapping.unique()) != n_cg and i <= 10000000:
-        i +=
-
-         1
+        i += 1
         mapping = torch.LongTensor(n_atoms).random_(0, n_cg)
 
     return mapping
