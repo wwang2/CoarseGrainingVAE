@@ -143,7 +143,14 @@ class CGDataset(TorchDataset):
 
     def __getitem__(self, idx):
         return {key: val[idx] for key, val in self.props.items()}
-    
+
+    def generate_aux_edges(self, auxcutoff, device='cpu', undirected=True):
+        edge_list = []
+        
+        for nxyz in tqdm(self.props['nxyz'], desc='building aux edge list', file=sys.stdout):
+            edge_list.append(get_neighbor_list(nxyz[:, 1:4], device, auxcutoff, undirected).to("cpu"))
+
+        self.props['bond_edge_list'] = edge_list
 
     def generate_neighbor_list(self, atom_cutoff, cg_cutoff, device='cpu', undirected=True):
 

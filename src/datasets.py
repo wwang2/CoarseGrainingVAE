@@ -153,7 +153,6 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
 
 
     # print coarse graining summary 
-
     print("CG method: {}".format(cg_method))
     print("Number of CG sites: {}".format(mapping.max() + 1))
 
@@ -291,14 +290,6 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, order
 
     edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
     edges = get_high_order_edge(edges, order, atomic_nums.shape[0])
-
-    # # get adj 
-    # adj = torch.ones(atomic_nums.shape[0], atomic_nums.shape[0])
-    # adj[edges[:,0], edges[:,1]] = 1
-    # adj[edges[:,1], edges[:,0]] = 1
-
-    # # get higher edges 
-    # edges = torch.triu(get_higher_order_adj_matrix(adj, order=order)).nonzero()
 
     for xyz in traj:
         nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)

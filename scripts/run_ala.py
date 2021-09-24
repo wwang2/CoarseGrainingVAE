@@ -49,7 +49,11 @@ def build_split_dataset(traj, params, mapping=None):
     if params['cg_radius_graph']:
         dataset.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], cg_cutoff=None, device="cpu", undirected=True)
     else:
-        dataset.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], cg_cutoff= params['cg_cutoff'], device="cpu", undirected=True)       
+        dataset.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], cg_cutoff= params['cg_cutoff'], device="cpu", undirected=True)
+
+    # if auxcutoff is defined, use the aux cutoff
+    if params['auxcutoff'] > 0.0:
+        dataset.generate_aux_edges(params['auxcutoff'])
 
     # check CG nbr_list connectivity 
     if not check_CGgraph(dataset):
@@ -102,6 +106,7 @@ def run_cv(params):
     mapshuffle = params['mapshuffle']
     threshold = params['threshold']
     savemodel = params['savemodel']
+    auxcutoff = params['auxcutoff']
     min_lr = 5e-8
 
     if det:
@@ -499,6 +504,7 @@ if __name__ == '__main__':
     parser.add_argument("-n_ensemble", type=int, default=16)
     parser.add_argument("-nevals", type=int, default=36)
     parser.add_argument("-edgeorder", type=int, default=2)
+    parser.add_argument("-auxcutoff", type=float, default=0.0)
     parser.add_argument("-beta", type=float, default=0.001)
     parser.add_argument("-gamma", type=float, default=0.01)
     parser.add_argument("-eta", type=float, default=0.01)
