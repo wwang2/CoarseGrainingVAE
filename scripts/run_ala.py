@@ -248,7 +248,7 @@ def run_cv(params):
 
             # smoothen the validation curve 
             smooth = sm.nonparametric.lowess(train_log['val_loss'].values,  # y
-                                            train_log['val_loss'].values, # x
+                                            train_log['epoch'].values, # x
                                             frac=0.2)
             smoothed_valloss = smooth[-1, 1]
 

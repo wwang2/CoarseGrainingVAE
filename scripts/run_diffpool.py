@@ -27,6 +27,7 @@ from sklearn.model_selection import train_test_split
 import json
 import pandas as pd 
 import torch.autograd.profiler as profiler
+import statsmodels.api as sm
 
 def plot_map(assign, z, save_path=None):
     mapping = assign.detach().cpu().numpy().transpose()
@@ -144,7 +145,7 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
     
 def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         gamma, kappa, train=True, looptext='', tqdm_flag=True, recon_weight=1.0, tau_min=None):
-    
+
     all_loss = []
     recon_loss = []
     adj_loss = []
@@ -179,7 +180,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_recon = (xyz_recon - xyz).pow(2).mean()
         loss_entropy = soft_cg_adj.diagonal(dim1=1, dim2=2).std(-1).mean()# -(assign * torch.log(assign)).sum(-1).mean()
         node_sim_mat = assign.matmul(assign.transpose(1,2))
-        loss_adj = (node_sim_mat - adj).pow(2).mean()
+        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).sqrt().mean()
 
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
         
@@ -188,7 +189,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
-        loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj +  kappa * loss_entropy #+ 0.0001 * prior_reg
+        loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
 
         #if epoch % 5 == 0:
         #    print(H_prior_mu.mean().item(), H_prior_sigma.mean().item(), H_mu.mean().item(), H_sigma.mean().item())
@@ -262,6 +263,7 @@ def run(params):
     tau_pre = params['tau_pre']
     nsplits = params['nsplits']
 
+    print(eta, gamma)
     create_dir(working_dir)
 
     if label in PROTEINFILES.keys():
@@ -300,7 +302,7 @@ def run(params):
                 'all atom graph valid ratio': [], 
                 'heavy atom graph valid ratio': [],
                 'all atom rmsd': [], 'heavy atom rmsd':[]} )
-    
+
     # split train, test index 
     # train_index, test_index = train_test_split(list(range(len(dataset))),test_size=0.2)
     # train_index, val_index = train_test_split(list(range(len(train_index))),test_size=0.1)
@@ -360,6 +362,7 @@ def run(params):
         
         failed = False 
 
+
         if cg_method == 'diff':
             for epoch in range(params['n_pretrain']):
                 model.train()
@@ -385,10 +388,10 @@ def run(params):
         for epoch in range(n_epochs):
             model.train()
             mean_train_loss, mean_train_recon, mean_train_graph, mean_train_KL, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, tau_train_sched, epoch, 
-                                            beta, gamma, eta,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
+                                            beta, eta, gamma,  kappa, train=True, looptext='', tqdm_flag=tqdm_flag)
 
             mean_val_loss, mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
-                                            beta, gamma, eta,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
+                                            beta, eta, gamma,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
 
             stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
@@ -399,23 +402,28 @@ def run(params):
 
             train_log = train_log.append(stats, ignore_index=True)
 
+            smooth = sm.nonparametric.lowess(train_log['val_loss'].values,  # y
+                                            train_log['epoch'].values, # x
+                                            frac=0.2)
+            smoothed_valloss = smooth[-1, 1]
+
             if np.isnan(mean_train_recon):
                 print("NaN encoutered, exiting...")
                 failed = True
                 break 
                 
-            if epoch % 50 == 0:
+            if epoch % params['mapsavefreq'] == 0:
                 map_save_path = os.path.join(split_dir, 'map_{}.png'.format(epoch) )
                 plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
-            scheduler.step(mean_val_loss)
+            scheduler.step(smoothed_valloss)
             loss_log.append([mean_train_recon, mean_val_recon])
 
             # early stopping 
             if optimizer.param_groups[0]['lr'] <= 5e-8:
                 break
 
-            early_stopping(mean_val_loss)
+            early_stopping(smoothed_valloss)
             if early_stopping.early_stop:
                 break
 
@@ -494,6 +502,7 @@ if __name__ == '__main__':
     parser.add_argument('-nconv_pool', type=int, default= 7)
     parser.add_argument('-enc_nconv', type=int, default= 4)
     parser.add_argument('-dec_nconv', type=int, default= 3)
+    parser.add_argument('-mapsavefreq', type=int, default= 5)
     parser.add_argument('-cutoff', type=float, default= 8.0)
     parser.add_argument('-cg_cutoff', type=float, default=8.0)
     parser.add_argument('-n_rbf', type=int,  default= 7)
