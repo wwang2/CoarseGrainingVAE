@@ -238,6 +238,11 @@ def run_cv(params):
                                                         looptext='Ncg {} Fold {} test'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
 
+            # check NaN
+            if np.isnan(mean_recon_val):
+                print("NaN encoutered, exiting...")
+                break 
+                
             stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                     'train_loss': train_loss, 'val_loss': val_loss, 
                     'train_recon': mean_recon_train, 'val_recon': mean_recon_val,
@@ -255,11 +260,6 @@ def run_cv(params):
 
             scheduler.step(smoothed_valloss)
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
-
-            # check NaN
-            if np.isnan(mean_recon_val):
-                print("NaN encoutered, exiting...")
-                break 
 
             if optimizer.param_groups[0]['lr'] <= min_lr * 1.5:
                 print('converged')

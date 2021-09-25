@@ -394,6 +394,12 @@ def run(params):
                                             beta, eta, gamma,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
 
+
+            if np.isnan(mean_train_recon):
+                print("NaN encoutered, exiting...")
+                failed = True
+                break 
+
             stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                     'train_loss': mean_train_loss, 'val_loss': mean_val_loss, 
                     'train_recon': mean_train_recon, 'val_recon': mean_val_recon,
@@ -407,11 +413,7 @@ def run(params):
                                             frac=0.2)
             smoothed_valloss = smooth[-1, 1]
 
-            if np.isnan(mean_train_recon):
-                print("NaN encoutered, exiting...")
-                failed = True
-                break 
-                
+
             if epoch % params['mapsavefreq'] == 0:
                 map_save_path = os.path.join(split_dir, 'map_{}.png'.format(epoch) )
                 plot_map(assign[0], props['z'][0].numpy(), map_save_path)
