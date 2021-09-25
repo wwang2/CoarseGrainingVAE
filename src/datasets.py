@@ -144,6 +144,7 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
 
     elif cg_method == 'seqpartition':
         partition = random.sample(range(n_atoms), n_cgs - 1 )
+        partition = np.sort(partition)
         mapping = np.zeros(n_atoms)
         mapping[partition] = 1
         mapping = np.cumsum(mapping)
