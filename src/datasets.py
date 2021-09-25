@@ -142,6 +142,15 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
 
         frames = shuffle(frames)
 
+    elif cg_method == 'seqpartition':
+        partition = random.sample(range(n_atoms), n_cgs - 1 )
+        mapping = np.zeros(n_atoms)
+        mapping[partition] = 1
+        mapping = np.cumsum(mapping)
+
+        cg_coord = None
+        frames = shuffle(frames)
+
     elif cg_method =='random':
 
         mapping = get_random_mapping(n_cgs, n_atoms)
