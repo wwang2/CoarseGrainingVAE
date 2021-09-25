@@ -201,7 +201,7 @@ def run_cv(params):
                             atomwise_z=atom_decode_flag, det=det).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=int(patience//2), 
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=2, 
                                                                 factor=factor, verbose=True, 
                                                                 threshold=threshold,  min_lr=min_lr)
         early_stopping = EarlyStopping(patience=patience)
@@ -242,7 +242,7 @@ def run_cv(params):
             if np.isnan(mean_recon_val):
                 print("NaN encoutered, exiting...")
                 break 
-                
+
             stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                     'train_loss': train_loss, 'val_loss': val_loss, 
                     'train_recon': mean_recon_train, 'val_recon': mean_recon_val,
@@ -256,7 +256,6 @@ def run_cv(params):
                                             train_log['epoch'].values, # x
                                             frac=0.2)
             smoothed_valloss = smooth[-1, 1]
-
 
             scheduler.step(smoothed_valloss)
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
@@ -517,7 +516,7 @@ if __name__ == '__main__':
     parser.add_argument("-gamma", type=float, default=0.01)
     parser.add_argument("-eta", type=float, default=0.01)
     parser.add_argument("-kappa", type=float, default=0.01)
-    parser.add_argument("-threshold", type=float, default=1e-4)
+    parser.add_argument("-threshold", type=float, default=1e-3)
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("-patience", type=int, default=5)
     parser.add_argument("-factor", type=float, default=0.6)
