@@ -26,6 +26,7 @@ import json
 import time
 from datetime import timedelta
 import pandas as pd
+import statsmodels.api as sm
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
@@ -245,7 +246,14 @@ def run_cv(params):
 
             train_log = train_log.append(stats, ignore_index=True)
 
-            scheduler.step(val_loss)
+            # smoothen the validation curve 
+            smooth = sm.nonparametric.lowess(train_log['val_loss'].values,  # y
+                                            train_log['val_loss'].values, # x
+                                            frac=0.2)
+            smoothed_valloss = smooth[-1, 1]
+
+
+            scheduler.step(smoothed_valloss)
             recon_hist.append(xyz_train_recon.detach().cpu().numpy().reshape(-1, n_atoms, 3))
 
             # check NaN
@@ -257,7 +265,7 @@ def run_cv(params):
                 print('converged')
                 break
 
-            early_stopping(val_loss)
+            early_stopping(smoothed_valloss)
             if early_stopping.early_stop:
                 break
 
