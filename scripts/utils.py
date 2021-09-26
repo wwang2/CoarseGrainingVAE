@@ -112,10 +112,10 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
 
         # add graph loss 
-        edge_list = batch['bond_edge_list']
-        xyz = batch['nxyz'][:, 1:]
+        edge_list = batch['bond_edge_list'].to("cpu")
+        xyz = batch['nxyz'][:, 1:].to("cpu")
         gen_dist = (xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
-        data_dist = (xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
+        data_dist = (xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt().to(xyz_recon.device)
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         # add orientation loss 

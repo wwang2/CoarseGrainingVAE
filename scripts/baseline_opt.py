@@ -14,10 +14,12 @@ parser.add_argument('-dataset', type=str, default='dipeptide')
 parser.add_argument('-ndata', type=int, default= 2000)
 parser.add_argument("-batch_size", type=int, default=32)
 parser.add_argument("-n_cgs", type=int)
+parser.add_argument("-mapshuffle", type=float, default=0.0)
 parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("-cg_method", type=str, default='newman')
 parser.add_argument("--dry_run", action='store_true', default=False)
 parser.add_argument("--tqdm_flag", action='store_true', default=False)
+parser.add_argument('-model', type=str, default='equilinear')
 params = vars(parser.parse_args())
 
 if params['dry_run']:
@@ -38,6 +40,7 @@ if params['id'] == 0:
         metrics=[dict(name='recon', objective='minimize')],
         parameters=[
             dict(name='cutoff', type='double', bounds=dict(min=2.0, max=9.0)),
+            dict(name='edgeorder', type='int', bounds=dict(min=1, max=3)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='gamma', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='kappa', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
@@ -67,7 +70,10 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['cg_method'] = params['cg_method']
     trial['ndata'] = params['ndata']
     trial['dataset'] = params['dataset']
+    trial['mapshuffle'] = params['mapshuffle']
+    trial['model'] = params['model']
     trial['cross'] = False
+    trial['n_splits'] = 2
 
     print("Suggestion ID: {}".format(suggestion.id))
 
