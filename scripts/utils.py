@@ -56,9 +56,6 @@ class EarlyStopping():
                 print('INFO: Early stopping')
                 self.early_stop = True
 
-# def KL(mu, std):
-#      return -0.5 * torch.sum(1 + torch.log(std.pow(2)) - mu.pow(2) - std.pow(2), dim=-1).mean()
-
 def KL(mu1, std1, mu2, std2):
     if mu2 == None:
         return -0.5 * torch.sum(1 + torch.log(std1.pow(2)) - mu1.pow(2) - std1.pow(2), dim=-1).mean()
@@ -97,19 +94,11 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
         batch = batch_to(batch, device)
 
-        # batch['bond_edge_list'] =  batch['bond_edge_list'].cpu()
-        # batch['nbr_list'] =  batch['nbr_list'].cpu()
-        # batch['CG_nbr_list'] =  batch['CG_nbr_list'].cpu()
-        # batch['CG_mapping'] = batch['CG_mapping'].cpu()
-
-        #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True, use_cuda=True) as prof:
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
 
         # loss
         loss_kl = KL(S_mu, S_sigma, H_prior_mu, H_prior_sigma) 
-
         loss_recon = (xyz_recon - xyz).pow(2).mean()
-
 
         # add graph loss 
         edge_list = batch['bond_edge_list'].to("cpu")
@@ -122,20 +111,6 @@ def loop(loader, optimizer, device, model, beta, epoch,
         cg_xyz = batch['CG_nxyz'][:, 1:]
         mapping = batch['CG_mapping']
 
-        # recon_dx = xyz_recon - cg_xyz[mapping]
-        # data_dx = xyz - cg_xyz[mapping]
-
-        # recon_norm = recon_dx.pow(2).sum(-1).sqrt()
-        # data_norm = data_dx.pow(2).sum(-1).sqrt()
-
-        # recon_unit = recon_dx / recon_norm.unsqueeze(-1)
-        # data_unit = data_dx / data_norm.unsqueeze(-1)
-
-        # # minimize norm
-        # loss_dx_norm = (recon_norm - data_norm).pow(2).mean()
-        # # maxmize orientation
-        # #import ipdb ;ipdb.set_trace()
-        # loss_dx_orient = -(data_unit * recon_unit).sum(-1).mean()
         loss_dx_orient = 0.0
         loss_dx_norm = 0.0
 
