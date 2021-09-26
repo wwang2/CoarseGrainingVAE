@@ -214,6 +214,11 @@ def run_cv(params):
         graph_his = []
         lr_hist = []
 
+        # dump model hyperparams 
+        with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
+            params['mapping'] = mapping.numpy()
+            json.dump(params, outfile, indent=4)
+
         # intialize training log 
         train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 'train_recon': [], 'val_recon': [],
                    'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
@@ -268,9 +273,6 @@ def run_cv(params):
             if early_stopping.early_stop:
                 break
 
-        # dump model hyperparams 
-        with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
-            json.dump(params, outfile)
 
         # dump training curve 
         train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
