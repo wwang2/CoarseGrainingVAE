@@ -221,7 +221,7 @@ def run_cv(params):
         graph_his = []
         lr_hist = []
 
-        print(mapping )
+        print(mapping)
         # dump model hyperparams 
         with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
             params['mapping'] = mapping.numpy().tolist()
@@ -281,191 +281,191 @@ def run_cv(params):
             if early_stopping.early_stop:
                 break
 
+        if not failed:
+            # dump training curve 
+            train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
 
-        # dump training curve 
-        train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
+            # dump learning trajectory 
+            recon_hist = np.concatenate(recon_hist)
+            dump_numpy2xyz(recon_hist, atomic_nums, os.path.join(split_dir, 'recon_hist.xyz'))
+                
+            # save sampled geometries 
+            trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
+            train_true_xyzs, train_recon_xyzs, train_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(trainloader, 
+                                                                                                 device,
+                                                                                                 model,
+                                                                                                 atomic_nums,
+                                                                                                 n_cg=n_cgs,
+                                                                                                 atomwise_z=atom_decode_flag,
+                                                                                                 tqdm_flag=tqdm_flag)
 
-        # dump learning trajectory 
-        recon_hist = np.concatenate(recon_hist)
-        dump_numpy2xyz(recon_hist, atomic_nums, os.path.join(split_dir, 'recon_hist.xyz'))
-            
-        # save sampled geometries 
-        trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
-        train_true_xyzs, train_recon_xyzs, train_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(trainloader, 
-                                                                                             device,
-                                                                                             model,
-                                                                                             atomic_nums,
-                                                                                             n_cg=n_cgs,
-                                                                                             atomwise_z=atom_decode_flag,
-                                                                                             tqdm_flag=tqdm_flag)
+            # sample geometries 
+            train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
-        # sample geometries 
-        train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+            cg_types = np.array([6] * n_cgs)
 
-        cg_types = np.array([6] * n_cgs)
+            dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
+            dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
+            dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
+            dump_numpy2xyz(train_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
 
-        dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
-        dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
-        dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
-        dump_numpy2xyz(train_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
+            testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
+            test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(testloader, 
+                                                                                                 device,
+                                                                                                 model,
+                                                                                                 atomic_nums,
+                                                                                                 n_cg=n_cgs,
+                                                                                                 atomwise_z=atom_decode_flag,
+                                                                                                 tqdm_flag=tqdm_flag)
 
-        testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
-        test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(testloader, 
-                                                                                             device,
-                                                                                             model,
-                                                                                             atomic_nums,
-                                                                                             n_cg=n_cgs,
-                                                                                             atomwise_z=atom_decode_flag,
-                                                                                             tqdm_flag=tqdm_flag)
+            test_loss, mean_kl_test, mean_recon_test, mean_graph_test, xyz_test, xyz_test_recon = loop(valloader, optimizer, device,
+                                                       model, beta, epoch, 
+                                                       train=False,
+                                                        gamma=gamma,
+                                                        eta=eta,
+                                                        kappa=kappa,
+                                                        looptext='Ncg {} Fold {} test'.format(n_cgs, i),
+                                                        tqdm_flag=tqdm_flag)
 
-        test_loss, mean_kl_test, mean_recon_test, mean_graph_test, xyz_test, xyz_test_recon = loop(valloader, optimizer, device,
-                                                   model, beta, epoch, 
-                                                   train=False,
-                                                    gamma=gamma,
-                                                    eta=eta,
-                                                    kappa=kappa,
-                                                    looptext='Ncg {} Fold {} test'.format(n_cgs, i),
-                                                    tqdm_flag=tqdm_flag)
+            # sample geometries 
+            test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
-        # sample geometries 
-        test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+            dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
+            dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
+            dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
+            dump_numpy2xyz(test_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'test_cg.xyz'))
 
-        dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
-        dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
-        dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
-        dump_numpy2xyz(test_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'test_cg.xyz'))
+            # compute loss and metrics 
+            heavy_filter = atomic_nums != 1.
+            test_all_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
+            test_heavy_dxyz = (test_recon_xyzs - test_true_xyzs)[:, heavy_filter, :].reshape(-1)
 
-        # compute loss and metrics 
-        heavy_filter = atomic_nums != 1.
-        test_all_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
-        test_heavy_dxyz = (test_recon_xyzs - test_true_xyzs)[:, heavy_filter, :].reshape(-1)
+            unaligned_test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).mean())
+            unaligned_test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
 
-        unaligned_test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).mean())
-        unaligned_test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
+            # dump test rmsd 
+            np.savetxt(os.path.join(split_dir, 'test_all_rmsd{:.4f}.txt'.format(unaligned_test_all_rmsd)), np.array([unaligned_test_all_rmsd]))
+            np.savetxt(os.path.join(split_dir, 'test_heavy_rmsd{:.4f}.txt'.format(unaligned_test_heavy_rmsd)), np.array([unaligned_test_heavy_rmsd]))
 
-        # dump test rmsd 
-        np.savetxt(os.path.join(split_dir, 'test_all_rmsd{:.4f}.txt'.format(unaligned_test_all_rmsd)), np.array([unaligned_test_all_rmsd]))
-        np.savetxt(os.path.join(split_dir, 'test_heavy_rmsd{:.4f}.txt'.format(unaligned_test_heavy_rmsd)), np.array([unaligned_test_heavy_rmsd]))
+            # reconsturction loss 
+            cv_all_rmsd.append(unaligned_test_all_rmsd)
+            cv_heavy_rmsd.append(unaligned_test_heavy_rmsd)
 
-        # reconsturction loss 
-        cv_all_rmsd.append(unaligned_test_all_rmsd)
-        cv_heavy_rmsd.append(unaligned_test_heavy_rmsd)
+            # save model 
+            if savemodel:
+                model = model.to('cpu')
+                torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
 
-        # save model 
-        if savemodel:
-            model = model.to('cpu')
-            torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
+            ##### generate rotating movies for visualization #####
+            n_w = 3
+            n_h = 3
+            n_frames = n_w * n_h
 
-        ##### generate rotating movies for visualization #####
-        n_w = 3
-        n_h = 3
-        n_frames = n_w * n_h
+     
+            sampleloader = DataLoader(testset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
- 
-        sampleloader = DataLoader(testset, batch_size=1, collate_fn=CG_collate, shuffle=False)
+            sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
+                                                                                    model, atomic_nums, 
+                                                                                    n_cgs, n_sample=n_ensemble,
+                                                                                    graph_eval=graph_eval)
 
-        sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
-                                                                                model, atomic_nums, 
-                                                                                n_cgs, n_sample=n_ensemble,
-                                                                                graph_eval=graph_eval)
+            if graph_eval:
+                sample_valid = np.array(sample_valid).mean()
+                sample_hh_valid = np.array(sample_hh_valid).mean()
 
-        if graph_eval:
-            sample_valid = np.array(sample_valid).mean()
-            sample_hh_valid = np.array(sample_hh_valid).mean()
+                if all_rmsds is not None:
+                    mean_all_rmsd = np.array(all_rmsds)[:, 0].mean()
+                else:
+                    mean_all_rmsd = None
 
-            if all_rmsds is not None:
-                mean_all_rmsd = np.array(all_rmsds)[:, 0].mean()
-            else:
-                mean_all_rmsd = None
+                if all_heavy_rmsds is not None:
+                    mean_heavy_rmsd = np.array(all_heavy_rmsds)[:, 1].mean()
+                else:
+                    mean_heavy_rmsd = None
 
-            if all_heavy_rmsds is not None:
-                mean_heavy_rmsd = np.array(all_heavy_rmsds)[:, 1].mean()
-            else:
-                mean_heavy_rmsd = None
+                cv_sample_valid.append(sample_valid)
+                cv_sample_hh_valid.append(sample_hh_valid)
+                
+                mean_graph_diff = np.array(sample_graph_val_ratio_list).mean()
+                mean_graph_hh_diff = np.array(sample_graph_hh_val_ratio_list).mean()
+                cv_graph_diff.append(mean_graph_diff)
+                cv_graph_hh_diff.append(mean_graph_hh_diff)
 
-            cv_sample_valid.append(sample_valid)
-            cv_sample_hh_valid.append(sample_hh_valid)
-            
-            mean_graph_diff = np.array(sample_graph_val_ratio_list).mean()
-            mean_graph_hh_diff = np.array(sample_graph_hh_val_ratio_list).mean()
-            cv_graph_diff.append(mean_graph_diff)
-            cv_graph_hh_diff.append(mean_graph_hh_diff)
-
-            print("Sample Quality Stats: ")
-            print("sample RMSD (heavy atoms) : {}".format(mean_heavy_rmsd))
-            print("sample RMSD (all atoms) : {}".format(mean_all_rmsd))
-            print("sample validity (heavy atoms): {}".format(sample_valid))
-            print("sample validity (all atoms): {}".format(sample_hh_valid))
-            print("sample graph difference ratio (heavy atoms): {}".format(mean_graph_diff))
-            print("sample graph difference ratio (all atoms): {}".format(mean_graph_hh_diff))
-
-
-        test_stats = { 'train_recon': mean_recon_train,
-                'test_all_recon': unaligned_test_all_rmsd,
-                'test_heavy_recon': unaligned_test_heavy_rmsd,
-                'train_KL': mean_kl_train, 'test_KL': mean_kl_test, 
-                'train_graph': mean_graph_train,  'test_graph': mean_graph_test,
-                'all atom ged': mean_graph_hh_diff, 'heavy atom ged': mean_graph_diff, 
-                'all atom graph valid ratio': sample_hh_valid, 
-                'heavy atom graph valid ratio': sample_valid,
-                'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd} 
-
-        cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
-        cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)
-
-        # compute maxium dimension
-        ref_xyz = data_xyzs[0]
-        ref_xyz = ref_xyz - ref_xyz.mean(0)
-        geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.25
-
-        # loop over all the ensembles and dump individual samples
-        for sample_id in range(n_ensemble): 
-            snapshot = sample_xyzs.reshape(-1, n_ensemble, n_atoms, 3)[:, sample_id, :, :]
-            ensemble_atoms = xyz_grid_view(torch.Tensor(snapshot).reshape(-1, 3),
-                            atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
-
-            rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
-
-            io.write(os.path.join(split_dir, 'rotate_test_ensemble_{}.xyz'.format(sample_id)), rotate_ensemble)
-
-        data_atoms = xyz_grid_view(torch.Tensor(data_xyzs).reshape(-1, 3),
-                      atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
-
-        recon_atoms = xyz_grid_view(torch.Tensor(recon_xyzs).reshape(-1, 3),
-                      atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
-
-        cg_atoms = xyz_grid_view(torch.Tensor(cg_xyzs).reshape(-1, 3),
-                      np.ones(n_cgs) * 6, [n_cgs] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
+                print("Sample Quality Stats: ")
+                print("sample RMSD (heavy atoms) : {}".format(mean_heavy_rmsd))
+                print("sample RMSD (all atoms) : {}".format(mean_all_rmsd))
+                print("sample validity (heavy atoms): {}".format(sample_valid))
+                print("sample validity (all atoms): {}".format(sample_hh_valid))
+                print("sample graph difference ratio (heavy atoms): {}".format(mean_graph_diff))
+                print("sample graph difference ratio (all atoms): {}".format(mean_graph_hh_diff))
 
 
-        rotate_data = rotate_grid(data_atoms, n_frames, axis='y')
-        rotate_recon = rotate_grid(recon_atoms, n_frames, axis='y')
-        rotate_cg = rotate_grid(cg_atoms, n_frames, axis='y')
-        #rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
+            test_stats = { 'train_recon': mean_recon_train,
+                    'test_all_recon': unaligned_test_all_rmsd,
+                    'test_heavy_recon': unaligned_test_heavy_rmsd,
+                    'train_KL': mean_kl_train, 'test_KL': mean_kl_test, 
+                    'train_graph': mean_graph_train,  'test_graph': mean_graph_test,
+                    'all atom ged': mean_graph_hh_diff, 'heavy atom ged': mean_graph_diff, 
+                    'all atom graph valid ratio': sample_hh_valid, 
+                    'heavy atom graph valid ratio': sample_valid,
+                    'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd} 
 
-        io.write(os.path.join(split_dir, 'rotate_test_data.xyz'), rotate_data)
-        io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
-        io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
+            cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
+            cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)
 
-        # dump rmsd distributions 
-        if graph_eval:
-            if all_rmsds is not None:
-                np.savetxt(os.path.join(split_dir, 'valid_all_rmsds.txt'), np.array(all_rmsds))
-            if all_heavy_rmsds is not None:
-                np.savetxt(os.path.join(split_dir, 'valid_heavy_rmsds.txt'), np.array(all_heavy_rmsds))
+            # compute maxium dimension
+            ref_xyz = data_xyzs[0]
+            ref_xyz = ref_xyz - ref_xyz.mean(0)
+            geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.25
 
-        end = time.time()
+            # loop over all the ensembles and dump individual samples
+            for sample_id in range(n_ensemble): 
+                snapshot = sample_xyzs.reshape(-1, n_ensemble, n_atoms, 3)[:, sample_id, :, :]
+                ensemble_atoms = xyz_grid_view(torch.Tensor(snapshot).reshape(-1, 3),
+                                atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
 
-        temp = end-start
-        hours = temp//3600
-        temp = temp - 3600*hours
-        minutes = temp//60
-        seconds = temp - 60*minutes
-        format_time = '%d:%d:%d' %(hours,minutes,seconds)
+                rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
 
-        np.savetxt(os.path.join(split_dir, '{}.txt'.format(format_time)), np.ones(10))
+                io.write(os.path.join(split_dir, 'rotate_test_ensemble_{}.xyz'.format(sample_id)), rotate_ensemble)
 
-        print("time elapsed: {}".format(format_time))
+            data_atoms = xyz_grid_view(torch.Tensor(data_xyzs).reshape(-1, 3),
+                          atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
+
+            recon_atoms = xyz_grid_view(torch.Tensor(recon_xyzs).reshape(-1, 3),
+                          atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
+
+            cg_atoms = xyz_grid_view(torch.Tensor(cg_xyzs).reshape(-1, 3),
+                          np.ones(n_cgs) * 6, [n_cgs] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
+
+
+            rotate_data = rotate_grid(data_atoms, n_frames, axis='y')
+            rotate_recon = rotate_grid(recon_atoms, n_frames, axis='y')
+            rotate_cg = rotate_grid(cg_atoms, n_frames, axis='y')
+            #rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
+
+            io.write(os.path.join(split_dir, 'rotate_test_data.xyz'), rotate_data)
+            io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
+            io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
+
+            # dump rmsd distributions 
+            if graph_eval:
+                if all_rmsds is not None:
+                    np.savetxt(os.path.join(split_dir, 'valid_all_rmsds.txt'), np.array(all_rmsds))
+                if all_heavy_rmsds is not None:
+                    np.savetxt(os.path.join(split_dir, 'valid_heavy_rmsds.txt'), np.array(all_heavy_rmsds))
+
+            end = time.time()
+
+            temp = end-start
+            hours = temp//3600
+            temp = temp - 3600*hours
+            minutes = temp//60
+            seconds = temp - 60*minutes
+            format_time = '%d:%d:%d' %(hours,minutes,seconds)
+
+            np.savetxt(os.path.join(split_dir, '{}.txt'.format(format_time)), np.ones(10))
+
+            print("time elapsed: {}".format(format_time))
 
         ########################################################
 
