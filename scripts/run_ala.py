@@ -170,6 +170,13 @@ def run_cv(params):
         train_index, val_index = train_test_split(train_index, test_size=0.1)
 
         trainset, mapping = build_split_dataset(traj[train_index], params, mapping=None)
+        true_n_cgs = len(list(set(mapping.tolist())))
+        
+        if true_n_cgs < n_cgs:
+            while true_n_cgs < n_cgs:
+                trainset, mapping = build_split_dataset(traj[train_index], params, mapping=None)
+                true_n_cgs = len(list(set(mapping.tolist())))
+
         valset, mapping = build_split_dataset(traj[val_index], params, mapping)
         testset, mapping = build_split_dataset(traj[test_index], params, mapping)
 
@@ -214,9 +221,10 @@ def run_cv(params):
         graph_his = []
         lr_hist = []
 
+        print(mapping )
         # dump model hyperparams 
         with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
-            params['mapping'] = mapping.numpy()
+            params['mapping'] = mapping.numpy().tolist()
             json.dump(params, outfile, indent=4)
 
         # intialize training log 
