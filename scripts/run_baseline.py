@@ -209,6 +209,8 @@ def run(params):
     trajs = [md.load_xtc(file,
                 top=pdb_file) for file in traj_files]
 
+    traj = trajs[0]
+
     atomic_nums, protein_index = get_atomNum(trajs[0])
     n_atoms = len(atomic_nums)
 
@@ -262,6 +264,17 @@ def run(params):
 
         elif cg_method == 'random':
             mapping = get_random_mapping(N_cg, n_atoms)
+            assign_idx = torch.LongTensor( np.array(mapping) )
+
+        elif cg_method == 'backbonepartition': 
+            mapping = backbone_partition(trajs[0], N_cg)
+            true_n_cgs = len(list(set(mapping.tolist())))
+            
+            if true_n_cgs < N_cg:
+                while true_n_cgs < N_cg:
+                    mapping = backbone_partition(trajs[0], N_cg)
+                    true_n_cgs = len(list(set(mapping.tolist())))
+
             assign_idx = torch.LongTensor( np.array(mapping) )
 
         # shuffle if mapshuffle is on 
