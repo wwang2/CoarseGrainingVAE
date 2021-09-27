@@ -34,6 +34,35 @@ PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-1144
                             }}
 
 
+def backbone_partition(traj, n_cgs, skip=100):
+    atomic_nums, protein_index = get_atomNum(traj)
+    indices = traj.top.select_atom_indices('minimal')
+
+    if indices.shape[0] < n_cgs:
+        raise ValueError("N_cg = {} is larger than N_backbone = {}".format(n_cgs, indices.shape[0]) )
+
+    partition = random.sample(range(indices.shape[0]), n_cgs - 1 )
+    partition = np.sort(partition)
+
+    mapping = np.zeros(indices.shape[0])
+    mapping[partition] = 1
+    mapping = np.cumsum(mapping)
+
+    backbone_cgxyz = scatter_mean(torch.Tensor(traj.xyz[:, indices]), 
+                          index=torch.LongTensor(mapping), dim=1).numpy()
+
+    mappings = []
+    for i in protein_index:
+        dist = traj.xyz[::skip, [i], ] - backbone_cgxyz[::skip]
+        map_index = np.argmin( np.sqrt( np.sum(dist ** 2, -1)).mean(0) )
+        mappings.append(map_index)
+
+    cg_coord = None
+    mapping = np.array(mappings)
+
+    return mapping 
+
+
 def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1):
     props = {}
 
@@ -143,29 +172,8 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
         frames = shuffle(frames)
 
     elif cg_method == 'backbonepartition': 
-        indices = traj.top.select_atom_indices('minimal')
-
-        if indices.shape[0] < n_cgs:
-            raise ValueError("N_cg = {} is larger than N_backbone = {}".format(n_cgs, indices.shape[0]) )
-
-        partition = random.sample(range(indices.shape[0]), n_cgs - 1 )
-        partition = np.sort(partition)
-
-        mapping = np.zeros(indices.shape[0])
-        mapping[partition] = 1
-        mapping = np.cumsum(mapping)
-
-        backbone_cgxyz = scatter_mean(torch.Tensor(traj.xyz[:, indices]), 
-                              index=torch.LongTensor(mapping), dim=1).numpy()
-
-        mappings = []
-        for i in protein_index:
-            dist = traj.xyz[::skip, [i], ] - backbone_cgxyz[::skip]
-            map_index = np.argmin( np.sqrt( np.sum(dist ** 2, -1)).mean(0) )
-            mappings.append(map_index)
-
+        mapping = backbone_partition(traj, n_cgs)
         cg_coord = None
-        mapping = np.array(mappings)
 
     elif cg_method == 'seqpartition':
         partition = random.sample(range(n_atoms), n_cgs - 1 )
