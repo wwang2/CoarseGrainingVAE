@@ -248,13 +248,16 @@ def run(params):
         split_dir = os.path.join(working_dir, 'fold{}'.format(i)) 
         create_dir(split_dir)
 
-        trainset = get_subset_by_indices(train_index, dataset)
-        testset = get_subset_by_indices(test_index, dataset)
+        train_index, val_index = train_test_split(list(range(len(train_index))),test_size=0.1)
 
         trainset = get_subset_by_indices(train_index, dataset)
+        valset = get_subset_by_indices(val_index, dataset)
         testset = get_subset_by_indices(test_index, dataset)
+
 
         trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+        valloader = DataLoader(valset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
+
 
         # get cg_map 
         if cg_method == 'newman':
@@ -300,12 +303,21 @@ def run(params):
         
         failed = False 
 
+
+        train_log = pd.DataFrame({'epoch': [], 'lr': [],
+                    'train_recon': [], 'val_recon': [],
+                   'train_graph': [], 'val_graph': []})
+
         # train     
         for epoch in range(n_epochs):
         
             mean_train_recon, mean_train_graph, mean_train_tetra, assign, train_xyz, train_xyz_recon = loop(trainloader, optimizer, device, model, 
                                                                         epoch, gamma, kappa, tetra_index, 
                                                                         train=True, looptext='', tqdm_flag=tqdm_flag)
+
+            mean_val_recon, mean_val_graph, mean_val_tetra, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, 
+                                                                        epoch, gamma, kappa, tetra_index, 
+                                                                        train=False, looptext='', tqdm_flag=tqdm_flag)
 
             if np.isnan(mean_train_recon):
                 print("NaN encoutered, exiting...")
@@ -317,7 +329,20 @@ def run(params):
             #     #plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
 
-            scheduler.step(mean_train_recon)
+            scheduler.step(mean_val_recon)
+
+            # early stop 
+
+            # early stopping 
+            if optimizer.param_groups[0]['lr'] <= 1.5e-7:
+                break
+
+            stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
+                    'train_recon': mean_train_recon, 'val_recon': mean_val_recon,
+                    'train_graph': mean_train_graph, 'val_graph': mean_val_graph}
+
+            train_log = train_log.append(stats, ignore_index=True)
+            train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
 
         dump_numpy2xyz(train_xyz_recon, props['z'][0].numpy(), os.path.join(split_dir, 'train_recon.xyz'))
 
