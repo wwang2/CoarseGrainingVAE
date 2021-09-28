@@ -19,6 +19,7 @@ parser.add_argument("-n_epochs", type=int, default=60)
 parser.add_argument("-cg_method", type=str, default='newman')
 parser.add_argument("--dry_run", action='store_true', default=False)
 parser.add_argument("--tqdm_flag", action='store_true', default=False)
+parser.add_argument("--cross", action='store_true', default=False)
 parser.add_argument('-model', type=str, default='equilinear')
 params = vars(parser.parse_args())
 
@@ -72,7 +73,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['dataset'] = params['dataset']
     trial['mapshuffle'] = params['mapshuffle']
     trial['model'] = params['model']
-    trial['cross'] = False
+    trial['cross'] = params['cross']
     trial['n_splits'] = 2
 
     print("Suggestion ID: {}".format(suggestion.id))
