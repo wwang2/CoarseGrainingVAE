@@ -12,6 +12,7 @@ from utils import *
 from visualization import xyz_grid_view, rotate_grid
 #from plots import *
 from sampling import * 
+from run_baseline import retrieve_recon_structures
 from utils import * 
 import torch
 from torch import nn
@@ -254,6 +255,7 @@ def run_cv(params):
             # check NaN
             if np.isnan(mean_recon_val):
                 print("NaN encoutered, exiting...")
+                failed = True
                 break 
 
             stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
@@ -291,13 +293,16 @@ def run_cv(params):
                 
             # save sampled geometries 
             trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
-            train_true_xyzs, train_recon_xyzs, train_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(trainloader, 
+            train_true_xyzs, train_recon_xyzs, train_cg_xyzs, mu, sigma, train_all_valid_ratio, train_heavy_valid_ratio, train_all_ged, train_heavy_ged= get_all_true_reconstructed_structures(trainloader, 
                                                                                                  device,
                                                                                                  model,
                                                                                                  atomic_nums,
                                                                                                  n_cg=n_cgs,
                                                                                                  atomwise_z=atom_decode_flag,
                                                                                                  tqdm_flag=tqdm_flag)
+
+            #all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged, heavy_valid_ratio, all_valid_ratio = retrieve_recon_structures(testloader, device, model, tqdm_flag=True)
+
 
             # sample geometries 
             train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
@@ -310,7 +315,7 @@ def run_cv(params):
             dump_numpy2xyz(train_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
 
             testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
-            test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma = get_all_true_reconstructed_structures(testloader, 
+            test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma, test_all_valid_ratio, test_heavy_valid_ratio, test_all_ged, test_heavy_ged = get_all_true_reconstructed_structures(testloader, 
                                                                                                  device,
                                                                                                  model,
                                                                                                  atomic_nums,
@@ -391,24 +396,22 @@ def run_cv(params):
                 cv_graph_diff.append(mean_graph_diff)
                 cv_graph_hh_diff.append(mean_graph_hh_diff)
 
-                print("Sample Quality Stats: ")
-                print("sample RMSD (heavy atoms) : {}".format(mean_heavy_rmsd))
-                print("sample RMSD (all atoms) : {}".format(mean_all_rmsd))
-                print("sample validity (heavy atoms): {}".format(sample_valid))
-                print("sample validity (all atoms): {}".format(sample_hh_valid))
-                print("sample graph difference ratio (heavy atoms): {}".format(mean_graph_diff))
-                print("sample graph difference ratio (all atoms): {}".format(mean_graph_hh_diff))
-
-
             test_stats = { 'train_recon': mean_recon_train,
                     'test_all_recon': unaligned_test_all_rmsd,
                     'test_heavy_recon': unaligned_test_heavy_rmsd,
                     'train_KL': mean_kl_train, 'test_KL': mean_kl_test, 
                     'train_graph': mean_graph_train,  'test_graph': mean_graph_test,
-                    'all atom ged': mean_graph_hh_diff, 'heavy atom ged': mean_graph_diff, 
-                    'all atom graph valid ratio': sample_hh_valid, 
-                    'heavy atom graph valid ratio': sample_valid,
-                    'all atom rmsd': mean_all_rmsd, 'heavy atom rmsd':mean_heavy_rmsd} 
+                    'recon_all_ged': test_all_ged, 'recon_heavy_ged': test_heavy_ged, 
+                    'recon_all_valid_ratio': test_all_valid_ratio, 
+                    'recon_heavy_valid_ratio': test_heavy_valid_ratio,
+                    'sample_all_ged': mean_graph_hh_diff, 'sample_heavy_ged': mean_graph_diff, 
+                    'sample_all_valid_ratio': sample_hh_valid, 
+                    'sample_heavy_valid_ratio': sample_valid,
+                    'sample_all_rmsd': mean_all_rmsd, 'sample_heavy_rmsd':mean_heavy_rmsd} 
+
+
+            for key in test_stats:
+                print(key, test_stats[key])
 
             cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
             cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)

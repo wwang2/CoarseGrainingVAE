@@ -7,6 +7,7 @@ from ase import Atoms, io
 import networkx as nx
 from datetime import date
 import torch.autograd.profiler as profiler
+from sampling import *
 
 def annotate_job(task, job_name, N_cg):
     today = date.today().strftime('%m-%d')
@@ -177,6 +178,12 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     mus = []
     sigmas = []
 
+    heavy_ged = []
+    all_ged = []
+
+    all_valid_ratios = []
+    heavy_valid_ratios = []
+
     if atomwise_z == True:
         n_z = len(atomic_nums)
     else:
@@ -198,10 +205,28 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
         num_features = S_mu.shape[-1]
 
-        del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
-
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
         postfix = ['memory ={:.4f} Mb'.format(memory)]
+
+
+        recon_x_split =  torch.split(xyz_recon, batch['num_atoms'].tolist())
+        data_x_split =  torch.split(xyz, batch['num_atoms'].tolist())
+
+        for i, x in enumerate(data_x_split):
+
+            ref_atoms = Atoms(numbers=atomic_nums, positions=x.detach().cpu().numpy())
+            recon_atoms = Atoms(numbers=atomic_nums, positions=recon_x_split[i].detach().cpu().numpy())
+
+            # compute ged diff 
+            all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, [recon_atoms])
+
+            heavy_ged.append(graph_val_ratio)
+            all_ged.append(graph_hh_val_ratio)
+
+            all_valid_ratios.append(valid_hh_ratio)
+            heavy_valid_ratios.append(valid_ratio)
+
+        del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
         
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
@@ -212,8 +237,14 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     
     mu = torch.cat(mus).reshape(-1, n_z, num_features).mean(0)
     sigma = torch.cat(sigmas).reshape(-1, n_z, num_features).mean(0)
+
+    all_valid_ratio = np.array(all_valid_ratios).mean()
+    heavy_valid_ratio = np.array(heavy_valid_ratios).mean()
+
+    all_ged = np.array(all_ged).mean()
+    heavy_ged = np.array(heavy_ged).mean()
     
-    return true_xyzs, recon_xyzs, cg_xyzs, mu, sigma
+    return true_xyzs, recon_xyzs, cg_xyzs, mu, sigma, all_valid_ratio, heavy_valid_ratio, all_ged, heavy_ged
 
 def dump_numpy2xyz(xyzs, atomic_nums, path):
     trajs = [Atoms(positions=xyz, numbers=atomic_nums.ravel()) for xyz in xyzs]
