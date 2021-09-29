@@ -63,7 +63,7 @@ def backbone_partition(traj, n_cgs, skip=100):
     return mapping 
 
 
-def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1):
+def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True):
     props = {}
 
     num_cgs = []
@@ -86,6 +86,10 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1):
         for xyz in frames: 
             z_data.append(torch.Tensor(atomic_nums))
             coord = torch.Tensor(xyz)
+
+            if recenter:
+                coord = coord - coord.mean(0)[None, ...]
+
             xyz_data.append(coord)
             bond_data.append(bond_edges)
             hyperedge_data.append(hyper_edges)
