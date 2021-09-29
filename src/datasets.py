@@ -49,7 +49,7 @@ def backbone_partition(traj, n_cgs, skip=100):
     if indices.shape[0] < n_cgs:
         raise ValueError("N_cg = {} is larger than N_backbone = {}".format(n_cgs, indices.shape[0]) )
 
-    if len(indices) >= n_cgs:
+    if len(indices) == n_cgs:
         partition = list(range(1, n_cgs))
     else:
         partition = random.sample(range(indices.shape[0]), n_cgs - 1 )
