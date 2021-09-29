@@ -149,15 +149,18 @@ def run_cv(params):
 
     split_iter = kf.split(list(range(ndata)))
      
-    cv_stats_pd = pd.DataFrame( { 'train_recon': [], 'test_recon': [],
-                'test_all_recon': [], 
-                'test_heavy_recon': [], 
-                'train_KL': [], 'test_KL': [], 
-                'train_graph': [], 'test_graph': [],
-                'all atom ged': [], 'heavy atom ged': [], 
-                'all atom graph valid ratio': [], 
-                'heavy atom graph valid ratio': [],
-                'all atom rmsd': [], 'heavy atom rmsd':[]} )
+    cv_stats_pd = pd.DataFrame( { 'train_recon': [],
+                    'test_all_recon': [],
+                    'test_heavy_recon': [],
+                    'train_KL': [], 'test_KL': [], 
+                    'train_graph': [],  'test_graph': [],
+                    'recon_all_ged': [], 'recon_heavy_ged': [], 
+                    'recon_all_valid_ratio': [], 
+                    'recon_heavy_valid_ratio': [],
+                    'sample_all_ged': [], 'sample_heavy_ged': [], 
+                    'sample_all_valid_ratio': [], 
+                    'sample_heavy_valid_ratio': [],
+                    'sample_all_rmsd': [], 'sample_heavy_rmsd':[]}  )
 
     for i, (train_index, test_index) in enumerate(split_iter):
 
