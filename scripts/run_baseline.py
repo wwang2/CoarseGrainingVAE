@@ -39,7 +39,7 @@ def plot_map(assign, z, save_path=None):
         
     plt.show()
 
-def retrive_recon_structures(loader, device, model, tqdm_flag=True):
+def retrieve_recon_structures(loader, device, model, tqdm_flag=True):
     # get all structure
     # compute rmsd 
     # compute graph metric 
@@ -354,7 +354,7 @@ def run(params):
                                                                     epoch, gamma, kappa, tetra_index, 
                                                                     train=False, looptext='', tqdm_flag=tqdm_flag)
 
-        all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged, heavy_valid_ratio, all_valid_ratio = retrive_recon_structures(testloader, device, model, tqdm_flag=True)
+        all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged, heavy_valid_ratio, all_valid_ratio = retrieve_recon_structures(testloader, device, model, tqdm_flag=True)
 
         # compute rmsd 
         atomic_nums = props['z'][0].numpy()
