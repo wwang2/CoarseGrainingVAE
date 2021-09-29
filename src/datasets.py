@@ -34,15 +34,26 @@ PROTEINFILES = {'covid': {'traj_paths': "../data/DESRES-Trajectory_sarscov2-1144
                             }}
 
 
+def get_backbone(top):
+    backbone_index = []
+    for atom in top.atoms:
+        if atom.is_backbone:
+            backbone_index.append(atom.index)
+    return np.array(backbone_index)
+
 def backbone_partition(traj, n_cgs, skip=100):
     atomic_nums, protein_index = get_atomNum(traj)
-    indices = traj.top.select_atom_indices('minimal')
+    #indices = traj.top.select_atom_indices('minimal')
+    indices = get_backbone(traj.top)
 
     if indices.shape[0] < n_cgs:
         raise ValueError("N_cg = {} is larger than N_backbone = {}".format(n_cgs, indices.shape[0]) )
 
-    partition = random.sample(range(indices.shape[0]), n_cgs - 1 )
-    partition = np.sort(partition)
+    if len(indices) >= n_cgs:
+        partition = list(range(1, n_cgs))
+    else:
+        partition = random.sample(range(indices.shape[0]), n_cgs - 1 )
+        partition = np.sort(partition)
 
     mapping = np.zeros(indices.shape[0])
     mapping[partition] = 1

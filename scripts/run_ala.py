@@ -175,7 +175,7 @@ def run_cv(params):
 
         trainset, mapping = build_split_dataset(traj[train_index], params, mapping=None)
         true_n_cgs = len(list(set(mapping.tolist())))
-        
+
         if true_n_cgs < n_cgs:
             while true_n_cgs < n_cgs:
                 trainset, mapping = build_split_dataset(traj[train_index], params, mapping=None)
