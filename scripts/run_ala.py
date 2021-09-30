@@ -547,8 +547,6 @@ if __name__ == '__main__':
     parser.add_argument("--det", action='store_true', default=False)
     parser.add_argument("--cg_radius_graph", action='store_true', default=False)
 
-
-
     params = vars(parser.parse_args())
     params['savemodel'] = True
 
@@ -558,6 +556,6 @@ if __name__ == '__main__':
     else:
         task = 'sample'
 
-    params['logdir'] = annotate_job(params['cg_method'] + '_' + task + '_ndata'.format(params['ndata']), params['logdir'], params['n_cgs'])
+    params['logdir'] = annotate_job(params['cg_method'] + '_' + task + '_ndata{}'.format(params['ndata']), params['logdir'], params['n_cgs'])
 
     run_cv(params)
