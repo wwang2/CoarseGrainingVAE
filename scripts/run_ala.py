@@ -109,6 +109,7 @@ def run_cv(params):
     threshold = params['threshold']
     savemodel = params['savemodel']
     auxcutoff = params['auxcutoff']
+    invariantdec = params['invariantdec']
     min_lr = 5e-8
 
     if det:
@@ -209,7 +210,7 @@ def run_cv(params):
 
         
         model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
-                            atomwise_z=atom_decode_flag, det=det).to(device)
+                            atomwise_z=atom_decode_flag, det=det, equivariant= not invariantdec).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=2, 
@@ -546,6 +547,7 @@ if __name__ == '__main__':
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
     parser.add_argument("--det", action='store_true', default=False)
     parser.add_argument("--cg_radius_graph", action='store_true', default=False)
+    parser.add_argument("--invariantdec", action='store_true', default=False)
 
     params = vars(parser.parse_args())
     params['savemodel'] = True
@@ -556,6 +558,9 @@ if __name__ == '__main__':
     else:
         task = 'sample'
 
-    params['logdir'] = annotate_job(params['cg_method'] + '_' + task + '_ndata{}'.format(params['ndata']), params['logdir'], params['n_cgs'])
+    if params['invariantdec']:
+        params['logdir'] = annotate_job(params['cg_method'] + '_invariantdec_' + task + '_ndata{}'.format(params['ndata']), params['logdir'], params['n_cgs'])
+    else:
+        params['logdir'] = annotate_job(params['cg_method'] + '_' + task + '_ndata{}'.format(params['ndata']), params['logdir'], params['n_cgs'])
 
     run_cv(params)

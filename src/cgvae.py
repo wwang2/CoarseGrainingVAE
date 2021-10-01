@@ -78,6 +78,8 @@ class EquivariantDecoder(nn.Module):
              for _ in range(num_conv)]
         )
 
+        self.n_atom_basis = n_atom_basis
+
     
     def forward(self, cg_xyz, CG_nbr_list, mapping, H, h):
     
@@ -182,6 +184,7 @@ class EquiEncoder(nn.Module):
         self.dir_mp = dir_mp
         self.cg_mp = cg_mp
         self.atomwise_z = atomwise_z
+        self.n_atom_basis = n_atom_basis
     
     def forward(self, z, xyz, cg_xyz, mapping, nbr_list, cg_nbr_list):
         
@@ -329,7 +332,7 @@ class CGequiVAE(nn.Module):
                     n_atoms, n_cgs, feature_dim,
                     prior_net=None, 
                     atomwise_z=False,
-                    det=False):
+                    det=False, equivariant=True):
         nn.Module.__init__(self)
         self.encoder = encoder
         self.equivaraintconv = equivaraintconv
@@ -341,6 +344,9 @@ class CGequiVAE(nn.Module):
         self.atomwise_z = atomwise_z
         self.prior_net = prior_net
         self.det = det
+
+        self.equivariant = equivariant
+        self.euclidean = nn.Linear(self.encoder.n_atom_basis, self.encoder.n_atom_basis * 3)
         
     def get_inputs(self, batch):
 
@@ -382,7 +388,13 @@ class CGequiVAE(nn.Module):
         cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I, s_i)
 
         CG2atomChannel = self.CG2ChannelIdx(mapping)
-        xyz_rel = cg_v[mapping, CG2atomChannel, :]
+
+        # implement an non-equivariant decoder 
+        if self.equivariant == False: 
+            dv = self.euclidean(cg_s).reshape(cg_s.shape[0], cg_s.shape[1], 3)
+            xyz_rel = dv[mapping, CG2atomChannel, :]
+        else:
+            xyz_rel = cg_v[mapping, CG2atomChannel, :]
 
         #this constraint is only true for geometrical mean
         decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
