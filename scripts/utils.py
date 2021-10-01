@@ -167,10 +167,8 @@ def loop(loader, optimizer, device, model, beta, epoch,
     return mean_total_loss, mean_kl, mean_recon, mean_graph, xyz, xyz_recon 
 
 def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True):
-
-    model.eval()
-
     model = model.to(device)
+    model.eval()
 
     true_xyzs = []
     recon_xyzs = []
@@ -205,17 +203,21 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
         num_features = S_mu.shape[-1]
 
+        recon  = xyz_recon.detach().cpu()
+        data = xyz.detach().cpu()
+
+        recon_x_split =  torch.split(recon, batch['num_atoms'].tolist())
+        data_x_split =  torch.split(data, batch['num_atoms'].tolist())
+
+        del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon, batch
+
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
         postfix = ['memory ={:.4f} Mb'.format(memory)]
 
-
-        recon_x_split =  torch.split(xyz_recon, batch['num_atoms'].tolist())
-        data_x_split =  torch.split(xyz, batch['num_atoms'].tolist())
-
         for i, x in enumerate(data_x_split):
 
-            ref_atoms = Atoms(numbers=atomic_nums, positions=x.detach().cpu().numpy())
-            recon_atoms = Atoms(numbers=atomic_nums, positions=recon_x_split[i].detach().cpu().numpy())
+            ref_atoms = Atoms(numbers=atomic_nums, positions=x.numpy())
+            recon_atoms = Atoms(numbers=atomic_nums, positions=recon_x_split[i].numpy())
 
             # compute ged diff 
             all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, [recon_atoms])
@@ -225,8 +227,6 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
             all_valid_ratios.append(valid_hh_ratio)
             heavy_valid_ratios.append(valid_ratio)
-
-        del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
         
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
