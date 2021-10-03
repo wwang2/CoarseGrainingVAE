@@ -295,6 +295,9 @@ def run(params):
             model = EquiLinear(pooler, N_cg, n_atoms, cross=cross).to(device)
         elif params['model'] == 'linear': 
             model = Baseline(pooler, N_cg, n_atoms).to(device)
+        elif params['model'] == 'mlp':
+            model = MLP(pooler, N_cg, n_atoms).to(device)
+
         
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 

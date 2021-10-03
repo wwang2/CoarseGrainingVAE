@@ -29,6 +29,44 @@ class Baseline(nn.Module):
         return soft_assign, xyz, x_recon
 
 
+class MLP(nn.Module):
+    def __init__(self, pooler, n_cgs, n_atoms):
+        nn.Module.__init__(self)
+        self.pooler = pooler 
+
+        input_dim = n_cgs * 3 
+        output_dim = n_atoms * 3 
+
+        self.n_cgs = n_cgs 
+        self.n_atoms = n_atoms
+
+        self.mlp = torch.nn.Sequential(torch.nn.Linear(input_dim, output_dim), 
+                                    nn.ReLU(), 
+                                    torch.nn.Linear(output_dim, output_dim), 
+                                    nn.ReLU(),  
+                                    torch.nn.Linear(output_dim, output_dim))
+        
+    def forward(self, batch):
+    
+        xyz = batch['xyz']        
+        device = xyz.device
+        
+        z = batch['z'] # torch.ones_like( batch['z'] ) 
+        nbr_list = batch['nbr_list']
+
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+                                                                   batch['xyz'], 
+                                                                   batch['bonds'], 
+                                                                   tau=0.0,
+                                                                   gumbel=True)
+
+        x_recon = self.mlp(cg_xyz.reshape(-1, self.n_cgs * 3))
+
+        x_recon = x_recon.reshape(-1, self.n_atoms, 3)
+        
+        return soft_assign, xyz, x_recon
+
+
 class EquiLinear(nn.Module):
     def __init__(self, pooler, n_cgs, n_atoms, cross):
         nn.Module.__init__(self)
