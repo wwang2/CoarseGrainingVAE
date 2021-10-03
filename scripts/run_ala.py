@@ -305,9 +305,6 @@ def run_cv(params):
                                                                                                  atomwise_z=atom_decode_flag,
                                                                                                  tqdm_flag=tqdm_flag)
 
-            #all_test_xyz_data, all_test_xyz_recon, heavy_ged, all_ged, heavy_valid_ratio, all_valid_ratio = retrieve_recon_structures(testloader, device, model, tqdm_flag=True)
-
-
             # sample geometries 
             train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
