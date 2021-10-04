@@ -287,9 +287,11 @@ def run_cv(params):
             if early_stopping.early_stop:
                 break
 
-        if not failed:
             # dump training curve 
             train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
+
+        if not failed:
+            print(failed)
 
             # dump learning trajectory 
             recon_hist = np.concatenate(recon_hist)
