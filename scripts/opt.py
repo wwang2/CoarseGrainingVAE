@@ -44,8 +44,11 @@ else:
 # add more info about this job 
 if params['det']:
     task = 'recon'
+    metric_name = 'rmsd'
 else:
     task = 'sample'
+    metric_name = 'ged'
+
 params['logdir'] = annotate_job(params['cg_method'] + '_' + task, params['logdir'],  params['n_cgs'])
 
 create_dir(params['logdir'])
@@ -56,7 +59,7 @@ conn = Connection(client_token=token)
 if params['id'] == 0:
     experiment = conn.experiments().create(
         name=params['logdir'],
-        metrics=[dict(name='cv rmsd', objective='minimize')],
+        metrics=[dict(name=metric_name, objective='minimize')],
         parameters=[
             dict(name='n_basis', type='int', bounds=dict(min=128, max=600)),
             dict(name='n_rbf', type='int', bounds=dict(min=5, max=10)),
@@ -64,10 +67,11 @@ if params['id'] == 0:
             dict(name='cg_radius_graph', type='categorical', categorical_values=["True", "False"]),
             dict(name='cg_cutoff', type='double', bounds=dict(min=params['min_cgcutoff'], max=params['min_cgcutoff'] + 10.0)),
             dict(name='atom_cutoff', type='double', bounds=dict(min=7.0, max=9.5)),
+            dict(name='edgeorder', type='int', bounds=dict(min=1, max=3)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=4)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.1), transformation="log"),
-            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=10.0), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=30.0), transformation="log"),
             # dict(name='eta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             # dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.0001), transformation="log"),
@@ -125,6 +129,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['mapshuffle'] = params['mapshuffle']
     trial['threshold'] = params['threshold']
     trial['savemodel'] = False
+    trial['auxcutoff'] = 0.0
+    trial['invariantdec'] = False
 
     print("Suggestion ID: {}".format(suggestion.id))
 
