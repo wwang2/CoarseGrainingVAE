@@ -111,6 +111,7 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True):
         hyper_edges = get_high_order_edge(bond_edges, edgeorder, n_atoms)
 
         for xyz in frames: 
+            xyz = random_rotation(xyz)
             z_data.append(torch.Tensor(atomic_nums))
             coord = torch.Tensor(xyz)
 
