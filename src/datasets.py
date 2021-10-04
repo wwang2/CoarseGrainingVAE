@@ -41,6 +41,14 @@ def get_backbone(top):
             backbone_index.append(atom.index)
     return np.array(backbone_index)
 
+def random_rotation(xyz): 
+    atoms = Atoms(positions=xyz, numbers=list( range(xyz.shape[0]) ))
+    vec = np.random.randn(3)
+    nvec = vec / np.sqrt( np.sum(vec ** 2) )
+    angle = random.randrange(-180, 180)
+    atoms.rotate(angle, nvec)
+    return atoms.positions
+
 def backbone_partition(traj, n_cgs, skip=100):
     atomic_nums, protein_index = get_atomNum(traj)
     #indices = traj.top.select_atom_indices('minimal')
@@ -358,6 +366,8 @@ def build_dataset(mapping, traj, atom_cutoff, cg_cutoff, atomic_nums, top, order
     edges = get_high_order_edge(edges, order, atomic_nums.shape[0])
 
     for xyz in traj:
+
+        xyz = random_rotation(xyz)
         nxyz = torch.cat((torch.Tensor(atomic_nums[..., None]), torch.Tensor(xyz) ), dim=-1)
         nxyz_data.append(nxyz)
         num_atoms_list.append(torch.LongTensor( [len(nxyz)]))
