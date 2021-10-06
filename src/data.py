@@ -86,13 +86,20 @@ def DiffPool_collate(dicts):
     xyzs, xyz_pad = padding_tensor([dict['xyz'] for dict in dicts])
     zs, z_pad = padding_tensor([dict['z'] for dict in dicts])
     
-    bonds_batch = []
     bonds = [dict['bond'] for dict in dicts]
-    hyperedge_batch = []
-    hyperedges = [dict['hyperedge'] for dict in dicts]
-    nbrs_batch = []
-    nbrs = [dict['nbr_list'] for dict in dicts]
     
+    bonds_batch = []
+    hyperedge_batch = []
+    nbrs_batch = []
+    dihedrals_batch = []
+    angles_batch = []
+
+    hyperedges = [dict['hyperedge'] for dict in dicts]
+    nbrs = [dict['nbr_list'] for dict in dicts]
+    angles = [dict['angle'] for dict in dicts]
+    dihedrals = [dict['dihedral'] for dict in dicts]
+    
+    # definitely can refactor this part 
     for i, bond in enumerate(bonds):
         batch_index = torch.LongTensor([i] * bond.shape[0])        
         bonds_batch.append((torch.cat( (batch_index.unsqueeze(-1), bond),dim=-1 ) )) 
@@ -104,12 +111,28 @@ def DiffPool_collate(dicts):
     for i, nbr in enumerate(nbrs):
         batch_index = torch.LongTensor([i] * nbr.shape[0])        
         nbrs_batch.append((torch.cat( (batch_index.unsqueeze(-1), nbr),dim=-1 ) )) 
+
+    for i, angle in enumerate(angles):
+        batch_index = torch.LongTensor([i] * angle.shape[0])
+        if angle is not None:
+            angles_batch.append((torch.cat( (batch_index.unsqueeze(-1), angle),dim=-1 ) ))      
+        else:
+            angles_batch.append(None)
+
+    for i, dihedral in enumerate(dihedrals):
+        batch_index = torch.LongTensor([i] * dihedral.shape[0])
+        if dihedral is not None:
+            dihedrals_batch.append((torch.cat( (batch_index.unsqueeze(-1), dihedral),dim=-1 ) ))    
+        else:
+            dihedrals_batch.append(None)
         
     nbrs_batch = torch.cat(nbrs_batch)
     bonds_batch = torch.cat(bonds_batch)
     hyperedge_batch = torch.cat(hyperedge_batch)
         
-    return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch, 'hyperedges': hyperedge_batch,  'pad': z_pad}
+    return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch, 
+                'angles': angles_batch, 'dihedrals':dihedrals_batch,
+                'hyperedges': hyperedge_batch,  'pad': z_pad}
 
 
 def padding_tensor(sequences):

@@ -4,6 +4,7 @@ import networkx as nx
 import itertools
 from data import *
 from torch_scatter import scatter_mean, scatter_add
+from moleculekit.molecule import Molecule
 import glob 
 import sys
 
@@ -90,7 +91,7 @@ def backbone_partition(traj, n_cgs, skip=100):
     return mapping 
 
 
-def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True):
+def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None):
     props = {}
 
     num_cgs = []
@@ -99,7 +100,18 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True):
     z_data = []
     xyz_data = []
     bond_data = []
+    angle_data = []
+    dihedral_data = []
     hyperedge_data = []
+
+    # todo: not quite generalizable to different proteins
+    if pdb is not None:
+        mol = Molecule(pdb, guess=['bonds', 'angles', 'dihedrals'] )  
+        dihedrals = torch.LongTensor(mol.dihedrals.astype(int))
+        angles = torch.LongTensor(mol.angles.astype(int))
+    else:
+        dihedrals = None
+        angles = None
 
     for traj in trajs:
         atomic_nums, protein_index = get_atomNum(traj)
@@ -121,10 +133,14 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True):
             xyz_data.append(coord)
             bond_data.append(bond_edges)
             hyperedge_data.append(hyper_edges)
+
+            angle_data.append(angles)
+            dihedral_data.append(dihedrals)
+
             num_cgs.append(torch.LongTensor([N_cg]))
             num_atoms.append(torch.LongTensor([n_atoms]))
 
-    z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data = shuffle( z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data)
+    z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data, angle_data, dihedral_data = shuffle( z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data, angle_data, dihedral_data)
 
 
     props = {'z': z_data[:n_data],
@@ -132,14 +148,16 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True):
          'num_atoms': num_atoms[:n_data], 
          'num_CGs':num_cgs[:n_data],
          'bond': bond_data[:n_data],
-         'hyperedge': hyperedge_data[:n_data]
+         'hyperedge': hyperedge_data[:n_data],
+         'angle': angle_data[:n_data],
+         'dihedral': dihedral_data[:n_data]
         }
 
     return props
 
-def load_protein_traj(label): 
+def load_protein_traj(label, ntraj=200): 
     
-    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:200]
+    traj_files = glob.glob(PROTEINFILES[label]['traj_paths'])[:ntraj]
     pdb_file = PROTEINFILES[label]['pdb_path']
     file_type = PROTEINFILES[label]['file_type']
     
