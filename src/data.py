@@ -129,6 +129,9 @@ def DiffPool_collate(dicts):
     nbrs_batch = torch.cat(nbrs_batch)
     bonds_batch = torch.cat(bonds_batch)
     hyperedge_batch = torch.cat(hyperedge_batch)
+    angles_batch = torch.cat(angles_batch)
+    dihedrals_batch = torch.cat(dihedrals_batch)
+
         
     return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch, 
                 'angles': angles_batch, 'dihedrals':dihedrals_batch,
