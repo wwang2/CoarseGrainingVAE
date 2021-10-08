@@ -225,8 +225,6 @@ def run(params):
     protein_top = trajs[0].top.subset(protein_index)
     g = protein_top.to_bondgraph()
 
-    shuffle_traj
-
     props = get_diffpool_data(N_cg, trajs[:n_data], n_data=n_data, edgeorder=edgeorder, pdb=pdb_file)
 
     dataset = DiffPoolDataset(props)
