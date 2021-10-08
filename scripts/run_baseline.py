@@ -126,6 +126,7 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
     epoch_recon_loss = []
     epoch_dist_loss = []
     epoch_methyl_loss = []
+    epoch_dihe_loss = []
     
     if train:
         model.train()
@@ -144,12 +145,16 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         batch = batch_to(batch, device=device)
         nbr_list = batch['hyperedges']
         assign, xyz, xyz_recon = model(batch)
+
+        dihe_recon = compute_dihedral_vec(batch['dihedrals'], xyz_recon)
+        dihe_data = compute_dihedral_vec(batch['dihedrals'], xyz)
         
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean() # recon loss
+        loss_dihe = (dihe_recon - dihe_data).pow(2).mean()
         loss_dist = dist_loss(xyz, xyz_recon, nbr_list) # distance loss 
         loss_methyl = compute_HCH(xyz_recon, tetra_index) # methyl cap loss 
-        loss = loss_recon + gamma * loss_dist + kappa * loss_methyl
+        loss = loss_recon + gamma * loss_dist + kappa * loss_dihe
 
         if train:
             optimizer.zero_grad()
@@ -162,16 +167,18 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         epoch_recon_loss.append(loss_recon.item())
         epoch_dist_loss.append(loss_dist.item())
         epoch_methyl_loss.append(loss_methyl.item())
+        epoch_dihe_loss.append(loss_dihe.item())
 
         mean_recon = np.array(epoch_recon_loss).mean()
         mean_dist = np.array(epoch_dist_loss).mean()
         mean_methyl = np.array(epoch_methyl_loss).mean()
+        mean_dihe = np.array(epoch_dihe_loss).mean()
         
         del loss, loss_dist, loss_methyl
 
         postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
                     'avg. dist loss={:.4f}'.format(mean_dist),
-                    'avg. methyl loss={:.4f}'.format(mean_methyl)]
+                    'avg. dihe loss={:.4f}'.format(mean_dihe)]
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
@@ -179,7 +186,7 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         for result in postfix:
             print(result)
     
-    return mean_recon, mean_dist, mean_methyl, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
+    return mean_recon, mean_dist, mean_dihe, assign, xyz.detach().cpu(), xyz_recon.detach().cpu() 
 
 def run(params):
 
