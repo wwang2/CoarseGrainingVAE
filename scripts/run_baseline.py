@@ -11,6 +11,7 @@ from diffpoolvae import *
 from conv import * 
 from datasets import * 
 from utils import * 
+from geometry import * 
 from visualization import xyz_grid_view, rotate_grid
 from sampling import * 
 import torch
@@ -61,7 +62,6 @@ def retrieve_recon_structures(loader, device, model, tqdm_flag=True):
 
     for batch in loader:     
         batch = batch_to(batch, device=device)
-
         assign, xyz, xyz_recon = model(batch)
 
         all_xyz_data.append(xyz.detach().cpu().numpy())
@@ -207,7 +207,7 @@ def run(params):
     file_type = PROTEINFILES[dataset_label]['file_type']
 
     trajs = [md.load_xtc(file,
-                top=pdb_file) for file in traj_files]
+                top=pdb_file, stride=50) for file in traj_files]
 
     traj = trajs[0]
 
@@ -218,7 +218,9 @@ def run(params):
     protein_top = trajs[0].top.subset(protein_index)
     g = protein_top.to_bondgraph()
 
-    props = get_diffpool_data(N_cg, trajs, n_data=n_data, edgeorder=edgeorder, pdb=pdb_file)
+    shuffle_traj
+
+    props = get_diffpool_data(N_cg, trajs[:n_data], n_data=n_data, edgeorder=edgeorder, pdb=pdb_file)
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
