@@ -64,11 +64,6 @@ def build_split_dataset(traj, params, mapping=None):
 
     return dataset, mapping
 
-def shuffle_traj(traj):
-    full_idx = list(range(len(traj)))
-    full_idx = shuffle(full_idx)
-    return traj[full_idx]
-
 def run_cv(params):
     failed = False
     working_dir = params['logdir']
@@ -256,12 +251,6 @@ def run_cv(params):
                                                         looptext='Ncg {} Fold {} test'.format(n_cgs, i),
                                                         tqdm_flag=tqdm_flag)
 
-            # check NaN
-            if np.isnan(mean_recon_val):
-                print("NaN encoutered, exiting...")
-                failed = True
-                break 
-
             stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                     'train_loss': train_loss, 'val_loss': val_loss, 
                     'train_recon': mean_recon_train, 'val_recon': mean_recon_val,
@@ -286,6 +275,12 @@ def run_cv(params):
             early_stopping(smoothed_valloss)
             if early_stopping.early_stop:
                 break
+
+            # check NaN
+            if np.isnan(mean_recon_val):
+                print("NaN encoutered, exiting...")
+                failed = True
+                break 
 
             # dump training curve 
             train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)

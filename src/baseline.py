@@ -67,6 +67,59 @@ class MLP(nn.Module):
         return soft_assign, xyz, x_recon
 
 
+class EquiMLP(nn.Module):
+    def __init__(self, pooler, n_cgs, n_atoms):
+        nn.Module.__init__(self)
+        self.pooler = pooler 
+
+        self.input_dim = int( n_cgs  * (n_cgs - 1) / 2 )
+        self.output_dim = self.input_dim * n_atoms
+
+        self.n_cgs = n_cgs 
+        self.n_atoms = n_atoms
+
+        self.mlp = torch.nn.Sequential(torch.nn.Linear(self.input_dim, self.output_dim), 
+                                    nn.ReLU(), 
+                                    torch.nn.Linear(self.output_dim, self.output_dim), 
+                                    nn.ReLU(),  
+                                    torch.nn.Linear(self.output_dim, self.output_dim))
+        
+    def forward(self, batch):
+    
+        xyz = batch['xyz']        
+        device = xyz.device
+        
+        z = batch['z'] # torch.ones_like( batch['z'] ) 
+        nbr_list = batch['nbr_list']
+
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+                                                                   batch['xyz'], 
+                                                                   batch['bonds'], 
+                                                                   tau=0.0,
+                                                                   gumbel=True)
+
+        
+        basis = cg_xyz.unsqueeze(1) - cg_xyz.unsqueeze(2)
+
+        dist = basis.pow(2).sum(-1).sqrt()
+        triu_indx = torch.ones_like(dist[0]).triu(diagonal=1).nonzero()
+
+        dist_input = dist[:, triu_indx[:,0 ], triu_indx[:,1]]
+        basis_triu = basis[:,triu_indx[:,0 ], triu_indx[:,1] ]
+
+        coeffs = self.mlp(dist_input).reshape(dist_input.shape[0], self.n_atoms, self.input_dim)
+
+        dx_recon = torch.einsum("ije,inj->ine", basis_triu, coeffs )
+
+        # recentering 
+        cg_offset = torch.einsum("bin,bij->bjn", dx_recon, assign_norm)
+        cg_offset_lift = cg_offset[:, self.pooler.assign_idx, :]
+
+        xyz_recon = cg_xyz[:, self.pooler.assign_idx, :] - cg_offset_lift + dx_recon
+        
+        return soft_assign, xyz, xyz_recon
+
+
 class EquiLinear(nn.Module):
     def __init__(self, pooler, n_cgs, n_atoms, cross):
         nn.Module.__init__(self)
