@@ -8,6 +8,12 @@ import networkx as nx
 from datetime import date
 import torch.autograd.profiler as profiler
 from sampling import *
+from sklearn.utils import shuffle
+
+def shuffle_traj(traj):
+    full_idx = list(range(len(traj)))
+    full_idx = shuffle(full_idx)
+    return traj[full_idx]
 
 def annotate_job(task, job_name, N_cg):
     today = date.today().strftime('%m-%d')
@@ -150,8 +156,6 @@ def loop(loader, optimizer, device, model, beta, epoch,
         postfix = ['total={:.3f}'.format(mean_total_loss),
                     'KL={:.4f}'.format(mean_kl) , 
                    'recon={:.4f}'.format(mean_recon),
-                   # 'norm={:.4f}'.format(mean_norm) , 
-                   # 'orient={:.4f}'.format(mean_orient),
                    'graph={:.4f}'.format(mean_graph) , 
                    'memory ={:.4f} Mb'.format(memory) 
                    ]
