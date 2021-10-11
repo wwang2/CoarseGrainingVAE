@@ -68,21 +68,22 @@ class MLP(nn.Module):
 
 
 class EquiMLP(nn.Module):
-    def __init__(self, pooler, n_cgs, n_atoms):
+    def __init__(self, pooler, n_cgs, n_atoms, width=1, depth=1, activation='ReLU'):
         nn.Module.__init__(self)
         self.pooler = pooler 
 
         self.input_dim = int( n_cgs  * (n_cgs - 1) / 2 )
         self.output_dim = self.input_dim * n_atoms
+        self.layer_width = self.output_dim * width
 
         self.n_cgs = n_cgs 
         self.n_atoms = n_atoms
 
-        self.mlp = torch.nn.Sequential(torch.nn.Linear(self.input_dim, self.output_dim), 
-                                    nn.ReLU(), 
-                                    torch.nn.Linear(self.output_dim, self.output_dim), 
-                                    nn.ReLU(),  
-                                    torch.nn.Linear(self.output_dim, self.output_dim))
+        layer_list = [ torch.nn.Linear(self.input_dim, self.layer_width ) ] + \
+                    [to_module(activation), torch.nn.Linear(self.layer_width, self.layer_width)] * depth + \
+                    [to_module(activation), torch.nn.Linear(self.layer_width, self.output_dim)]
+
+        self.mlp = torch.nn.Sequential(*layer_list)
         
     def forward(self, batch):
     
