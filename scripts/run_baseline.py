@@ -304,6 +304,8 @@ def run(params):
             model = Baseline(pooler, N_cg, n_atoms).to(device)
         elif params['model'] == 'mlp':
             model = MLP(pooler, N_cg, n_atoms).to(device)
+        elif params['model'] == 'equimlp':
+            model = EquiMLP(pooler, N_cg, n_atoms).to(device)
 
         
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
