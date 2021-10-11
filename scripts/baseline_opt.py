@@ -54,7 +54,7 @@ conn = Connection(client_token=token)
 if params['id'] == 0:
     experiment = conn.experiments().create(
         name=params['logdir'],
-        metrics=[dict(name='recon', objective='minimize')],
+        metrics=[dict(name='ged', objective='minimize')],
         parameters=paramsrange ,
         observation_budget=n_obs, # how many iterations to run for the optimization
         parallel_bandwidth=10,
