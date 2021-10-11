@@ -32,6 +32,22 @@ else:
     n_epochs = params['n_epochs'] 
     n_obs = 1000
 
+
+paramsrange = [
+            dict(name='cutoff', type='double', bounds=dict(min=2.0, max=9.0)),
+            dict(name='edgeorder', type='int', bounds=dict(min=1, max=3)),
+            dict(name='beta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
+            dict(name='kappa', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
+            dict(name='lr', type='double', bounds=dict(min=0.00002, max=0.0002), transformation="log")]
+
+if 'mlp' in params['model']:
+    paramsrange += [dict(name='depth', type='int', bounds=dict(min=1, max=3)), 
+                    dict(name='width', type='int', bounds=dict(min=1, max=3)),
+                    dict(name='activation', type='categorical', 
+                        categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"])
+                    ]
+
 create_dir(params['logdir'])
 conn = Connection(client_token=token)
 
@@ -39,15 +55,7 @@ if params['id'] == 0:
     experiment = conn.experiments().create(
         name=params['logdir'],
         metrics=[dict(name='recon', objective='minimize')],
-        parameters=[
-            dict(name='cutoff', type='double', bounds=dict(min=2.0, max=9.0)),
-            dict(name='edgeorder', type='int', bounds=dict(min=1, max=3)),
-            dict(name='beta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
-            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
-            dict(name='kappa', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
-            dict(name='lr', type='double', bounds=dict(min=0.00002, max=0.0002), transformation="log"),
-            #dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
-        ],
+        parameters=paramsrange ,
         observation_budget=n_obs, # how many iterations to run for the optimization
         parallel_bandwidth=10,
     )
@@ -82,6 +90,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     baseline_param = copy.deepcopy(trial) 
     exp_param['logdir'] = os.path.join(trial['logdir'], 'exp')
 
+    for key in exp_param.keys():
+        print("{}: {}".format(key, exp_param[key]))
 
     create_dir(trial['logdir'])
     print("run experiments")
