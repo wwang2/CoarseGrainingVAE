@@ -18,7 +18,7 @@ class Baseline(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=0.0,
@@ -57,7 +57,7 @@ class MLP(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=0.0,
@@ -96,7 +96,7 @@ class EquiMLP(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=0.0,
@@ -143,7 +143,7 @@ class EquiLinear(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=0.0,

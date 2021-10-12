@@ -29,7 +29,7 @@ class DiffPoolVAE(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, assign_norm, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H_chem, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=tau,
@@ -63,7 +63,7 @@ class DiffPoolVAE(nn.Module):
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
-        soft_assign, assign_norm, h, H_chem, adj, cg_xyz, soft_cg_adj = self.pooler(z, 
+        soft_assign, assign_norm, h, H_chem, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
                                                                    batch['xyz'], 
                                                                    batch['bonds'], 
                                                                    tau=tau,
@@ -190,11 +190,13 @@ class CGpool(nn.Module):
         cg_xyz = torch.einsum("bin,bij->bjn", xyz, assign_norm)
 
         Ncg = H.shape[1]
-
         # compute weighted adjacency 
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
 
-        return assign, assign_norm,  h, H, adj, cg_xyz, cg_adj
+        dist = (cg_xyz.unsqueeze(-2) - cg_xyz.unsqueeze(-3)).pow(2).sum(-1).sqrt()
+        value, knbrs = dist.sort(dim=-1, descending=False).detach().cpu()
+
+        return assign, assign_norm,  h, H, adj, cg_xyz, cg_adj， knbrs
 
 
 class DenseContract(nn.Module):
