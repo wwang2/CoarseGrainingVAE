@@ -260,10 +260,8 @@ def run(params):
         valset = get_subset_by_indices(val_index, dataset)
         testset = get_subset_by_indices(test_index, dataset)
 
-
         trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
         valloader = DataLoader(valset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True)
-
 
         # get cg_map 
         if cg_method == 'newman':
@@ -295,14 +293,17 @@ def run(params):
         pooler = CGpool(1, 16, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
 
         if params['model'] == 'equilinear':
-            model = EquiLinear(pooler, N_cg, n_atoms, cross=cross, knn=params['knbr']).to(device)
+            model = EquiLinear(pooler, N_cg, n_atoms, cross=cross, 
+                               knn=params['knbr']).to(device)
         elif params['model'] == 'linear': 
             model = Baseline(pooler, N_cg, n_atoms).to(device)
         elif params['model'] == 'mlp':
-            model = MLP(pooler, N_cg, n_atoms, width=params['width'], depth=params['depth']).to(device)
+            model = MLP(pooler, N_cg, n_atoms, width=params['width'], 
+                        depth=params['depth'], activation=params['activation']).to(device)
         elif params['model'] == 'equimlp':
             model = EquiMLP(pooler, N_cg, n_atoms, knn=params['knbr'], 
-                                width=params['width'], depth=params['depth']).to(device)
+                                width=params['width'], depth=params['depth'],
+                                activation=params['activation']).to(device)
 
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
@@ -428,6 +429,7 @@ if __name__ == '__main__':
     parser.add_argument('-ndata', type=int, default= 2000)
     parser.add_argument('-knbr', type=int, default= 5)
     parser.add_argument("-cg_method", type=str, default='newman')
+    parser.add_argument("-activation", type=str, default='ReLU')
     parser.add_argument("-mapshuffle", type=float, default=0.0)
     parser.add_argument('-lr', type=float, default=1e-3)
     parser.add_argument('-gamma', type=float, default=0.0)
