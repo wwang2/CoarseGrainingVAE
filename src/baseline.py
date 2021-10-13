@@ -309,10 +309,13 @@ class EquiLinear(nn.Module):
         nn.Module.__init__(self)
         self.pooler = pooler 
         self.knn = knn
-        if cross:
-            self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs ** 2 + (n_cgs ** 2)**2 ) )
-        else:
-            self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs ** 2 ) )
+        # if cross:
+        #     self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs ** 2 + (n_cgs ** 2)**2 ) )
+        # else:
+
+        self.knn = knn
+        self.n_cgs = n_cgs
+        self.B = nn.Parameter(0.01 * torch.randn(n_atoms, n_cgs * knn ) )
 
         self.cross = cross
         
@@ -329,23 +332,27 @@ class EquiLinear(nn.Module):
                                                                    batch['bonds'], 
                                                                    tau=0.0,
                                                                    gumbel=True)
-        basis = cg_xyz.unsqueeze(1) - cg_xyz.unsqueeze(2)
-        B = basis.reshape(h.shape[0], -1, 3)
+
+
+
+
+
+        # get 
+        dist = (cg_xyz.unsqueeze(-2) - cg_xyz.unsqueeze(-3)).pow(2).sum(-1).sqrt()
+        value, knbrs = dist.sort(dim=-1, descending=False)
+        knbrs = knbrs.cpu()
+        value = value.cpu()
+
+        value[:,:, self.knn+1:] = 0.0
+        cg_nbr_list = value.nonzero()
+        pad_cg_xyz = cg_xyz.reshape(-1, 3)
+        pad_cg_nbr_list = cg_nbr_list[:, 1:] + (cg_nbr_list[:, 0] * cg_xyz.shape[1]).unsqueeze(-1)
+        dist_vec = pad_cg_xyz[pad_cg_nbr_list[:,1]] - pad_cg_xyz[pad_cg_nbr_list[:,0]]
+        dist_vec = dist_vec.reshape(cg_xyz.shape[0],  self.n_cgs * self.knn, 3)
         
-
-        if self.cross:
-            npair = B.shape[1]
-            nbatch = B.shape[0]
-            
-            Bij = B.unsqueeze(1).expand(-1, npair, -1, -1).reshape(nbatch, -1,  3)
-            Bjk = B.unsqueeze(2).expand(-1, -1, npair, -1).reshape(nbatch, -1, 3)
-            
-            cross_basis = torch.cross(Bij, Bjk, dim=-1)
-            B = torch.cat((B, cross_basis), dim=1)
-
         #dx = xyz - cg_xyz[:, self.pooler.assign_idx, :]
         
-        dx_recon = torch.einsum("ije,nj->ine", B, self.B )
+        dx_recon = torch.einsum("ije,nj->ine", dist_vec,  self.B )
 
         # recentering 
         cg_offset = torch.einsum("bin,bij->bjn", dx_recon, assign_norm)
