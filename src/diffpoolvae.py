@@ -194,9 +194,11 @@ class CGpool(nn.Module):
         cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
 
         dist = (cg_xyz.unsqueeze(-2) - cg_xyz.unsqueeze(-3)).pow(2).sum(-1).sqrt()
-        value, knbrs = dist.sort(dim=-1, descending=False).detach().cpu()
+        value, knbrs = dist.sort(dim=-1, descending=False)
+        knbrs = knbrs.cpu()
+        value = value.cpu()
 
-        return assign, assign_norm,  h, H, adj, cg_xyz, cg_adj， knbrs
+        return assign, assign_norm,  h, H, adj, cg_xyz, cg_adj, knbrs
 
 
 class DenseContract(nn.Module):
