@@ -123,12 +123,12 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None)
         hyper_edges = get_high_order_edge(bond_edges, edgeorder, n_atoms)
 
         for xyz in frames: 
+            if recenter:
+                xyz = xyz - xyz.mean(0)[None, ...]
+
             xyz = random_rotation(xyz)
             z_data.append(torch.Tensor(atomic_nums))
             coord = torch.Tensor(xyz)
-
-            if recenter:
-                coord = coord - coord.mean(0)[None, ...]
 
             xyz_data.append(coord)
             bond_data.append(bond_edges)
