@@ -48,6 +48,9 @@ if 'mlp' in params['model']:
                         categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"])
                     ]
 
+if 'equi' in params['model']:
+    paramsrange += [dict(name='knbr', type='int', bounds=dict(min=1, max=params['n_cgs']-1))]
+
 create_dir(params['logdir'])
 conn = Connection(client_token=token)
 

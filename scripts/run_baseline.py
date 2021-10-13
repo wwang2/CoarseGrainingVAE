@@ -140,7 +140,6 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         loader = tqdm(loader, position=0, file=sys.stdout,
                          leave=True, desc='({} epoch #{})'.format(mode, epoch))
         
-        
     for batch in loader:     
         batch = batch_to(batch, device=device)
         nbr_list = batch['hyperedges']
@@ -294,27 +293,23 @@ def run(params):
             assign_idx[ran_idx] = idx2map
 
         pooler = CGpool(1, 16, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
-        
-        #model = Baseline(pooler=pooler, n_cgs=N_cg, n_atoms=n_atoms).to(device)
-
 
         if params['model'] == 'equilinear':
-            model = EquiLinear(pooler, N_cg, n_atoms, cross=cross).to(device)
+            model = EquiLinear(pooler, N_cg, n_atoms, cross=cross, knn=params['knbr']).to(device)
         elif params['model'] == 'linear': 
             model = Baseline(pooler, N_cg, n_atoms).to(device)
         elif params['model'] == 'mlp':
-            model = MLP(pooler, N_cg, n_atoms).to(device)
+            model = MLP(pooler, N_cg, n_atoms, width=params['width'], depth=params['depth']).to(device)
         elif params['model'] == 'equimlp':
-            model = EquiMLP(pooler, N_cg, n_atoms).to(device)
+            model = EquiMLP(pooler, N_cg, n_atoms, knn=params['knbr'], 
+                                width=params['width'], depth=params['depth']).to(device)
 
-        
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
                                                                 factor=0.6, verbose=True, 
                                                                 threshold=1e-4,  min_lr=1e-7)
         
         failed = False 
-
 
         train_log = pd.DataFrame({'epoch': [], 'lr': [],
                     'train_recon': [], 'val_recon': [],
@@ -340,11 +335,7 @@ def run(params):
             #     map_save_path = os.path.join(working_dir, 'map_{}.png'.format(epoch) )
             #     #plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
-
             scheduler.step(mean_val_recon)
-
-            # early stop 
-
             # early stopping 
             if optimizer.param_groups[0]['lr'] <= 1.5e-7:
                 break
@@ -429,10 +420,13 @@ if __name__ == '__main__':
     parser.add_argument('-cutoff', type=float, default=2.5)
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-N_cg', type=int, default= 3)
+    parser.add_argument('-width', type=int, default= 1)
+    parser.add_argument('-depth', type=int, default= 1)
     parser.add_argument('-edgeorder', type=int, default= 2)
     parser.add_argument('-n_splits', type=int, default= 3)
     parser.add_argument('-n_epochs', type=int, default= 50)
     parser.add_argument('-ndata', type=int, default= 2000)
+    parser.add_argument('-knbr', type=int, default= 5)
     parser.add_argument("-cg_method", type=str, default='newman')
     parser.add_argument("-mapshuffle", type=float, default=0.0)
     parser.add_argument('-lr', type=float, default=1e-3)
