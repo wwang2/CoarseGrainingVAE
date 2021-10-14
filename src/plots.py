@@ -29,7 +29,7 @@ def get_cv_stats( csvs, column, k ):
         cv_data = pd.read_csv(path)
         cg_res.append(res)
         mean = cv_data[column].mean()
-        error = cv_data[column].mean() / math.sqrt(k)
+        error = cv_data[column].std() / math.sqrt(k)
         
         all_mean.append(mean)
         all_error.append(error)
@@ -67,6 +67,8 @@ def kernel_density_plot(data, xlabel, ylabel, label='kT', figsize=(6,6)):
     cbar.ax.tick_params(labelsize=20)
     cbar.set_label(label=label, size=20)
 
+
+
 def ramachandran_plot(xyzs, atomic_nums):
 
     traj = []
@@ -80,7 +82,7 @@ def ramachandran_plot(xyzs, atomic_nums):
     feat.add_backbone_torsions() 
     data = pyemma.coordinates.load('tmp.xyz', features=feat)
 
-    kernel_density_plot(data, '$\Phi$', '$\Psi$', label='kT')
+    return data
 
 def get_bond_name(bond):
     atom1_res = bond.atom1.residue.name
