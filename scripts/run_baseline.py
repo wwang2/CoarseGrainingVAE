@@ -208,6 +208,9 @@ def run(params):
     mapshuffle = params['mapshuffle']
     create_dir(working_dir)
 
+    if params['knbr'] == 0:
+        params['knbr'] = N_cg - 1
+    
     traj_files = glob.glob(PROTEINFILES[dataset_label]['traj_paths'])[:200]
     pdb_file = PROTEINFILES[dataset_label]['pdb_path']
     file_type = PROTEINFILES[dataset_label]['file_type']
@@ -301,7 +304,7 @@ def run(params):
             model = MLP(pooler, N_cg, n_atoms, width=params['width'], 
                         depth=params['depth'], activation=params['activation']).to(device)
         elif params['model'] == 'equimlp':
-            model = EquiMLP(pooler, N_cg, n_atoms, knn=params['knbr'], 
+            model = EquiMLP2(pooler, N_cg, n_atoms, knn=params['knbr'], 
                                 width=params['width'], depth=params['depth'],
                                 activation=params['activation']).to(device)
 
@@ -426,8 +429,8 @@ if __name__ == '__main__':
     parser.add_argument('-edgeorder', type=int, default= 2)
     parser.add_argument('-n_splits', type=int, default= 3)
     parser.add_argument('-n_epochs', type=int, default= 50)
-    parser.add_argument('-ndata', type=int, default= 2000)
-    parser.add_argument('-knbr', type=int, default= 5)
+    parser.add_argument('-ndata', type=int, default=2000)
+    parser.add_argument('-knbr', type=int, default=0)
     parser.add_argument("-cg_method", type=str, default='newman')
     parser.add_argument("-activation", type=str, default='ReLU')
     parser.add_argument("-mapshuffle", type=float, default=0.0)
