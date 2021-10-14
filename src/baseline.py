@@ -144,6 +144,9 @@ class EquiMLP2(nn.Module):
         self.input_dim = int( n_cgs  * self.knn)
         self.output_dim = self.input_dim * n_atoms
         self.layer_width = self.output_dim * width
+        
+        print("input dim: {}".format(self.input_dim)) 
+        print("output dim: {}".format(self.output_dim))
 
         self.n_cgs = n_cgs 
         self.n_atoms = n_atoms
