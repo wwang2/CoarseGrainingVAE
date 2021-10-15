@@ -44,6 +44,7 @@ paramsrange = [
 if 'mlp' in params['model']:
     paramsrange += [dict(name='depth', type='int', bounds=dict(min=1, max=3)), 
                     dict(name='width', type='int', bounds=dict(min=1, max=3)),
+                    dict(name='feature_dim', type='int', bounds=dict(min=32, max=256)),
                     dict(name='activation', type='categorical', 
                         categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"])
                     ]

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from conv import * 
+from modules import * 
 from torch_scatter import scatter_mean, scatter_add
 
 
@@ -27,6 +28,76 @@ class Baseline(nn.Module):
         x_recon = torch.einsum("bce,ca->bae", cg_xyz, self.B)
         
         return soft_assign, xyz, x_recon
+
+
+class settransform(nn.Module):
+    def __init__(self, K, activation):
+        nn.Module.__init__(self)
+        self.mlp = torch.nn.Sequential(nn.Linear(K, K), to_module(activation), nn.Linear(K, K))
+        self.update = torch.nn.Sequential(nn.Linear(K, K), to_module(activation), nn.Linear(K, K))
+  
+    def forward(self, edgeset):
+        update = self.mlp(edgeset)
+        CGcontract = update.mean(-2)
+        output = self.update(update + CGcontract.unsqueeze(-2))
+        # this is permutational equivariant 
+        return output 
+        
+class edgesetMLP(nn.Module):
+    def __init__(self, pooler, n_cgs, n_atoms, knn, depth, feature_dim, cutoff, activation):
+        nn.Module.__init__(self)
+        self.smear = GaussianSmearing(0, cutoff, feature_dim)      
+        self.layers = nn.ModuleList(
+            [settransform(K=feature_dim, activation=activation) for _ in range(depth)])
+        
+        self.pooler = pooler
+        self.knn = knn
+        self.n_cgs = n_cgs
+        self.n_atoms = n_atoms
+        self.decode = nn.Sequential(nn.Linear(feature_dim, feature_dim),
+                                    to_module(activation),
+                                    nn.Linear(feature_dim, n_atoms ))
+        
+    def forward(self, batch):
+        
+        xyz = batch['xyz']        
+        device = xyz.device
+        
+        z = batch['z'] # torch.ones_like( batch['z'] ) 
+        nbr_list = batch['nbr_list']
+
+        soft_assign, assign_norm, h, H, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
+                                                                   batch['xyz'], 
+                                                                   batch['bonds'], 
+                                                                   tau=0.0,
+                                                                   gumbel=True)
+        # get 
+        dist = (cg_xyz.unsqueeze(-2) - cg_xyz.unsqueeze(-3)).pow(2).sum(-1).sqrt()
+        value, knbrs = dist.sort(dim=-1, descending=False)
+        knbrs = knbrs.cpu()
+        value = value.cpu()
+
+        value[:,:, self.knn+1:] = 0.0
+        cg_nbr_list = value.nonzero()
+        pad_cg_xyz = cg_xyz.reshape(-1, 3)
+        pad_cg_nbr_list = cg_nbr_list[:, 1:] + (cg_nbr_list[:, 0] * cg_xyz.shape[1]).unsqueeze(-1)
+        dist_vec = pad_cg_xyz[pad_cg_nbr_list[:,1]] - pad_cg_xyz[pad_cg_nbr_list[:,0]]
+        dist_vec = dist_vec.reshape(cg_xyz.shape[0],  self.n_cgs * self.knn, 3)
+        dist = dist_vec.pow(2).sum(-1).sqrt().reshape(cg_xyz.shape[0], self.n_cgs, self.knn, 1)
+        
+        # perm. equivariant update 
+        output= self.smear(dist)
+        for module in self.layers:
+            output = module(output)
+        coeffs = self.decode(output).reshape(-1, self.n_cgs * self.knn, self.n_atoms)
+        
+        dx_recon = torch.einsum("bio,bin->bon", coeffs, dist_vec)
+        cg_offset = torch.einsum("bin,bij->bjn", dx_recon, assign_norm)
+        cg_offset_lift = cg_offset[:, self.pooler.assign_idx, :]
+
+        xyz_recon = cg_xyz[:, self.pooler.assign_idx, :] - cg_offset_lift + dx_recon
+
+        return soft_assign, xyz, xyz_recon
 
 
 class MLP(nn.Module):

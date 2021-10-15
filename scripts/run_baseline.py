@@ -304,9 +304,15 @@ def run(params):
             model = MLP(pooler, N_cg, n_atoms, width=params['width'], 
                         depth=params['depth'], activation=params['activation']).to(device)
         elif params['model'] == 'equimlp':
-            model = EquiMLP2(pooler, N_cg, n_atoms, knn=params['knbr'], 
-                                width=params['width'], depth=params['depth'],
-                                activation=params['activation']).to(device)
+            # model = EquiMLP2(pooler, N_cg, n_atoms, knn=params['knbr'], 
+            #                     width=params['width'], depth=params['depth'],
+            #                     activation=params['activation']).to(device)
+
+            model = edgesetMLP(pooler, N_cg, n_atoms, knn=params['knbr'], 
+                    activation=params['activation'],
+                    depth=params['depth'],
+                    feature_dim=params['feature_dim'], 
+                    cutoff=cutoff).to(device)
 
         optimizer = torch.optim.Adam(model.parameters(),lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, 
