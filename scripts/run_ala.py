@@ -300,7 +300,7 @@ def run_cv(params):
                                                                                                  atomic_nums,
                                                                                                  n_cg=n_cgs,
                                                                                                  atomwise_z=atom_decode_flag,
-                                                                                                 tqdm_flag=tqdm_flag)
+                                                                                                 tqdm_flag=tqdm_flag, reflection=params['reflectiontest'])
 
             # sample geometries 
             train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
@@ -319,16 +319,18 @@ def run_cv(params):
                                                                                                  atomic_nums,
                                                                                                  n_cg=n_cgs,
                                                                                                  atomwise_z=atom_decode_flag,
-                                                                                                 tqdm_flag=tqdm_flag)
+                                                                                                 tqdm_flag=tqdm_flag, reflection=params['reflectiontest'])
 
-            test_loss, mean_kl_test, mean_recon_test, mean_graph_test, xyz_test, xyz_test_recon = loop(valloader, optimizer, device,
+            # this is just to get KL loss 
+            test_loss, mean_kl_test, mean_recon_test, mean_graph_test, xyz_test, xyz_test_recon = loop(testloader, optimizer, device,
                                                        model, beta, epoch, 
                                                        train=False,
                                                         gamma=gamma,
                                                         eta=eta,
                                                         kappa=kappa,
                                                         looptext='Ncg {} Fold {} test'.format(n_cgs, i),
-                                                        tqdm_flag=tqdm_flag)
+                                                        tqdm_flag=tqdm_flag
+                                                        )
 
             # sample geometries 
             test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
@@ -372,7 +374,7 @@ def run_cv(params):
             sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
                                                                                     model, atomic_nums, 
                                                                                     n_cgs, n_sample=n_ensemble,
-                                                                                    graph_eval=graph_eval)
+                                                                                    graph_eval=graph_eval, reflection=params['reflectiontest'])
 
             if graph_eval:
                 sample_valid = np.array(sample_valid).mean()
@@ -544,6 +546,7 @@ if __name__ == '__main__':
     parser.add_argument("--det", action='store_true', default=False)
     parser.add_argument("--cg_radius_graph", action='store_true', default=False)
     parser.add_argument("--invariantdec", action='store_true', default=False)
+    parser.add_argument("--reflectiontest", action='store_true', default=False)
 
     params = vars(parser.parse_args())
     params['savemodel'] = True
@@ -561,5 +564,8 @@ if __name__ == '__main__':
 
     if params['cross']:
         params['logdir']  += '_cross'
+
+    if params['reflectiontest']:
+        params['logdir']  += '_reflectiontest'
 
     run_cv(params)

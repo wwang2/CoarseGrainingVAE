@@ -170,7 +170,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
     
     return mean_total_loss, mean_kl, mean_recon, mean_graph, xyz, xyz_recon 
 
-def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True):
+def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True, reflection=False):
     model = model.to(device)
     model.eval()
 
@@ -196,6 +196,13 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
     for batch in loader:
         batch = batch_to(batch, device)
+
+        if reflection: 
+            xyz = batch['nxyz'][:,1:]
+            xyz[:, 1] *= -1 # reflect around x-z plane
+            cgxyz = batch['CG_nxyz'][:,1:]
+            cgxyz[:, 1] *= -1 
+
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
 
         true_xyzs.append(xyz.detach().cpu())

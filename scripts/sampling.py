@@ -248,10 +248,17 @@ def sample_normal(mu, sigma):
     z= eps.mul(sigma).add_(mu)
     return z 
 
-def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_eval=True):
+def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_eval=True, reflection=False):
 
     # TODO: included batched sampling 
     model = model.to(device)
+
+    if reflection: 
+        xyz = batch['nxyz'][:,1:]
+        xyz[:, 1] *= -1 # reflect around x-z plane
+        cgxyz = batch['CG_nxyz'][:,1:]
+        cgxyz[:, 1] *= -1 
+
     batch = batch_to(batch, device)
 
     z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
@@ -327,7 +334,7 @@ def eval_sample_qualities(ref_atoms, atoms_list):
 
     return all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio
 
-def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample, graph_eval=True):
+def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample, reflection, graph_eval=True):
     '''
     conditional sampling based on CG geometry, only works for batch_size = 1
     '''
@@ -350,7 +357,10 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     sample_graph_hh_val_ratio_list = []
 
     for batch in loader:    
-        sample_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds,  heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval)
+        sample_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds, \
+         heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, \
+         graph_hh_val_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval, reflection=reflection)
+
         sample_xyz_list.append(sample_atoms.get_positions())
         data_xyz_list.append(data_atoms.get_positions())
         cg_xyz_list.append(cg_atoms.get_positions())
