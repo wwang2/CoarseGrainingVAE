@@ -346,7 +346,8 @@ class CGequiVAE(nn.Module):
         self.det = det
 
         self.equivariant = equivariant
-        self.euclidean = nn.Linear(self.encoder.n_atom_basis, self.encoder.n_atom_basis * 3)
+        if equivariant == False:
+            self.euclidean = nn.Linear(self.encoder.n_atom_basis, self.encoder.n_atom_basis * 3)
         
     def get_inputs(self, batch):
 
