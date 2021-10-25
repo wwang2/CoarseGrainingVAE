@@ -42,6 +42,21 @@ def get_backbone(top):
             backbone_index.append(atom.index)
     return np.array(backbone_index)
 
+def random_rotate_xyz_cg(xyz, cg_xyz ): 
+    atoms = Atoms(positions=xyz, numbers=list( range(xyz.shape[0]) ))
+    cgatoms = Atoms(positions=cg_xyz, numbers=list( range(cg_xyz.shape[0]) ))
+    
+    # generate rotation paramters 
+    vec = np.random.randn(3)
+    nvec = vec / np.sqrt( np.sum(vec ** 2) )
+    angle = random.randrange(-180, 180)
+    
+    # rotate 
+    atoms.rotate(angle, nvec)
+    cgatoms.rotate(angle, nvec)
+    
+    return atoms.positions, cgatoms.positions
+
 def random_rotation(xyz): 
     atoms = Atoms(positions=xyz, numbers=list( range(xyz.shape[0]) ))
     vec = np.random.randn(3)
