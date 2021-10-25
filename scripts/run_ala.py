@@ -192,7 +192,7 @@ def run_cv(params):
         # register encoder 
         decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
                                       cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, 
-                                      atomwise_z=atom_decode_flag)
+                                      atomwise_z=atom_decode_flag, cross_flag=params['cross'])
 
         encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
@@ -367,7 +367,9 @@ def run_cv(params):
      
             sampleloader = DataLoader(testset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-            sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
+            sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, \
+            sample_valid, sample_hh_valid, sample_graph_val_ratio_list, \
+            sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
                                                                                     model, atomic_nums, 
                                                                                     n_cgs, n_sample=n_ensemble,
                                                                                     graph_eval=graph_eval)
@@ -406,7 +408,6 @@ def run_cv(params):
                     'sample_all_valid_ratio': sample_hh_valid, 
                     'sample_heavy_valid_ratio': sample_valid,
                     'sample_all_rmsd': mean_all_rmsd, 'sample_heavy_rmsd':mean_heavy_rmsd} 
-
 
             for key in test_stats:
                 print(key, test_stats[key])
@@ -533,6 +534,7 @@ if __name__ == '__main__':
     parser.add_argument("-factor", type=float, default=0.6)
     parser.add_argument("-mapshuffle", type=float, default=0.0)
     parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
+    parser.add_argument("--cross", action='store_true', default=False)
     parser.add_argument("--graph_eval", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
     parser.add_argument("--cg_mp", action='store_true', default=False)
@@ -556,5 +558,8 @@ if __name__ == '__main__':
         params['logdir'] = annotate_job(params['cg_method'] + '_invariantdec_' + task + '_ndata{}'.format(params['ndata']), params['logdir'], params['n_cgs'])
     else:
         params['logdir'] = annotate_job(params['cg_method'] + '_' + task + '_ndata{}'.format(params['ndata']), params['logdir'], params['n_cgs'])
+
+    if params['cross']:
+        params['logdir']  += '_cross'
 
     run_cv(params)
