@@ -17,7 +17,7 @@ import re
 import pandas as pd
 
 import math
-def get_cv_stats( csvs, column, k ):
+def get_cv_stats( csvs, column):
     
     cg_res = []
     
@@ -29,7 +29,7 @@ def get_cv_stats( csvs, column, k ):
         cv_data = pd.read_csv(path)
         cg_res.append(res)
         mean = cv_data[column].mean()
-        error = cv_data[column].std() / math.sqrt(k)
+        error = cv_data[column].std() / math.sqrt(cv_data[column].shape[0])
         
         all_mean.append(mean)
         all_error.append(error)
