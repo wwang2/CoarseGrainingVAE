@@ -114,8 +114,8 @@ ATOM2Z = {'C': 6,
 
 IDX2ATOM = {v: k for k, v in ATOM2IDX.items()}
 
-def types2z(types):
-    types = [IDX2ATOM[atom] for atom in types]
+def idx2z(idxs):
+    types = [IDX2ATOM[atom] for atom in idxs]
     z = [ATOM2Z[atom] for atom in types]  
     return z 
 
@@ -173,8 +173,8 @@ def get_sidechainet_props(data_dict):
         cg_type = np.array(cg_type)
         mapping = np.array(mapping)
 
-        num_atoms.append(xyzs.shape[0])
-        num_CGs.append(ca_xyz.shape[0])
+        num_atoms.append(torch.LongTensor([xyzs.shape[0]]))
+        num_CGs.append(torch.LongTensor([ca_xyz.shape[0]]))
         
         nxyz = np.hstack([np.array(atom_type).reshape(-1, 1), np.array(xyzs)])
         cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyz)])
@@ -189,4 +189,5 @@ def get_sidechainet_props(data_dict):
         
     return {'nxyz': all_nxyzs, 'CG_nxyz': all_cg_nxyz,
             'CG_mapping': all_mapping, 'num_atoms': num_atoms,
-            'num_CGs': num_CGs, 'bond_edge_list': bond_edges_list}
+            'num_CGs': num_CGs, 'bond_edge_list': bond_edges_list, 
+            'seq': data_dict['seq']}
