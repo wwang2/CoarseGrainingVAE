@@ -37,7 +37,7 @@ RES2IDX = {'N': 0,
              'C': 18,
              'T': 19}
 
-Z2IDX ={'C': 0,
+ATOM2IDX ={'C': 0,
          'CA': 1,
          'CB': 2,
          'CD': 3,
@@ -74,6 +74,44 @@ Z2IDX ={'C': 0,
          'SD': 34,
          'SG': 35}
 
+ATOM2Z = {'C': 6,
+         'CA': 6,
+         'CB': 6,
+         'CD': 6,
+         'CD1': 6,
+         'CD2': 6,
+         'CE': 6,
+         'CE1': 6,
+         'CE2': 6,
+         'CE3': 6,
+         'CG': 6,
+         'CG1': 6,
+         'CG2': 6,
+         'CH2': 6,
+         'CZ': 6,
+         'CZ2': 6,
+         'CZ3': 6,
+         'N': 7,
+         'ND1': 7,
+         'ND2': 7,
+         'NE': 7,
+         'NE1': 7,
+         'NE2': 7,
+         'NH1': 7,
+         'NH2': 7,
+         'NZ': 7,
+         'O': 8,
+         'OD1': 8,
+         'OD2': 8,
+         'OE1': 8,
+         'OE2': 8,
+         'OG': 8,
+         'OG1': 8,
+         'OH': 8,
+         'SD': 16,
+         'SG': 16}
+
+
 
 def get_sidechainet_props(data_dict):
     
@@ -86,13 +124,15 @@ def get_sidechainet_props(data_dict):
     all_mapping = []
     num_atoms = []
     num_CGs = []
+    bond_edges_list = []
 
     for i, seq in enumerate(data_dict['seq']):
         cg_type = []
         ca_xyz = []
         mapping = []
         xyzs = []
-        atom_zs = []
+        atom_type = []
+        atom_num = []
 
         xyz = data_dict['crd'][i].reshape(-1, 14, 3)
 
@@ -100,40 +140,47 @@ def get_sidechainet_props(data_dict):
             if data_dict['msk'][i][j] == "+":
                 cg_type.append(RES2IDX[res])
 
-
+        map = 0
         for j, res_xyz in enumerate(xyz):
-
             zmap = ATOM_MAP_14[seq[j]]
-
             if data_dict['msk'][i][j] == "+":
                 ca_xyz.append(res_xyz[1]) # the 2nd atom is the alpha carbon 
                 for k, xyz in enumerate(res_xyz):
                     if np.power(xyz, 2).sum() != 0:
                         # also need to retrieve 
                         xyzs.append(xyz)
-                        mapping.append(j)
-                        atom_zs.append(Z2IDX[zmap[k]])
+                        mapping.append(map)
+                        atom_type.append(ATOM2IDX[zmap[k]])
+                        atom_num.append(ATOM2Z[zmap[k]])
                         
-        
+                map += 1 
 
         xyzs = np.vstack(xyzs)
         
+        # compute bond_graphs 
+        
+        atoms = Atoms(positions=xyzs, numbers=atom_num)        
+        edges = get_bond_graphs(atoms).nonzero()
+
         ca_xyz = np.array(ca_xyz)
-        atomszs = np.array(atom_zs)
+        atom_type = np.array(atom_type)
         cg_type = np.array(cg_type)
         mapping = np.array(mapping)
 
         num_atoms.append(xyzs.shape[0])
         num_CGs.append(ca_xyz.shape[0])
         
-        nxyz = np.hstack([np.array(atomszs).reshape(-1, 1), np.array(xyzs)])
+        nxyz = np.hstack([np.array(atom_type).reshape(-1, 1), np.array(xyzs)])
         cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyz)])
 
         all_nxyzs.append(torch.Tensor(nxyz))
         all_cg_nxyz.append(torch.Tensor(cg_nxyz))
         all_mapping.append(torch.LongTensor(mapping))
+        bond_edges_list.append(torch.LongTensor(edges))
+        # compute bond graphs 
+        
 
         
     return {'nxyz': all_nxyzs, 'CG_nxyz': all_cg_nxyz,
             'CG_mapping': all_mapping, 'num_atoms': num_atoms,
-            'num_CGs': num_CGs}
+            'num_CGs': num_CGs, 'bond_edge_list': bond_edges_list}
