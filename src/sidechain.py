@@ -112,6 +112,12 @@ ATOM2Z = {'C': 6,
          'SG': 16}
 
 
+IDX2ATOM = {v: k for k, v in ATOM2IDX.items()}
+
+def types2z(types):
+    types = [IDX2ATOM[atom] for atom in types]
+    z = [ATOM2Z[atom] for atom in types]  
+    return z 
 
 def get_sidechainet_props(data_dict):
     
