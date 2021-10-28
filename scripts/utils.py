@@ -120,16 +120,20 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # add graph loss 
         edge_list = batch['bond_edge_list'].to("cpu")
         xyz = batch['nxyz'][:, 1:].to("cpu")
-        gen_dist = (xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
-        data_dist = (xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt().to(xyz_recon.device)
-        loss_graph = (gen_dist - data_dist).pow(2).mean()
+
+        if gamma != 0.0:
+            gen_dist = (xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
+            data_dist = (xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt().to(xyz_recon.device)
+            loss_graph = (gen_dist - data_dist).pow(2).mean()
+        else:
+            loss_graph = torch.Tensor([0.0]).to(device)
 
         # add orientation loss 
         cg_xyz = batch['CG_nxyz'][:, 1:]
         mapping = batch['CG_mapping']
 
-        loss = loss_kl * beta + loss_recon + loss_graph * gamma
-        
+        loss =  loss_recon + loss_kl * beta+ loss_graph * gamma 
+
         # optimize 
         if train:
             optimizer.zero_grad()
