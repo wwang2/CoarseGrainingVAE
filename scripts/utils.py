@@ -128,10 +128,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
         cg_xyz = batch['CG_nxyz'][:, 1:]
         mapping = batch['CG_mapping']
 
-        loss_dx_orient = 0.0
-        loss_dx_norm = 0.0
-
-        loss = loss_kl * beta + loss_recon + loss_graph * gamma + eta * loss_dx_orient + kappa * loss_dx_norm
+        loss = loss_kl * beta + loss_recon + loss_graph * gamma
         
         # optimize 
         if train:
@@ -173,7 +170,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
-        del loss, loss_graph, loss_kl, loss_recon, loss_dx_orient, loss_dx_norm
+        del loss, loss_graph, loss_kl, loss_recon
 
     for result in postfix:
         print(result)
