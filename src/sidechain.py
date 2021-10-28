@@ -3,6 +3,7 @@ import numpy as np
 import networkx as nx
 import itertools
 from data import *
+from sampling import get_bond_graphs
 from torch_scatter import scatter_mean, scatter_add
 from moleculekit.molecule import Molecule
 import glob 
@@ -14,7 +15,7 @@ import pyemma
 from sklearn.utils import shuffle
 import random
 
-from sidechainnet.structure.PdbBuilder import PdbBuilder
+from sidechainnet.structure.PdbBuilder import PdbBuilder, ATOM_MAP_14
 
 RES2IDX = {'N': 0,
              'H': 1,
@@ -130,8 +131,6 @@ def save_pdb(msk, seq, xyz, fn='./junk.pdb'):
 def get_sidechainet_props(data_dict):
     
     '''parse sidechainnet data struct'''
-
-    data = scn.load("debug")
 
     all_nxyzs = []
     all_cg_nxyz = []
