@@ -192,9 +192,8 @@ def run_cv(params):
         cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
                                          dir_mp=False)
-
         
-        model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
+        model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
                             atomwise_z=atom_decode_flag, det=det, equivariant= not invariantdec).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
@@ -216,6 +215,7 @@ def run_cv(params):
         # intialize training log 
         train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 'train_recon': [], 'val_recon': [],
                    'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
+
 
         for epoch in range(nepochs):
             # train

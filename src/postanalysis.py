@@ -130,7 +130,7 @@ def test(exp_dir, label, skip=1000):
                                      dir_mp=dir_mp_flag)
 
 
-    model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
+    model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
                         atomwise_z=atom_decode_flag).to(device)
 
     # load pretrained model 

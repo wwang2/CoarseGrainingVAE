@@ -329,22 +329,22 @@ class CGprior(nn.Module):
 class CGequiVAE(nn.Module):
     def __init__(self, encoder, equivaraintconv, 
                      atom_munet, atom_sigmanet,
-                    n_atoms, n_cgs, feature_dim,
+                     n_cgs, feature_dim,
                     prior_net=None, 
                     atomwise_z=False,
-                    det=False, equivariant=True):
+                    det=False, equivariant=True, offset=True):
         nn.Module.__init__(self)
         self.encoder = encoder
         self.equivaraintconv = equivaraintconv
         self.atom_munet = atom_munet
         self.atom_sigmanet = atom_sigmanet
-        
-        self.n_atoms = n_atoms
+
         self.n_cgs = n_cgs
         self.atomwise_z = atomwise_z
         self.prior_net = prior_net
         self.det = det
 
+        self.offset = offset
         self.equivariant = equivariant
         if equivariant == False:
             self.euclidean = nn.Linear(self.encoder.n_atom_basis, self.encoder.n_atom_basis * 3)
@@ -398,8 +398,11 @@ class CGequiVAE(nn.Module):
             xyz_rel = cg_v[mapping, CG2atomChannel, :]
 
         #this constraint is only true for geometrical mean
-        decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
-        xyz_rel = xyz_rel - decode_offsets[mapping]
+        # need to include weights 
+
+        if self.offset:
+          decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
+          xyz_rel = xyz_rel - decode_offsets[mapping]
 
         xyz_recon = xyz_rel + cg_xyz[mapping]
         
