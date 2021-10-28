@@ -28,8 +28,10 @@ import time
 from datetime import timedelta
 import pandas as pd
 import statsmodels.api as sm
+from sidechain import * 
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
+
 
 def build_split_dataset(traj, params, mapping=None):
 
@@ -65,7 +67,7 @@ def build_split_dataset(traj, params, mapping=None):
     return dataset, mapping
 
 def run_cv(params):
-    failed = False
+
     working_dir = params['logdir']
     device  = params['device']
     n_cgs  = params['n_cgs']
@@ -87,7 +89,6 @@ def run_cv(params):
     dataset_label = params['dataset']
     shuffle_flag = params['shuffle']
     dir_mp_flag = params['dir_mp']
-    # dec_type = params['dec_type']
     cg_mp_flag = params['cg_mp']
     atom_decode_flag = params['atom_decode']
     nevals = params['nevals']
@@ -105,6 +106,8 @@ def run_cv(params):
     savemodel = params['savemodel']
     auxcutoff = params['auxcutoff']
     invariantdec = params['invariantdec']
+
+    failed = False
     min_lr = 5e-8
 
     if det:
@@ -123,10 +126,9 @@ def run_cv(params):
         traj = load_protein_traj(dataset_label)
         traj = shuffle_traj(traj)
         atomic_nums, protein_index = get_atomNum(traj)
+        n_atoms = atomic_nums.shape[0]
     else:
         raise ValueError("data label {} not recognized".format(dataset_label))
-
-    n_atoms = atomic_nums.shape[0]
 
     # mapping options: alpha carbon, backbone, Girvan-Newman
     # create subdirectory 
@@ -134,14 +136,13 @@ def run_cv(params):
         
     kf = KFold(n_splits=nsplits, shuffle=True)
 
-    cv_all_rmsd = []
-    cv_heavy_rmsd = []
-    cv_sample_rmsd = []
-    cv_sample_valid = []
-    cv_sample_hh_valid = []
-
-    cv_graph_diff = []
-    cv_graph_hh_diff = []
+    # cv_all_rmsd = []
+    # cv_heavy_rmsd = []
+    # cv_sample_rmsd = []
+    # cv_sample_valid = []
+    # cv_sample_hh_valid = []
+    # cv_graph_diff = []
+    # cv_graph_hh_diff = []
 
     split_iter = kf.split(list(range(ndata)))
      
@@ -215,11 +216,7 @@ def run_cv(params):
         
         model.train()
 
-        recon_loss_hist = []
-        kl_loss_hist = []
         recon_hist = []
-        graph_his = []
-        lr_hist = []
 
         print(mapping)
         # dump model hyperparams 
@@ -352,10 +349,6 @@ def run_cv(params):
             np.savetxt(os.path.join(split_dir, 'test_all_rmsd{:.4f}.txt'.format(unaligned_test_all_rmsd)), np.array([unaligned_test_all_rmsd]))
             np.savetxt(os.path.join(split_dir, 'test_heavy_rmsd{:.4f}.txt'.format(unaligned_test_heavy_rmsd)), np.array([unaligned_test_heavy_rmsd]))
 
-            # reconsturction loss 
-            cv_all_rmsd.append(unaligned_test_all_rmsd)
-            cv_heavy_rmsd.append(unaligned_test_heavy_rmsd)
-
             # save model 
             if savemodel:
                 model = model.to('cpu')
@@ -390,13 +383,13 @@ def run_cv(params):
                 else:
                     mean_heavy_rmsd = None
 
-                cv_sample_valid.append(sample_valid)
-                cv_sample_hh_valid.append(sample_hh_valid)
+                # cv_sample_valid.append(sample_valid)
+                # cv_sample_hh_valid.append(sample_hh_valid)
                 
                 mean_graph_diff = np.array(sample_graph_val_ratio_list).mean()
                 mean_graph_hh_diff = np.array(sample_graph_hh_val_ratio_list).mean()
-                cv_graph_diff.append(mean_graph_diff)
-                cv_graph_hh_diff.append(mean_graph_hh_diff)
+                # cv_graph_diff.append(mean_graph_diff)
+                # cv_graph_hh_diff.append(mean_graph_hh_diff)
 
             test_stats = { 'train_recon': mean_recon_train,
                     'test_all_recon': unaligned_test_all_rmsd,
@@ -445,60 +438,18 @@ def run_cv(params):
             rotate_data = rotate_grid(data_atoms, n_frames, axis='y')
             rotate_recon = rotate_grid(recon_atoms, n_frames, axis='y')
             rotate_cg = rotate_grid(cg_atoms, n_frames, axis='y')
-            #rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
 
             io.write(os.path.join(split_dir, 'rotate_test_data.xyz'), rotate_data)
             io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
             io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
 
-            # dump rmsd distributions 
-            if graph_eval:
-                if all_rmsds is not None:
-                    np.savetxt(os.path.join(split_dir, 'valid_all_rmsds.txt'), np.array(all_rmsds))
-                if all_heavy_rmsds is not None:
-                    np.savetxt(os.path.join(split_dir, 'valid_heavy_rmsds.txt'), np.array(all_heavy_rmsds))
-
-            end = time.time()
-
-            temp = end-start
-            hours = temp//3600
-            temp = temp - 3600*hours
-            minutes = temp//60
-            seconds = temp - 60*minutes
-            format_time = '%d:%d:%d' %(hours,minutes,seconds)
-
-            np.savetxt(os.path.join(split_dir, '{}.txt'.format(format_time)), np.ones(10))
-
-            print("time elapsed: {}".format(format_time))
-
-        ########################################################
-
-
-    # save test score 
-    np.savetxt(os.path.join(working_dir, 'cv_all_rmsd.txt'), np.array(cv_all_rmsd))
-    np.savetxt(os.path.join(working_dir, 'cv_heavy_rmsd.txt'), np.array(cv_heavy_rmsd))
-
-    if graph_eval:
-        np.savetxt(os.path.join(working_dir, 'cv_valid.txt'), np.array(cv_sample_valid))
-        np.savetxt(os.path.join(working_dir, 'cv_hh_valid.txt'), np.array(cv_sample_hh_valid))
-        np.savetxt(os.path.join(working_dir, 'cv_graph_diff.txt'), np.array(cv_graph_diff))
-        np.savetxt(os.path.join(working_dir, 'cv_hh_graph_diff.txt'), np.array(cv_graph_hh_diff))
+            save_runtime(start - time.time(), split_dir)
 
     if failed:
         with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
             print("TRAINING FAILED", file=text_file)
 
-    all_rmsd_mean = np.array(cv_all_rmsd).mean()
-    all_rmsd_std = np.array(cv_all_rmsd).std()
-
-    if graph_eval:
-        all_graph_diff_mean = np.array(cv_graph_hh_diff).mean()
-        all_graph_diff_std = np.array(cv_graph_hh_diff).std() 
-    else:
-        all_graph_diff_mean = None 
-        all_graph_diff_std = None
-
-    return all_rmsd_mean, all_rmsd_std, all_graph_diff_mean, all_graph_diff_std, failed
+    return cv_stats_pd['test_all_recon'].mean(), cv_stats_pd['test_all_recon'].std(), cv_stats_pd['recon_all_ged'].mean(), cv_stats_pd['recon_all_ged'].std(), failed
 
 
 if __name__ == '__main__':
