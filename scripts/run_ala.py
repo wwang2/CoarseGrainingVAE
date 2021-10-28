@@ -273,8 +273,8 @@ def run_cv(params):
             train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
 
         if not failed:
-            print(failed)
 
+            print("Starting testing")
             # dump learning trajectory 
             recon_hist = np.concatenate(recon_hist)
             dump_numpy2xyz(recon_hist, atomic_nums, os.path.join(split_dir, 'recon_hist.xyz'))
@@ -291,13 +291,6 @@ def run_cv(params):
 
             # sample geometries 
             train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
-
-            cg_types = np.array([6] * n_cgs)
-
-            dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
-            dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
-            dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
-            dump_numpy2xyz(train_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'train_cg.xyz'))
 
             testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
             test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma, test_all_valid_ratio, test_heavy_valid_ratio, test_all_ged, test_heavy_ged = get_all_true_reconstructed_structures(testloader, 
@@ -322,10 +315,15 @@ def run_cv(params):
             # sample geometries 
             test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
+            dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
+            dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
+            dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
+            dump_numpy2xyz(train_cg_xyzs[:nsamples], np.array([6] * n_cgs), os.path.join(split_dir, 'train_cg.xyz'))
+
             dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
             dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
             dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
-            dump_numpy2xyz(test_cg_xyzs[:nsamples], cg_types, os.path.join(split_dir, 'test_cg.xyz'))
+            dump_numpy2xyz(test_cg_xyzs[:nsamples], np.array([6] * n_cgs), os.path.join(split_dir, 'test_cg.xyz'))
 
             # compute loss and metrics 
             heavy_filter = atomic_nums != 1.
@@ -349,15 +347,15 @@ def run_cv(params):
             sampleloader = DataLoader(testset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
             sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, \
-            sample_valid, sample_hh_valid, sample_graph_val_ratio_list, \
-            sample_graph_hh_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
+            sample_valid, sample_allatom_valid, sample_graph_val_ratio_list, \
+            sample_graph_allatom_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
                                                                                     model, atomic_nums, 
                                                                                     n_cgs, n_sample=n_ensemble,
                                                                                     graph_eval=graph_eval, reflection=params['reflectiontest'])
 
             if graph_eval:
                 sample_valid = np.array(sample_valid).mean()
-                sample_hh_valid = np.array(sample_hh_valid).mean()
+                sample_allatom_valid = np.array(sample_allatom_valid).mean()
 
                 if all_rmsds is not None:
                     mean_all_rmsd = np.array(all_rmsds)[:, 0].mean()
@@ -370,7 +368,7 @@ def run_cv(params):
                     mean_heavy_rmsd = None
 
                 mean_graph_diff = np.array(sample_graph_val_ratio_list).mean()
-                mean_graph_hh_diff = np.array(sample_graph_hh_val_ratio_list).mean()
+                mean_graph_allatom_diff = np.array(sample_graph_allatom_val_ratio_list).mean()
 
             test_stats = { 'train_recon': mean_recon_train,
                     'test_all_recon': unaligned_test_all_rmsd,
@@ -380,8 +378,8 @@ def run_cv(params):
                     'recon_all_ged': test_all_ged, 'recon_heavy_ged': test_heavy_ged, 
                     'recon_all_valid_ratio': test_all_valid_ratio, 
                     'recon_heavy_valid_ratio': test_heavy_valid_ratio,
-                    'sample_all_ged': mean_graph_hh_diff, 'sample_heavy_ged': mean_graph_diff, 
-                    'sample_all_valid_ratio': sample_hh_valid, 
+                    'sample_all_ged': mean_graph_allatom_diff, 'sample_heavy_ged': mean_graph_diff, 
+                    'sample_all_valid_ratio': sample_allatom_valid, 
                     'sample_heavy_valid_ratio': sample_valid,
                     'sample_all_rmsd': mean_all_rmsd, 'sample_heavy_rmsd':mean_heavy_rmsd} 
 

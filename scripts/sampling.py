@@ -306,8 +306,8 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon
 
     if graph_eval:
-        all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
-        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio
+        all_rmsds, heavy_rmsds, valid_ratio, valid_allatom_ratio, graph_val_ratio, graph_allatom_val_ratio = eval_sample_qualities(ref_atoms, recon_atoms_list)
+        return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds, heavy_rmsds, valid_ratio, valid_allatom_ratio, graph_val_ratio, graph_allatom_val_ratio
     
     else:
         return ensemble_atoms, data_atoms, recon_atoms, cg_atoms, None, None, None, None, None, None
@@ -326,13 +326,13 @@ def count_valid_smiles(true_smiles, inferred_smiles):
 def eval_sample_qualities(ref_atoms, atoms_list): 
 
     valid_ids, valid_ratio, graph_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=True)
-    valid_hh_ids, valid_hh_ratio, graph_hh_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=False)
+    valid_allatom_ids, valid_allatom_ratio, graph_allatom_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=False)
 
     # keep track of heavy and all-atom rmsds separately
     heavy_rmsds = compute_rmsd(atoms_list, ref_atoms, valid_ids) # rmsds for valid heavy atom graphs 
-    all_rmsds = compute_rmsd(atoms_list, ref_atoms, valid_hh_ids) # rmsds for valid allatom graphs 
+    all_rmsds = compute_rmsd(atoms_list, ref_atoms, valid_allatom_ids) # rmsds for valid allatom graphs 
 
-    return all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio
+    return all_rmsds, heavy_rmsds, valid_ratio, valid_allatom_ratio, graph_val_ratio, graph_allatom_val_ratio
 
 def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample, reflection, graph_eval=True):
     '''
@@ -351,15 +351,15 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     sample_heavy_rmsd = []
 
     sample_valid = []
-    sample_hh_valid = []
+    sample_allatom_valid = []
 
     sample_graph_val_ratio_list = []
-    sample_graph_hh_val_ratio_list = []
+    sample_graph_allatom_val_ratio_list = []
 
     for batch in loader:    
         sample_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds, \
-         heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, \
-         graph_hh_val_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval, reflection=reflection)
+         heavy_rmsds, valid_ratio, valid_allatom_ratio, graph_val_ratio, \
+         graph_allatom_val_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval, reflection=reflection)
 
         sample_xyz_list.append(sample_atoms.get_positions())
         data_xyz_list.append(data_atoms.get_positions())
@@ -374,10 +374,10 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
             sample_heavy_rmsd.append(heavy_rmsds)
 
         sample_valid.append(valid_ratio)
-        sample_hh_valid.append(valid_hh_ratio)
+        sample_allatom_valid.append(valid_allatom_ratio)
 
         sample_graph_val_ratio_list.append(graph_val_ratio)
-        sample_graph_hh_val_ratio_list.append(graph_hh_val_ratio)
+        sample_graph_allatom_val_ratio_list.append(graph_allatom_val_ratio)
 
     sample_xyzs = np.vstack(sample_xyz_list).reshape(-1, n_sample * n_atoms, 3)
     data_xyzs = np.vstack(data_xyz_list).reshape(-1, n_atoms, 3)
@@ -396,7 +396,7 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         else:
             all_rmsds = None
 
-        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, sample_valid, sample_hh_valid, sample_graph_val_ratio_list, sample_graph_hh_val_ratio_list
+        return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, sample_valid, sample_allatom_valid, sample_graph_val_ratio_list, sample_graph_allatom_val_ratio_list
     else:
         return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, None, None, None, None, None, None 
 
