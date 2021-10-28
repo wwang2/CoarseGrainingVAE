@@ -248,6 +248,9 @@ def CG_collate(dicts):
                 data[key]
                 for data in dicts
             ], dim=0)
+
+        elif type(val) == str: 
+            batch[key] = [data[key] for data in dicts]
         else:
             batch[key] = torch.stack(
                 [data[key] for data in dicts],
