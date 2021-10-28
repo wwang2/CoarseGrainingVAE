@@ -23,6 +23,16 @@ def create_dir(name):
     if not os.path.isdir(name):
         os.mkdir(name)   
 
+def save_runtime(dtime, dir):
+    hours = dtime//3600
+    dtime = dtime - 3600*hours
+    minutes = dtime//60
+    seconds = dtime - 60*minutes
+    format_time = '%d:%d:%d' %(hours,minutes,seconds)
+    np.savetxt(os.path.join(dir, '{}.txt'.format(format_time)), np.ones(10))
+    print("time elapsed: {}".format(format_time))
+    return format_time
+
 def check_CGgraph(dataset):
     frame_idx = np.random.randint(0, len(dataset), 20)
 

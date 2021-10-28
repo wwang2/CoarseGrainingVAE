@@ -9,7 +9,7 @@ from cgvae import *
 from conv import * 
 from datasets import * 
 from utils import * 
-from visualization import xyz_grid_view, rotate_grid
+from visualization import xyz_grid_view, rotate_grid, save_rotate_frames
 #from plots import *
 from sampling import * 
 from run_baseline import retrieve_recon_structures
@@ -130,19 +130,9 @@ def run_cv(params):
     else:
         raise ValueError("data label {} not recognized".format(dataset_label))
 
-    # mapping options: alpha carbon, backbone, Girvan-Newman
     # create subdirectory 
-    create_dir(working_dir)
-        
+    create_dir(working_dir)     
     kf = KFold(n_splits=nsplits, shuffle=True)
-
-    # cv_all_rmsd = []
-    # cv_heavy_rmsd = []
-    # cv_sample_rmsd = []
-    # cv_sample_valid = []
-    # cv_sample_hh_valid = []
-    # cv_graph_diff = []
-    # cv_graph_hh_diff = []
 
     split_iter = kf.split(list(range(ndata)))
      
@@ -355,10 +345,6 @@ def run_cv(params):
                 torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
 
             ##### generate rotating movies for visualization #####
-            n_w = 3
-            n_h = 3
-            n_frames = n_w * n_h
-
      
             sampleloader = DataLoader(testset, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
@@ -383,13 +369,8 @@ def run_cv(params):
                 else:
                     mean_heavy_rmsd = None
 
-                # cv_sample_valid.append(sample_valid)
-                # cv_sample_hh_valid.append(sample_hh_valid)
-                
                 mean_graph_diff = np.array(sample_graph_val_ratio_list).mean()
                 mean_graph_hh_diff = np.array(sample_graph_hh_val_ratio_list).mean()
-                # cv_graph_diff.append(mean_graph_diff)
-                # cv_graph_hh_diff.append(mean_graph_hh_diff)
 
             test_stats = { 'train_recon': mean_recon_train,
                     'test_all_recon': unaligned_test_all_rmsd,
@@ -410,40 +391,8 @@ def run_cv(params):
             cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
             cv_stats_pd.to_csv(os.path.join(working_dir, 'cv_stats.csv'),  index=False)
 
-            # compute maxium dimension
-            ref_xyz = data_xyzs[0]
-            ref_xyz = ref_xyz - ref_xyz.mean(0)
-            geom_max_dim = (ref_xyz.max() - ref_xyz.min()) * 1.25
-
-            # loop over all the ensembles and dump individual samples
-            for sample_id in range(n_ensemble): 
-                snapshot = sample_xyzs.reshape(-1, n_ensemble, n_atoms, 3)[:, sample_id, :, :]
-                ensemble_atoms = xyz_grid_view(torch.Tensor(snapshot).reshape(-1, 3),
-                                atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
-
-                rotate_ensemble = rotate_grid(ensemble_atoms, n_frames, axis='y')
-
-                io.write(os.path.join(split_dir, 'rotate_test_ensemble_{}.xyz'.format(sample_id)), rotate_ensemble)
-
-            data_atoms = xyz_grid_view(torch.Tensor(data_xyzs).reshape(-1, 3),
-                          atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
-
-            recon_atoms = xyz_grid_view(torch.Tensor(recon_xyzs).reshape(-1, 3),
-                          atomic_nums, [n_atoms] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
-
-            cg_atoms = xyz_grid_view(torch.Tensor(cg_xyzs).reshape(-1, 3),
-                          np.ones(n_cgs) * 6, [n_cgs] * n_frames, n_w, n_h, grid_dim=geom_max_dim, grid_scale=1.25)
-
-
-            rotate_data = rotate_grid(data_atoms, n_frames, axis='y')
-            rotate_recon = rotate_grid(recon_atoms, n_frames, axis='y')
-            rotate_cg = rotate_grid(cg_atoms, n_frames, axis='y')
-
-            io.write(os.path.join(split_dir, 'rotate_test_data.xyz'), rotate_data)
-            io.write(os.path.join(split_dir, 'rotate_test_recon.xyz'), rotate_recon)
-            io.write(os.path.join(split_dir, 'rotate_test_cg.xyz'), rotate_cg)
-
-            save_runtime(start - time.time(), split_dir)
+            save_rotate_frames(sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, n_cgs, n_ensemble, atomic_nums, split_dir)
+            save_runtime(time.time() - start, split_dir)
 
     if failed:
         with open(os.path.join(split_dir, 'FAILED.txt'), "w") as text_file:
