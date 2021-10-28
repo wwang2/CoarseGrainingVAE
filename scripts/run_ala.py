@@ -88,7 +88,6 @@ def run_cv(params):
     optim = optim_dict[params['optimizer']]
     dataset_label = params['dataset']
     shuffle_flag = params['shuffle']
-    dir_mp_flag = params['dir_mp']
     cg_mp_flag = params['cg_mp']
     atom_decode_flag = params['atom_decode']
     nevals = params['nevals']
@@ -187,12 +186,12 @@ def run_cv(params):
 
         encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                        cg_mp=cg_mp_flag, dir_mp=dir_mp_flag, atomwise_z=atom_decode_flag)
+                                        cg_mp=cg_mp_flag, dir_mp=False, atomwise_z=atom_decode_flag)
 
         # define prior 
         cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                         dir_mp=dir_mp_flag)
+                                         dir_mp=False)
 
         
         model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_atoms, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
@@ -407,7 +406,7 @@ if __name__ == '__main__':
     parser.add_argument("-n_cgs", type=int)
     parser.add_argument("-lr", type=float, default=2e-4)
     parser.add_argument("-dataset", type=str, default='dipeptide')
-    parser.add_argument("-n_basis", type=int, default=256)
+    parser.add_argument("-n_basis", type=int, default=512)
     parser.add_argument("-n_rbf", type=int, default=10)
     parser.add_argument("-activation", type=str, default='swish')
     parser.add_argument("-cg_method", type=str, default='minimal')
@@ -438,7 +437,6 @@ if __name__ == '__main__':
     parser.add_argument("--graph_eval", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
     parser.add_argument("--cg_mp", action='store_true', default=False)
-    parser.add_argument("--dir_mp", action='store_true', default=False)
     parser.add_argument("--atom_decode", action='store_true', default=False)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
     parser.add_argument("--det", action='store_true', default=False)
