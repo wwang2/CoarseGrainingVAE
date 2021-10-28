@@ -14,7 +14,7 @@ import pyemma
 from sklearn.utils import shuffle
 import random
 
-
+from sidechainnet.structure.PdbBuilder import PdbBuilder
 
 RES2IDX = {'N': 0,
              'H': 1,
@@ -118,6 +118,14 @@ def idx2z(idxs):
     types = [IDX2ATOM[atom] for atom in idxs]
     z = [ATOM2Z[atom] for atom in types]  
     return z 
+
+def mask_seq(seq, msk):
+    return "".join( [seq[i] if el == '+' else "" for (i, el) in enumerate(msk) ] )
+
+def save_pdb(msk, seq, xyz, fn='./junk.pdb'):
+    msk_seq = mask_seq(seq, msk)
+    pdb = PdbBuilder(msk_seq, pad_crd.reshape(-1, 3).detach().numpy())
+    pdb.save_pdb(fn)
 
 def get_sidechainet_props(data_dict):
     
