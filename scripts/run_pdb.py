@@ -14,6 +14,7 @@ from sidechain import *
 from sampling import get_bond_graphs
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 
+
 def run_cv(params):
     working_dir = params['logdir']
     device  = params['device']
@@ -52,58 +53,64 @@ def run_cv(params):
 
 
     if params['dataset'] == 'debug':
-        data = scn.load("debug")
-        train_props = get_sidechainet_props(data['train'])
-        val_props = get_sidechainet_props(data['valid-10'])
-        test_props = get_sidechainet_props(data['test'])
+        data = scn.load( params['dataset'] )
+    elif params['dataset'] == 'casp12':
+        data = scn.load(casp_version=12, thinning=30)
+    elif params['dataset'] == 'casp14':
+        data = scn.load(casp_version=14, thinning=30)
 
-        traindata = CGDataset(train_props.copy())
-        valdata = CGDataset(val_props.copy())
-        testdata = CGDataset(test_props.copy())
 
-        traindata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
-                                       cg_cutoff=None, device="cpu", undirected=True)
-        valdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
-                                       cg_cutoff=None, device="cpu", undirected=True)
-        testdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
-                                       cg_cutoff=None, device="cpu", undirected=True)
+    train_props = get_sidechainet_props(data['train'], n_data=params['n_data'])
+    val_props = get_sidechainet_props(data['valid-10'], n_data=params['n_data'])
+    test_props = get_sidechainet_props(data['test'], n_data=params['n_data'])
 
-        trainloader = DataLoader(traindata, batch_size=1, collate_fn=CG_collate, shuffle=False)
-        valloader = DataLoader(valdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
-        testloader = DataLoader(testdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
+    traindata = CGDataset(train_props.copy())
+    valdata = CGDataset(val_props.copy())
+    testdata = CGDataset(test_props.copy())
 
-        # initialize model 
-        atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
-        atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
+    traindata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
+                                   cg_cutoff=None, device="cpu", undirected=True)
+    valdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
+                                   cg_cutoff=None, device="cpu", undirected=True)
+    testdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
+                                   cg_cutoff=None, device="cpu", undirected=True)
 
-        # register encoder 
+    trainloader = DataLoader(traindata, batch_size=1, collate_fn=CG_collate, shuffle=False)
+    valloader = DataLoader(valdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
+    testloader = DataLoader(testdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
-        decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
-                                      cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, cross_flag=True,
-                                      atomwise_z=False)
+    # initialize model 
+    atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
+    atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
 
-        encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                        cg_mp=cg_mp_flag, dir_mp=False, atomwise_z=False)
+    # register encoder 
 
-        # define prior 
-        cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                       n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                         dir_mp=False)
+    decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
+                                  cutoff=params['cg_cutoff'], num_conv = dec_nconv, activation=activation, cross_flag=True,
+                                  atomwise_z=False)
 
-        model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
-                            atomwise_z=False, offset=False, det=True).to(device)
+    encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
+                                   n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
+                                    cg_mp=cg_mp_flag, dir_mp=False, atomwise_z=False)
 
-        optimizer = optim(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=2, 
-                                                                factor=factor, verbose=True, 
-                                                                threshold=threshold,  min_lr=min_lr)
+    # define prior 
+    cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
+                                   n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
+                                     dir_mp=False)
 
-        early_stopping = EarlyStopping(patience=patience)
-        model.train()
-        # dump model hyperparams 
-        with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
-            json.dump(params, outfile, indent=4)
+    model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
+                        atomwise_z=False, offset=False, det=True).to(device)
+
+    optimizer = optim(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=2, 
+                                                            factor=factor, verbose=True, 
+                                                            threshold=threshold,  min_lr=min_lr)
+
+    early_stopping = EarlyStopping(patience=patience)
+    model.train()
+    # dump model hyperparams 
+    with open(os.path.join(split_dir, 'modelparams.json'), "w") as outfile: 
+        json.dump(params, outfile, indent=4)
 
     # intialize training log 
     train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 'train_recon': [], 'val_recon': [],
@@ -117,7 +124,7 @@ def run_cv(params):
                                                     gamma=params['gamma'],
                                                     eta=params['eta'],
                                                     kappa=params['kappa'],
-                                                    looptext='Ncg {} Fold {} test'.format(n_cgs, epoch),
+                                                    looptext='Ncg {} Fold {} train'.format(n_cgs, epoch),
                                                     tqdm_flag=True)
 
 
@@ -127,8 +134,8 @@ def run_cv(params):
                                             gamma=gamma,
                                             eta=eta,
                                             kappa=kappa,
-                                            looptext='Ncg {} Fold {} test'.format(n_cgs, epoch),
-                                            tqdm_flag=tqdm_flag)
+                                            looptext='Ncg {} Fold {} val'.format(n_cgs, epoch),
+                                            tqdm_flag=True)
 
         stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                 'train_loss': train_loss, 'val_loss': val_loss, 
@@ -164,6 +171,22 @@ def run_cv(params):
         # dump training curve 
         train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
 
+
+    for i, batch in enumerate(testloader):
+        if i <= 4: 
+            batch = batch_to(batch, device)
+            mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
+            
+            # only get the first protein 
+            xyz_recon_first = xyz_recon[: batch['num_atoms'].item()]
+            seq = batch['seq'][0]
+            msk = batch['msk'][0]
+
+            pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'])
+            save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(working_dir, seq))
+            
+        
+
     # dump selected pdbs 
 
 
@@ -173,15 +196,16 @@ if __name__ == '__main__':
     parser.add_argument("-logdir", type=str)
     parser.add_argument("-device", type=int)
     parser.add_argument("-n_cgs", type=int, default=10)
-    parser.add_argument("-lr", type=float, default=8e-5)
+    parser.add_argument("-lr", type=float, default=1e-5)
     parser.add_argument("-dataset", type=str, default='debug')
+    parser.add_argument("-n_data", type=int, default=1000)
     parser.add_argument("-cg_method", type=str, default='alpha')
     parser.add_argument("-n_rbf", type=int, default=8)
     parser.add_argument("-n_basis", type=int, default=600)
     parser.add_argument("-activation", type=str, default='swish')
     parser.add_argument("-atom_cutoff", type=float, default=3.5)
     parser.add_argument("-optimizer", type=str, default='adam')
-    parser.add_argument("-cg_cutoff", type=float, default=10.0)
+    parser.add_argument("-cg_cutoff", type=float, default=9.5)
     parser.add_argument("-enc_nconv", type=int, default=3)
     parser.add_argument("-dec_nconv", type=int, default=3)
     parser.add_argument("-batch_size", type=int, default=1)
@@ -194,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument("-kappa", type=float, default=0.0)
     parser.add_argument("-threshold", type=float, default=1e-3)
     parser.add_argument("-nsplits", type=int, default=5)
-    parser.add_argument("-patience", type=int, default=5)
+    parser.add_argument("-patience", type=int, default=15)
     parser.add_argument("-factor", type=float, default=0.6)
     parser.add_argument("--cross", action='store_true', default=False)
     parser.add_argument("--graph_eval", action='store_true', default=False)

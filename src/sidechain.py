@@ -123,12 +123,28 @@ def idx2z(idxs):
 def mask_seq(seq, msk):
     return "".join( [seq[i] if el == '+' else "" for (i, el) in enumerate(msk) ] )
 
-def save_pdb(msk, seq, xyz, fn='./junk.pdb'):
+def save_pdb(msk, seq, pad_crd, fn='./junk.pdb'):
     msk_seq = mask_seq(seq, msk)
     pdb = PdbBuilder(msk_seq, pad_crd.reshape(-1, 3).detach().numpy())
     pdb.save_pdb(fn)
+    
 
-def get_sidechainet_props(data_dict):
+def CG2ChannelIdx(CG_mapping):
+    CG2atomChannel = torch.zeros_like(CG_mapping).to("cpu")
+    for cg_type in torch.unique(CG_mapping): 
+        cg_filter = CG_mapping == cg_type
+        num_contri_atoms = cg_filter.sum().item()
+        CG2atomChannel[cg_filter] = torch.LongTensor(list(range(num_contri_atoms)))#.to(CG_mapping.device)
+        
+    return CG2atomChannel.detach()
+
+def dense2pad_crd(xyz, n_res, mapping):
+    pad_crd = torch.zeros(n_res, 14, 3)
+    channel_idx = CG2ChannelIdx(mapping).cpu()
+    pad_crd[mapping,  channel_idx, :] = xyz.cpu()
+    return pad_crd
+
+def get_sidechainet_props(data_dict, n_data=10000):
     
     '''parse sidechainnet data struct'''
 
@@ -139,7 +155,7 @@ def get_sidechainet_props(data_dict):
     num_CGs = []
     bond_edges_list = []
 
-    for i, seq in enumerate(data_dict['seq']):
+    for i, seq in enumerate(data_dict['seq'][:n_data]):
         cg_type = []
         ca_xyz = []
         mapping = []
@@ -197,4 +213,4 @@ def get_sidechainet_props(data_dict):
     return {'nxyz': all_nxyzs, 'CG_nxyz': all_cg_nxyz,
             'CG_mapping': all_mapping, 'num_atoms': num_atoms,
             'num_CGs': num_CGs, 'bond_edge_list': bond_edges_list, 
-            'seq': data_dict['seq']}
+            'seq': data_dict['seq'], 'msk':data_dict['msk']}
