@@ -14,6 +14,7 @@ import mdshare
 import pyemma
 from sklearn.utils import shuffle
 import random
+import tqdm 
 
 from sidechainnet.structure.PdbBuilder import PdbBuilder, ATOM_MAP_14
 
@@ -155,7 +156,13 @@ def get_sidechainet_props(data_dict, n_data=10000):
     num_CGs = []
     bond_edges_list = []
 
-    for i, seq in enumerate(data_dict['seq'][:n_data]):
+
+    # generate random index and take first n 
+    idx = list(range(len(data_dict['seq'])))
+    random.shuffle(idx)
+
+    for i in tqdm.tqdm(idx[:n_data]):
+        seq = data_dict['seq'][i]
         cg_type = []
         ca_xyz = []
         mapping = []
@@ -180,8 +187,7 @@ def get_sidechainet_props(data_dict, n_data=10000):
                         xyzs.append(xyz)
                         mapping.append(map)
                         atom_type.append(ATOM2IDX[zmap[k]])
-                        atom_num.append(ATOM2Z[zmap[k]])
-                        
+                        atom_num.append(ATOM2Z[zmap[k]]) 
                 map += 1 
 
         xyzs = np.vstack(xyzs)

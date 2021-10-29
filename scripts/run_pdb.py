@@ -185,8 +185,7 @@ def run_cv(params):
             pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'])
             save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(working_dir, seq))
             
-        
-
+    
     # dump selected pdbs 
 
 
@@ -196,7 +195,7 @@ if __name__ == '__main__':
     parser.add_argument("-logdir", type=str)
     parser.add_argument("-device", type=int)
     parser.add_argument("-n_cgs", type=int, default=10)
-    parser.add_argument("-lr", type=float, default=1e-5)
+    parser.add_argument("-lr", type=float, default=1e-6)
     parser.add_argument("-dataset", type=str, default='debug')
     parser.add_argument("-n_data", type=int, default=1000)
     parser.add_argument("-cg_method", type=str, default='alpha')
@@ -205,7 +204,7 @@ if __name__ == '__main__':
     parser.add_argument("-activation", type=str, default='swish')
     parser.add_argument("-atom_cutoff", type=float, default=3.5)
     parser.add_argument("-optimizer", type=str, default='adam')
-    parser.add_argument("-cg_cutoff", type=float, default=9.5)
+    parser.add_argument("-cg_cutoff", type=float, default=12.5)
     parser.add_argument("-enc_nconv", type=int, default=3)
     parser.add_argument("-dec_nconv", type=int, default=3)
     parser.add_argument("-batch_size", type=int, default=1)
