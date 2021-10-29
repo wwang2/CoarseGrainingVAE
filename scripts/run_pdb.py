@@ -89,17 +89,7 @@ def run_cv(params):
                                   cutoff=params['cg_cutoff'], num_conv = dec_nconv, activation=activation, cross_flag=True,
                                   atomwise_z=False)
 
-    encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                   n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                    cg_mp=cg_mp_flag, dir_mp=False, atomwise_z=False)
-
-    # define prior 
-    cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
-                                   n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                     dir_mp=False)
-
-    model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
-                        atomwise_z=False, offset=False, det=True).to(device)
+    model = PCN(decoder,  feature_dim=n_basis,  offset=False).to(device)
 
     optimizer = optim(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=2, 
@@ -178,12 +168,13 @@ def run_cv(params):
             mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
             
             # only get the first protein 
-            xyz_recon_first = xyz_recon[: batch['num_atoms'].item()]
+            xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
             seq = batch['seq'][0]
             msk = batch['msk'][0]
 
-            pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'])
-            save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(working_dir, seq))
+            pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])
+            
+            save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(working_dir, seq[:30]))
             
     
     # dump selected pdbs 
@@ -200,13 +191,13 @@ if __name__ == '__main__':
     parser.add_argument("-n_data", type=int, default=1000)
     parser.add_argument("-cg_method", type=str, default='alpha')
     parser.add_argument("-n_rbf", type=int, default=8)
-    parser.add_argument("-n_basis", type=int, default=600)
+    parser.add_argument("-n_basis", type=int, default=256)
     parser.add_argument("-activation", type=str, default='swish')
     parser.add_argument("-atom_cutoff", type=float, default=3.5)
     parser.add_argument("-optimizer", type=str, default='adam')
     parser.add_argument("-cg_cutoff", type=float, default=12.5)
-    parser.add_argument("-enc_nconv", type=int, default=3)
-    parser.add_argument("-dec_nconv", type=int, default=3)
+    parser.add_argument("-enc_nconv", type=int, default=2)
+    parser.add_argument("-dec_nconv", type=int, default=2)
     parser.add_argument("-batch_size", type=int, default=1)
     parser.add_argument("-nepochs", type=int, default=2)
     parser.add_argument("-ndata", type=int, default=200)

@@ -114,7 +114,10 @@ def loop(loader, optimizer, device, model, beta, epoch,
         S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
 
         # loss
-        loss_kl = KL(S_mu, S_sigma, H_prior_mu, H_prior_sigma) 
+        if S_mu is not None:
+            loss_kl = KL(S_mu, S_sigma, H_prior_mu, H_prior_sigma) 
+        else:
+            loss_kl = torch.zeros(1).to(device)
         loss_recon = (xyz_recon - xyz).pow(2).mean()
 
         # add graph loss 
