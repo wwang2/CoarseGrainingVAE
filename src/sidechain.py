@@ -156,6 +156,9 @@ def get_sidechainet_props(data_dict, n_data=10000):
     num_CGs = []
     bond_edges_list = []
 
+    all_seqs = []
+    all_msks = []
+
 
     # generate random index and take first n 
     idx = list(range(len(data_dict['seq'])))
@@ -208,6 +211,8 @@ def get_sidechainet_props(data_dict, n_data=10000):
         nxyz = np.hstack([np.array(atom_type).reshape(-1, 1), np.array(xyzs)])
         cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyz)])
 
+        all_seqs.append(data_dict['seq'][i])
+        all_msks.append(data_dict['msk'][i])
         all_nxyzs.append(torch.Tensor(nxyz))
         all_cg_nxyz.append(torch.Tensor(cg_nxyz))
         all_mapping.append(torch.LongTensor(mapping))
@@ -219,4 +224,4 @@ def get_sidechainet_props(data_dict, n_data=10000):
     return {'nxyz': all_nxyzs, 'CG_nxyz': all_cg_nxyz,
             'CG_mapping': all_mapping, 'num_atoms': num_atoms,
             'num_CGs': num_CGs, 'bond_edge_list': bond_edges_list, 
-            'seq': data_dict['seq'], 'msk':data_dict['msk']}
+            'seq': all_seqs, 'msk':all_msks}
