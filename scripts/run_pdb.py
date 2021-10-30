@@ -18,7 +18,6 @@ from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 def run_cv(params):
     working_dir = params['logdir']
     device  = params['device']
-    n_cgs  = params['n_cgs']
     n_basis  = params['n_basis']
     n_rbf  = params['n_rbf']
     atom_cutoff = params['atom_cutoff']
@@ -75,9 +74,9 @@ def run_cv(params):
     testdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
                                    cg_cutoff=None, device="cpu", undirected=True)
 
-    trainloader = DataLoader(traindata, batch_size=1, collate_fn=CG_collate, shuffle=False)
-    valloader = DataLoader(valdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
-    testloader = DataLoader(testdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
+    trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
+    valloader = DataLoader(valdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
+    testloader = DataLoader(testdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
 
     # initialize model 
     atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
@@ -108,13 +107,20 @@ def run_cv(params):
 
 
     for epoch in range(params['nepochs']):
+
+        if epoch <= params['graph_loss_entry']:
+            gamma = 0.0 
+        else:
+            gamma = params['gamma']
+
+
         train_loss, mean_kl_train, mean_recon_train, mean_graph_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                    model, beta, epoch, 
                                                    train=True,
-                                                    gamma=params['gamma'],
+                                                    gamma=gamma,
                                                     eta=params['eta'],
                                                     kappa=params['kappa'],
-                                                    looptext='Ncg {} Fold {} train'.format(n_cgs, epoch),
+                                                    looptext='dataset {} Fold {} train'.format(params['dataset'], epoch),
                                                     tqdm_flag=True)
 
 
@@ -124,7 +130,7 @@ def run_cv(params):
                                             gamma=gamma,
                                             eta=eta,
                                             kappa=kappa,
-                                            looptext='Ncg {} Fold {} val'.format(n_cgs, epoch),
+                                            looptext='dataset {} Fold {} val'.format(params['dataset'], epoch),
                                             tqdm_flag=True)
 
         stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
@@ -185,19 +191,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-logdir", type=str)
     parser.add_argument("-device", type=int)
-    parser.add_argument("-n_cgs", type=int, default=10)
-    parser.add_argument("-lr", type=float, default=1e-6)
+    parser.add_argument("-lr", type=float, default=1e-3)
     parser.add_argument("-dataset", type=str, default='debug')
     parser.add_argument("-n_data", type=int, default=1000)
+    parser.add_argument("-graph_loss_entry", type=int, default=2)
     parser.add_argument("-cg_method", type=str, default='alpha')
     parser.add_argument("-n_rbf", type=int, default=8)
-    parser.add_argument("-n_basis", type=int, default=256)
+    parser.add_argument("-n_basis", type=int, default=512)
     parser.add_argument("-activation", type=str, default='swish')
     parser.add_argument("-atom_cutoff", type=float, default=3.5)
     parser.add_argument("-optimizer", type=str, default='adam')
     parser.add_argument("-cg_cutoff", type=float, default=12.5)
     parser.add_argument("-enc_nconv", type=int, default=2)
-    parser.add_argument("-dec_nconv", type=int, default=2)
+    parser.add_argument("-dec_nconv", type=int, default=6)
     parser.add_argument("-batch_size", type=int, default=1)
     parser.add_argument("-nepochs", type=int, default=2)
     parser.add_argument("-ndata", type=int, default=200)
@@ -226,6 +232,6 @@ if __name__ == '__main__':
     else:
         task = 'sample'
     
-    params['logdir'] = annotate_job(params['cg_method'] +  task + '_ndata{}'.format(params['ndata']), params['logdir'], params['n_cgs'])
+    params['logdir'] = annotate_job(params['cg_method'] +  task + '_ndata{}'.format(params['ndata']), params['logdir'], params['dataset'])
  
     run_cv(params)

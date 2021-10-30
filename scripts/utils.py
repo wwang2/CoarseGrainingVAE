@@ -125,8 +125,8 @@ def loop(loader, optimizer, device, model, beta, epoch,
         xyz = batch['nxyz'][:, 1:].to("cpu")
 
         if gamma != 0.0:
-            gen_dist = (xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt()
-            data_dist = (xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1).sqrt().to(xyz_recon.device)
+            gen_dist = ((xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1) + 1e-6).sqrt()
+            data_dist = ((xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1) + 1e-6).sqrt().to(xyz_recon.device)
             loss_graph = (gen_dist - data_dist).pow(2).mean()
         else:
             loss_graph = torch.Tensor([0.0]).to(device)
