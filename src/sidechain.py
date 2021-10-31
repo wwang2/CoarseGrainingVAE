@@ -166,26 +166,59 @@ def get_sidechainet_props(data_dict, n_data=10000):
 
     for i in tqdm.tqdm(idx[:n_data]):
         seq = data_dict['seq'][i]
+        msk = data_dict['msk'][i]
+        crd = data_dict['crd'][i].reshape(-1, 14, 3) 
+
         cg_type = []
-        ca_xyz = []
+        ca_xyzs = []
         mapping = []
         xyzs = []
         atom_type = []
         atom_num = []
 
-        xyz = data_dict['crd'][i].reshape(-1, 14, 3)
+
+        msk_seq = mask_seq(seq, msk)
+
+        # filter_idx = []
+        # ca_filter_idx = []
+        # for (id, res) in enumerate(seq):
+        #     if msk[id] == '+':
+        #         ca_filter_idx.append(id)
+        #         for atom_id in range(len(ATOM_MAP_14[res])):
+        #             if ATOM_MAP_14[res][atom_id] != 'PAD':
+        #                 filter_idx.append([id, atom_id])
+                            
+        # for id, res in enumerate(msk_seq):
+        #     zmap = ATOM_MAP_14[res]
+        #     # generate types 
+        #     atom_type += [ATOM2IDX[atom] for atom in zmap if atom != 'PAD' ]
+        #     atom_num += [ATOM2Z[atom] for atom in zmap if atom != 'PAD' ]
+        #     mapping += [id for atom in zmap if atom != 'PAD' ]
+        #     cg_type += [RES2IDX[res]]
+
+        # atom_type = torch.LongTensor(atom_type)
+        # atom_num = torch.LongTensor(atom_num)
+        # mapping = torch.LongTensor(mapping)
+        # cg_type = torch.LongTensor(cg_type)
+
+        # filter_idx = torch.LongTensor(filter_idx)
+        # ca_filter_idx = torch.LongTensor(ca_filter_idx)
+        # xyzs = torch.Tensor( crd.reshape(-1, 14 ,3))[filter_idx[:,0 ], filter_idx[:,1]]
+        # ca_xyzs = torch.Tensor( crd.reshape(-1, 14 ,3))[ca_filter_idx, 1] 
+
 
         for j, res in enumerate(seq): 
             if data_dict['msk'][i][j] == "+":
                 cg_type.append(RES2IDX[res])
 
+        msk_seq = mask_seq(seq, msk)
         map = 0
-        for j, res_xyz in enumerate(xyz):
+        for j, res_xyz in enumerate(crd):
             zmap = ATOM_MAP_14[seq[j]]
             if data_dict['msk'][i][j] == "+":
-                ca_xyz.append(res_xyz[1]) # the 2nd atom is the alpha carbon 
+                ca_xyzs.append(res_xyz[1]) # the 2nd atom is the alpha carbon 
                 for k, xyz in enumerate(res_xyz):
-                    if np.power(xyz, 2).sum() != 0:
+                    if xyz.sum() != 0:
                         # also need to retrieve 
                         xyzs.append(xyz)
                         mapping.append(map)
@@ -198,18 +231,18 @@ def get_sidechainet_props(data_dict, n_data=10000):
         # compute bond_graphs 
         
         atoms = Atoms(positions=xyzs, numbers=atom_num)        
-        edges = get_bond_graphs(atoms).nonzero()
+        edges = get_bond_graphs(atoms, device=0).nonzero()
 
-        ca_xyz = np.array(ca_xyz)
+        ca_xyzs = np.array(ca_xyzs)
         atom_type = np.array(atom_type)
         cg_type = np.array(cg_type)
         mapping = np.array(mapping)
 
         num_atoms.append(torch.LongTensor([xyzs.shape[0]]))
-        num_CGs.append(torch.LongTensor([ca_xyz.shape[0]]))
+        num_CGs.append(torch.LongTensor([ca_xyzs.shape[0]]))
         
         nxyz = np.hstack([np.array(atom_type).reshape(-1, 1), np.array(xyzs)])
-        cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyz)])
+        cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyzs)])
 
         all_seqs.append(data_dict['seq'][i])
         all_msks.append(data_dict['msk'][i])
@@ -218,6 +251,8 @@ def get_sidechainet_props(data_dict, n_data=10000):
         all_mapping.append(torch.LongTensor(mapping))
         bond_edges_list.append(torch.LongTensor(edges))
         # compute bond graphs 
+
+        #import ipdb; ipdb.set_trace()
         
 
         
