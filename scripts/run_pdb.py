@@ -59,9 +59,9 @@ def run_cv(params):
         data = scn.load(casp_version=14, thinning=30)
 
 
-    train_props = get_sidechainet_props(data['train'], n_data=params['n_data'])
-    val_props = get_sidechainet_props(data['valid-10'], n_data=params['n_data'])
-    test_props = get_sidechainet_props(data['test'], n_data=params['n_data'])
+    train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'])
+    val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'])
+    test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'])
 
     traindata = CGDataset(train_props.copy())
     valdata = CGDataset(val_props.copy())
@@ -107,12 +107,6 @@ def run_cv(params):
 
 
     for epoch in range(params['nepochs']):
-
-        if epoch <= params['graph_loss_entry']:
-            gamma = 0.0 
-        else:
-            gamma = params['gamma']
-
 
         train_loss, mean_kl_train, mean_recon_train, mean_graph_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                    model, beta, epoch, 
@@ -194,8 +188,8 @@ if __name__ == '__main__':
     parser.add_argument("-lr", type=float, default=1e-3)
     parser.add_argument("-dataset", type=str, default='debug')
     parser.add_argument("-n_data", type=int, default=1000)
-    parser.add_argument("-graph_loss_entry", type=int, default=2)
     parser.add_argument("-cg_method", type=str, default='alpha')
+    parser.add_argument("-edgeorder", type=int, default=2)
     parser.add_argument("-n_rbf", type=int, default=8)
     parser.add_argument("-n_basis", type=int, default=512)
     parser.add_argument("-activation", type=str, default='swish')
@@ -207,7 +201,6 @@ if __name__ == '__main__':
     parser.add_argument("-batch_size", type=int, default=1)
     parser.add_argument("-nepochs", type=int, default=2)
     parser.add_argument("-ndata", type=int, default=200)
-    parser.add_argument("-edgeorder", type=int, default=1)
     parser.add_argument("-beta", type=float, default=0.0)
     parser.add_argument("-gamma", type=float, default=0.0)
     parser.add_argument("-eta", type=float, default=0.0)

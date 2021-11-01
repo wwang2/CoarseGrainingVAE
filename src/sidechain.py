@@ -4,6 +4,7 @@ import networkx as nx
 import itertools
 from data import *
 from sampling import get_bond_graphs
+from datasets import get_high_order_edge
 from torch_scatter import scatter_mean, scatter_add
 from moleculekit.molecule import Molecule
 import glob 
@@ -145,7 +146,7 @@ def dense2pad_crd(xyz, n_res, mapping):
     pad_crd[mapping,  channel_idx, :] = xyz.cpu()
     return pad_crd
 
-def get_sidechainet_props(data_dict, n_data=10000):
+def get_sidechainet_props(data_dict, params, n_data=10000):
     
     '''parse sidechainnet data struct'''
 
@@ -175,7 +176,6 @@ def get_sidechainet_props(data_dict, n_data=10000):
         xyzs = []
         atom_type = []
         atom_num = []
-
 
         msk_seq = mask_seq(seq, msk)
 
@@ -231,7 +231,10 @@ def get_sidechainet_props(data_dict, n_data=10000):
         # compute bond_graphs 
         
         atoms = Atoms(positions=xyzs, numbers=atom_num)        
-        edges = get_bond_graphs(atoms, device=0).nonzero()
+        edges = get_bond_graphs(atoms, device="cpu").nonzero()
+
+        if params['edgeorder'] > 1: 
+            edges = get_high_order_edge(edges, params['edgeorder'], xyzs.shape[0])
 
         ca_xyzs = np.array(ca_xyzs)
         atom_type = np.array(atom_type)
