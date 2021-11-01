@@ -42,6 +42,21 @@ def get_cv_stats( csvs, column):
     
     return cg_res, all_mean, all_error
 
+def retrieve_frames(exp_dir, variable_names):
+    cvs = glob.glob("{}/{}/cv_stats.csv".format(working_dir, exp_dir))
+
+    data_list = []
+    data_frame = []
+    for variable in variable_names:
+        res, mean, se  = get_cv_stats( cvs, variable, 5) 
+        data_frame.append( mean ) 
+        data_frame.append( se ) 
+
+    mux = pd.MultiIndex.from_product([variable_names, ['mean','se']])
+    frame = pd.DataFrame(np.array(data_frame).transpose(), columns=mux, index=res)
+
+    return frame 
+
 def kernel_density_plot(data, xlabel, ylabel, label='kT', figsize=(6,6)):
     k = gaussian_kde(np.vstack([data[:,0], data[:,1]]))
 
