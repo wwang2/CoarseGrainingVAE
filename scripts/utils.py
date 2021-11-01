@@ -10,6 +10,8 @@ import torch.autograd.profiler as profiler
 from sampling import *
 from sklearn.utils import shuffle
 
+EPS = 1e-1
+
 def shuffle_traj(traj):
     full_idx = list(range(len(traj)))
     full_idx = shuffle(full_idx)
@@ -125,8 +127,8 @@ def loop(loader, optimizer, device, model, beta, epoch,
         xyz = batch['nxyz'][:, 1:].to("cpu")
 
         if gamma != 0.0:
-            gen_dist = ((xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1) + 1e-6).sqrt()
-            data_dist = ((xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1) + 1e-6).sqrt().to(xyz_recon.device)
+            gen_dist = ((xyz_recon[edge_list[:, 0 ]] - xyz_recon[edge_list[:, 1 ]]).pow(2).sum(-1) + EPS).sqrt()
+            data_dist = ((xyz[edge_list[:, 0 ]] - xyz[edge_list[:, 1 ]]).pow(2).sum(-1) + EPS).sqrt().to(xyz_recon.device)
             loss_graph = (gen_dist - data_dist).pow(2).mean()
         else:
             loss_graph = torch.Tensor([0.0]).to(device)
@@ -184,15 +186,13 @@ def loop(loader, optimizer, device, model, beta, epoch,
     
     return mean_total_loss, mean_kl, mean_recon, mean_graph, xyz, xyz_recon 
 
-def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_cg, atomwise_z=False, tqdm_flag=True, reflection=False):
+def get_all_true_reconstructed_structures(loader, device, model, atomic_nums=None, n_cg=10, atomwise_z=False, tqdm_flag=True, reflection=False):
     model = model.to(device)
     model.eval()
 
     true_xyzs = []
     recon_xyzs = []
     cg_xyzs = []
-    mus = []
-    sigmas = []
 
     heavy_ged = []
     all_ged = []
@@ -200,16 +200,13 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     all_valid_ratios = []
     heavy_valid_ratios = []
 
-    if atomwise_z == True:
-        n_z = len(atomic_nums)
-    else:
-        n_z = n_cg 
-
     if tqdm_flag:
         loader = tqdm(loader, position=0, leave=True) 
 
     for batch in loader:
         batch = batch_to(batch, device)
+
+        atomic_nums = batch['nxyz'][:, 0].detach().cpu()
 
         if reflection: 
             xyz = batch['nxyz'][:,1:]
@@ -222,17 +219,13 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
         true_xyzs.append(xyz.detach().cpu())
         recon_xyzs.append(xyz_recon.detach().cpu())
         cg_xyzs.append(batch['CG_nxyz'][:, 1:].detach().cpu())
-        
-        mus.append(S_mu.detach().cpu())
-        sigmas.append(S_sigma.detach().cpu())
-
-        num_features = S_mu.shape[-1]
 
         recon  = xyz_recon.detach().cpu()
         data = xyz.detach().cpu()
 
         recon_x_split =  torch.split(recon, batch['num_atoms'].tolist())
         data_x_split =  torch.split(data, batch['num_atoms'].tolist())
+        atomic_nums_split = torch.split(atomic_nums, batch['num_atoms'].tolist())
 
         del S_mu, S_sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon, batch
 
@@ -241,8 +234,10 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
 
         for i, x in enumerate(data_x_split):
 
-            ref_atoms = Atoms(numbers=atomic_nums, positions=x.numpy())
-            recon_atoms = Atoms(numbers=atomic_nums, positions=recon_x_split[i].numpy())
+            z = atomic_nums_split[i].numpy()
+
+            ref_atoms = Atoms(numbers=z, positions=x.numpy())
+            recon_atoms = Atoms(numbers=z, positions=recon_x_split[i].numpy())
 
             # compute ged diff 
             all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, [recon_atoms])
@@ -256,12 +251,9 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
-    true_xyzs = torch.cat(true_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
-    recon_xyzs = torch.cat(recon_xyzs).reshape(-1, len(atomic_nums), 3).numpy()
-    cg_xyzs = torch.cat(cg_xyzs).reshape(-1, n_cg, 3).numpy()
-    
-    mu = torch.cat(mus).reshape(-1, n_z, num_features).mean(0)
-    sigma = torch.cat(sigmas).reshape(-1, n_z, num_features).mean(0)
+    true_xyzs = torch.cat(true_xyzs).numpy()
+    recon_xyzs = torch.cat(recon_xyzs).numpy()
+    cg_xyzs = torch.cat(cg_xyzs).numpy()
 
     all_valid_ratio = np.array(all_valid_ratios).mean()
     heavy_valid_ratio = np.array(heavy_valid_ratios).mean()
@@ -269,7 +261,7 @@ def get_all_true_reconstructed_structures(loader, device, model, atomic_nums, n_
     all_ged = np.array(all_ged).mean()
     heavy_ged = np.array(heavy_ged).mean()
     
-    return true_xyzs, recon_xyzs, cg_xyzs, mu, sigma, all_valid_ratio, heavy_valid_ratio, all_ged, heavy_ged
+    return true_xyzs, recon_xyzs, cg_xyzs, all_valid_ratio, heavy_valid_ratio, all_ged, heavy_ged
 
 def dump_numpy2xyz(xyzs, atomic_nums, path):
     trajs = [Atoms(positions=xyz, numbers=atomic_nums.ravel()) for xyz in xyzs]
