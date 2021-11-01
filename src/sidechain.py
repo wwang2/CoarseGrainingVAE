@@ -16,6 +16,8 @@ import pyemma
 from sklearn.utils import shuffle
 import random
 import tqdm 
+import os 
+import pickle
 
 from sidechainnet.structure.PdbBuilder import PdbBuilder, ATOM_MAP_14
 
@@ -146,7 +148,7 @@ def dense2pad_crd(xyz, n_res, mapping):
     pad_crd[mapping,  channel_idx, :] = xyz.cpu()
     return pad_crd
 
-def get_sidechainet_props(data_dict, params, n_data=10000):
+def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinning=30):
     
     '''parse sidechainnet data struct'''
 
@@ -164,6 +166,17 @@ def get_sidechainet_props(data_dict, params, n_data=10000):
     # generate random index and take first n 
     idx = list(range(len(data_dict['seq'])))
     random.shuffle(idx)
+
+    graph_data_path = os.path.join("../data/",  params['dataset'] + '_{}_{}graph.pkl'.format(split, thinning))
+
+    compute_graph = False 
+    if os.path.exists(graph_data_path): 
+        print("loading graph dictionary from {}".format(graph_data_path))
+        graph_data = pickle.load( open(graph_data_path, "rb" ) )
+    else:
+        compute_graph = True 
+        graph_data = {}
+        print("computing graph on the fly ")
 
     for i in tqdm.tqdm(idx[:n_data]):
         seq = data_dict['seq'][i]
@@ -230,8 +243,12 @@ def get_sidechainet_props(data_dict, params, n_data=10000):
         
         # compute bond_graphs 
         
-        atoms = Atoms(positions=xyzs, numbers=atom_num)        
-        edges = get_bond_graphs(atoms, device="cpu").nonzero()
+        if compute_graph:
+            atoms = Atoms(positions=xyzs, numbers=atom_num)        
+            edges = get_bond_graphs(atoms, device="cpu").nonzero()
+            graph_data[i] = edges
+        else: 
+            edges = graph_data[i]
 
         if params['edgeorder'] > 1: 
             edges = get_high_order_edge(edges, params['edgeorder'], xyzs.shape[0])
@@ -257,7 +274,8 @@ def get_sidechainet_props(data_dict, params, n_data=10000):
 
         #import ipdb; ipdb.set_trace()
         
-
+    if compute_graph:
+        pickle.dump( graph_data, open( graph_data_path, "wb" ) )
         
     return {'nxyz': all_nxyzs, 'CG_nxyz': all_cg_nxyz,
             'CG_mapping': all_mapping, 'num_atoms': num_atoms,

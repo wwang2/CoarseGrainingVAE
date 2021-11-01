@@ -54,14 +54,14 @@ def run_cv(params):
     if params['dataset'] == 'debug':
         data = scn.load( params['dataset'] )
     elif params['dataset'] == 'casp12':
-        data = scn.load(casp_version=12, thinning=30)
+        data = scn.load(casp_version=12, thinning=params['thinning'])
     elif params['dataset'] == 'casp14':
-        data = scn.load(casp_version=14, thinning=30)
+        data = scn.load(casp_version=14, thinning=params['thinning'])
 
 
-    train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'])
-    val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'])
-    test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'])
+    train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
+    val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
+    test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
 
     traindata = CGDataset(train_props.copy())
     valdata = CGDataset(val_props.copy())
@@ -187,6 +187,7 @@ if __name__ == '__main__':
     parser.add_argument("-device", type=int)
     parser.add_argument("-lr", type=float, default=1e-3)
     parser.add_argument("-dataset", type=str, default='debug')
+    parser.add_argument("-thinning", type=int, default=30)
     parser.add_argument("-n_data", type=int, default=1000)
     parser.add_argument("-cg_method", type=str, default='alpha')
     parser.add_argument("-edgeorder", type=int, default=2)
