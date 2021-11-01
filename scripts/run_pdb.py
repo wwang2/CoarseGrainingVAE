@@ -68,11 +68,11 @@ def run_cv(params):
     testdata = CGDataset(test_props.copy())
 
     traindata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
-                                   cg_cutoff=None, device="cpu", undirected=True)
+                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
     valdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
-                                   cg_cutoff=None, device="cpu", undirected=True)
+                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
     testdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
-                                   cg_cutoff=None, device="cpu", undirected=True)
+                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
 
     trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
     valloader = DataLoader(valdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
@@ -104,6 +104,14 @@ def run_cv(params):
     # intialize training log 
     train_log = pd.DataFrame({'epoch': [], 'lr': [], 'train_loss': [], 'val_loss': [], 'train_recon': [], 'val_recon': [],
                'train_KL': [], 'val_KL': [], 'train_graph': [], 'val_graph': []})
+
+
+    cv_stats_pd = pd.DataFrame( { 'train_heavy_recon': [],
+                'test_heavy_recon': [],
+                'train_graph': [],  'test_graph': [],
+                'recon_all_ged': [], 'recon_heavy_ged': [], 
+                'recon_all_valid_ratio': [], 
+                'recon_heavy_valid_ratio': [] })
 
 
     for epoch in range(params['nepochs']):
@@ -159,22 +167,59 @@ def run_cv(params):
             break 
 
         # dump training curve 
-        train_log.to_csv(os.path.join(split_dir, 'train_log.csv'),  index=False)
+
+    if not failed: 
+        test_true_xyzs, test_recon_xyzs, test_cg_xyzs,test_all_valid_ratio, test_heavy_valid_ratio, test_all_ged, test_heavy_ged= get_all_true_reconstructed_structures(testloader, 
+                                                                                         device,
+                                                                                         model,
+                                                                                         None,
+                                                                                         n_cg=None,
+                                                                                         atomwise_z=None,
+                                                                                         tqdm_flag=tqdm_flag, reflection=False)
+        test_loss, mean_kl_test, mean_recon_test, mean_graph_test, xyz_test, xyz_test_recon = loop(testloader, optimizer, device,
+                                   model, beta, epoch, 
+                                   train=False, 
+                                    gamma=gamma,
+                                    eta=eta,
+                                    kappa=kappa,
+                                    looptext='dataset {} Fold {} test'.format(params['dataset'], epoch),
+                                    tqdm_flag=True)
 
 
-    for i, batch in enumerate(testloader):
-        if i <= 4: 
-            batch = batch_to(batch, device)
-            mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
-            
-            # only get the first protein 
-            xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
-            seq = batch['seq'][0]
-            msk = batch['msk'][0]
+        train_loss, mean_kl_train, mean_recon_train, mean_graph_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
+                           model, beta, epoch, 
+                           train=False, 
+                            gamma=gamma,
+                            eta=eta,
+                            kappa=kappa,
+                            looptext='dataset {} Fold {} train'.format(params['dataset'], epoch),
+                            tqdm_flag=True)
 
-            pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])
-            
-            save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(working_dir, seq[:30]))
+        test_stats = {} 
+        test_stats['train_heavy_recon'] = mean_recon_train
+        test_stats['test_heavy_recon'] = mean_recon_test
+        test_stats['train_graph'] = mean_graph_train
+        test_stats['test_graph'] = mean_graph_test
+        test_stats['recon_heavy_ged'] = test_heavy_ged
+        test_stats['recon_heavy_valid_ratio'] = test_heavy_valid_ratio
+
+        cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
+        cv_stats_pd.to_csv(os.path.join(split_dir, 'cv_stats.csv'),  index=False)
+
+
+        for i, batch in enumerate(testloader):
+            if i <= 4: 
+                batch = batch_to(batch, device)
+                mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
+                
+                # only get the first protein 
+                xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
+                seq = batch['seq'][0]
+                msk = batch['msk'][0]
+
+                pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])
+                
+                save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(split_dir, seq[:30]))
             
     
     # dump selected pdbs 
