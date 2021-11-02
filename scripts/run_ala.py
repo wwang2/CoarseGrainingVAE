@@ -89,7 +89,6 @@ def run_cv(params):
     dataset_label = params['dataset']
     shuffle_flag = params['shuffle']
     cg_mp_flag = params['cg_mp']
-    atom_decode_flag = params['atom_decode']
     nevals = params['nevals']
     graph_eval = params['graph_eval']
     tqdm_flag = params['tqdm_flag']
@@ -182,11 +181,11 @@ def run_cv(params):
         # register encoder 
         decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
                                       cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, 
-                                      atomwise_z=atom_decode_flag, cross_flag=params['cross'])
+                                      cross_flag=params['cross'])
 
         encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                        cg_mp=cg_mp_flag, dir_mp=False, atomwise_z=atom_decode_flag)
+                                        cg_mp=cg_mp_flag, dir_mp=False)
 
         # define prior 
         cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
@@ -194,7 +193,7 @@ def run_cv(params):
                                          dir_mp=False)
         
         model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
-                            atomwise_z=atom_decode_flag, det=det, equivariant= not invariantdec).to(device)
+                             det=det, equivariant= not invariantdec).to(device)
         
         optimizer = optim(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=2, 
@@ -280,24 +279,22 @@ def run_cv(params):
                 
             # save sampled geometries 
             trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
-            train_true_xyzs, train_recon_xyzs, train_cg_xyzs, mu, sigma, train_all_valid_ratio, train_heavy_valid_ratio, train_all_ged, train_heavy_ged= get_all_true_reconstructed_structures(trainloader, 
+            train_true_xyzs, train_recon_xyzs, train_cg_xyzs, train_all_valid_ratio, train_heavy_valid_ratio, train_all_ged, train_heavy_ged= get_all_true_reconstructed_structures(trainloader, 
                                                                                                  device,
                                                                                                  model,
                                                                                                  atomic_nums,
                                                                                                  n_cg=n_cgs,
-                                                                                                 atomwise_z=atom_decode_flag,
                                                                                                  tqdm_flag=tqdm_flag, reflection=params['reflectiontest'])
 
             # sample geometries 
-            train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+            #train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs)
 
             testloader = DataLoader(testset, batch_size=batch_size, collate_fn=CG_collate, shuffle=True)
-            test_true_xyzs, test_recon_xyzs, test_cg_xyzs, mu, sigma, test_all_valid_ratio, test_heavy_valid_ratio, test_all_ged, test_heavy_ged = get_all_true_reconstructed_structures(testloader, 
+            test_true_xyzs, test_recon_xyzs, test_cg_xyzs, test_all_valid_ratio, test_heavy_valid_ratio, test_all_ged, test_heavy_ged = get_all_true_reconstructed_structures(testloader, 
                                                                                                  device,
                                                                                                  model,
                                                                                                  atomic_nums,
                                                                                                  n_cg=n_cgs,
-                                                                                                 atomwise_z=atom_decode_flag,
                                                                                                  tqdm_flag=tqdm_flag, reflection=params['reflectiontest'])
 
             # this is just to get KL loss 
@@ -312,22 +309,23 @@ def run_cv(params):
                                                         )
 
             # sample geometries 
-            test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+            #test_samples = sample(testloader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
 
-            dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
-            dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
-            dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
-            dump_numpy2xyz(train_cg_xyzs[:nsamples], np.array([6] * n_cgs), os.path.join(split_dir, 'train_cg.xyz'))
+            #dump_numpy2xyz(train_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'train_samples.xyz'))
+            # dump_numpy2xyz(train_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_original.xyz'))
+            # dump_numpy2xyz(train_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'train_recon.xyz'))
+            # dump_numpy2xyz(train_cg_xyzs[:nsamples], np.array([6] * n_cgs), os.path.join(split_dir, 'train_cg.xyz'))
 
-            dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
-            dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
-            dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
-            dump_numpy2xyz(test_cg_xyzs[:nsamples], np.array([6] * n_cgs), os.path.join(split_dir, 'test_cg.xyz'))
+            #dump_numpy2xyz(test_samples[:nsamples], atomic_nums, os.path.join(split_dir, 'test_samples.xyz'))
+            # dump_numpy2xyz(test_true_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_original.xyz'))
+            # dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
+            # dump_numpy2xyz(test_cg_xyzs[:nsamples], np.array([6] * n_cgs), os.path.join(split_dir, 'test_cg.xyz'))
 
             # compute loss and metrics 
             heavy_filter = atomic_nums != 1.
             test_all_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
-            test_heavy_dxyz = (test_recon_xyzs - test_true_xyzs)[:, heavy_filter, :].reshape(-1)
+            # need reshape here 
+            test_heavy_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1, n_atoms, 3)[:, heavy_filter, :].reshape(-1)
 
             unaligned_test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).mean())
             unaligned_test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
@@ -347,7 +345,7 @@ def run_cv(params):
 
             sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, all_rmsds, all_heavy_rmsds, \
             sample_valid, sample_allatom_valid, sample_graph_val_ratio_list, \
-            sample_graph_allatom_val_ratio_list = sample_ensemble(sampleloader, mu, sigma, device, 
+            sample_graph_allatom_val_ratio_list = sample_ensemble(sampleloader, device, 
                                                                                     model, atomic_nums, 
                                                                                     n_cgs, n_sample=n_ensemble,
                                                                                     graph_eval=graph_eval, reflection=params['reflectiontest'])
@@ -437,7 +435,6 @@ if __name__ == '__main__':
     parser.add_argument("--graph_eval", action='store_true', default=False)
     parser.add_argument("--shuffle", action='store_true', default=False)
     parser.add_argument("--cg_mp", action='store_true', default=False)
-    parser.add_argument("--atom_decode", action='store_true', default=False)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
     parser.add_argument("--det", action='store_true', default=False)
     parser.add_argument("--cg_radius_graph", action='store_true', default=False)

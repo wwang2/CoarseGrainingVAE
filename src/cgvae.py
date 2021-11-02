@@ -340,7 +340,6 @@ class CGequiVAE(nn.Module):
         self.atom_sigmanet = atom_sigmanet
 
         self.n_cgs = n_cgs
-        self.atomwise_z = atomwise_z
         self.prior_net = prior_net
         self.det = det
 
@@ -771,7 +770,6 @@ class CGequiVAE(nn.Module):
                      atom_munet, atom_sigmanet,
                      n_cgs, feature_dim,
                     prior_net=None, 
-                    atomwise_z=False,
                     det=False, equivariant=True, offset=True):
         nn.Module.__init__(self)
         self.encoder = encoder
@@ -780,7 +778,6 @@ class CGequiVAE(nn.Module):
         self.atom_sigmanet = atom_sigmanet
 
         self.n_cgs = n_cgs
-        self.atomwise_z = atomwise_z
         self.prior_net = prior_net
         self.det = det
 
@@ -826,7 +823,7 @@ class CGequiVAE(nn.Module):
             
     def decoder(self, cg_xyz, CG_nbr_list, S_I, s_i, mapping, num_CGs):
         
-        cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I, s_i)
+        cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I)
 
         CG2atomChannel = self.CG2ChannelIdx(mapping)
 

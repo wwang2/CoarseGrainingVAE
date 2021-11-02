@@ -250,7 +250,7 @@ def sample_normal(mu, sigma):
     z= eps.mul(sigma).add_(mu)
     return z 
 
-def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_eval=True, reflection=False):
+def sample_single(batch, model, n_batch, atomic_nums, device, graph_eval=True, reflection=False):
 
     # TODO: included batched sampling 
     model = model.to(device)
@@ -266,10 +266,7 @@ def sample_single(batch, mu, sigma, model, n_batch, atomic_nums, device, graph_e
     z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
 
     # compute cg prior 
-    if model.prior_net:
-        H_prior_mu, H_prior_sigma = model.prior_net(cg_z, cg_xyz, CG_nbr_list)
-    else:
-        H_prior_mu, H_prior_sigma = None, None 
+    H_prior_mu, H_prior_sigma = model.prior_net(cg_z, cg_xyz, CG_nbr_list)
 
     sample_xyzs = []
     recon_atoms_list = []
@@ -336,7 +333,7 @@ def eval_sample_qualities(ref_atoms, atoms_list):
 
     return all_rmsds, heavy_rmsds, valid_ratio, valid_allatom_ratio, graph_val_ratio, graph_allatom_val_ratio
 
-def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_sample, reflection, graph_eval=True):
+def sample_ensemble(loader, device, model, atomic_nums, n_cgs, n_sample, reflection, graph_eval=True):
     '''
     conditional sampling based on CG geometry, only works for batch_size = 1
     '''
@@ -361,7 +358,7 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
     for batch in loader:    
         sample_atoms, data_atoms, recon_atoms, cg_atoms, all_rmsds, \
          heavy_rmsds, valid_ratio, valid_allatom_ratio, graph_val_ratio, \
-         graph_allatom_val_ratio = sample_single(batch, mu, sigma, model, n_sample, atomic_nums, device, graph_eval=graph_eval, reflection=reflection)
+         graph_allatom_val_ratio = sample_single(batch, model, n_sample, atomic_nums, device, graph_eval=graph_eval, reflection=reflection)
 
         sample_xyz_list.append(sample_atoms.get_positions())
         data_xyz_list.append(data_atoms.get_positions())
@@ -403,34 +400,26 @@ def sample_ensemble(loader, mu, sigma, device, model, atomic_nums, n_cgs, n_samp
         return sample_xyzs, data_xyzs, cg_xyzs, recon_xyzs, None, None, None, None, None, None 
 
 
-def sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=False, tqdm_flag=False):
+def sample(loader, device, model, atomic_nums, n_cgs, tqdm_flag=False):
 
     model = model.to(device)
 
     true_xyzs = []
     recon_xyzs = []
     ensemble_atoms = []
-    mus = []
-    sigmas = []
 
-    if atomwise_z:
-        n_z = len(atomic_nums)
-    else:
-        n_z = n_cgs
+    n_z = n_cgs
 
     if tqdm_flag:
         loader = tqdm(loader, position=0, leave=True)    
 
     for batch in loader:
         batch = batch_to(batch, device)
-        
+
         z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = model.get_inputs(batch)
-        
+        atomic_nums = z.detach().cpu().numpy()
         # compute cg prior 
-        if model.prior_net:
-            H_prior_mu, H_prior_sigma = model.prior_net(cg_z, cg_xyz, CG_nbr_list)
-        else:
-            H_prior_mu, H_prior_sigma = None, None 
+        H_prior_mu, H_prior_sigma = model.prior_net(cg_z, cg_xyz, CG_nbr_list)
 
         # sample latent vectors
         z = sample_normal(H_prior_mu, H_prior_sigma)
