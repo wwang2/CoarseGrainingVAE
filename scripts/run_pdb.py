@@ -15,6 +15,22 @@ from sampling import get_bond_graphs
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 
 
+def save_selected_recon(loader, model, device, path):
+    for i, batch in enumerate(loader):
+        if i <= 4: 
+            batch = batch_to(batch, device)
+            mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
+            
+            # only get the first protein 
+            xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
+            seq = batch['seq'][0]
+            msk = batch['msk'][0]
+
+            pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])
+            
+            save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(path, seq[:30]))
+
+
 def run_cv(params):
     working_dir = params['logdir']
     device  = params['device']
@@ -207,23 +223,7 @@ def run_cv(params):
         cv_stats_pd.to_csv(os.path.join(split_dir, 'cv_stats.csv'),  index=False)
 
 
-        for i, batch in enumerate(testloader):
-            if i <= 4: 
-                batch = batch_to(batch, device)
-                mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
-                
-                # only get the first protein 
-                xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
-                seq = batch['seq'][0]
-                msk = batch['msk'][0]
-
-                pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])
-                
-                save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(split_dir, seq[:30]))
-            
-    
-    # dump selected pdbs 
-
+        save_selected_recon(testloader, model, device ,split_dir )
 
 if __name__ == '__main__':
 
