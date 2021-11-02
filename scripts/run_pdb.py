@@ -40,7 +40,6 @@ def run_cv(params):
     dec_nconv  = params['dec_nconv']
     batch_size  = params['batch_size']
     beta  = params['beta']
-    nsplits = params['nsplits']
     ndata = params['ndata']
     nepochs = params['nepochs']
     lr = params['lr']
@@ -128,8 +127,6 @@ def run_cv(params):
                                                    model, beta, epoch, 
                                                    train=True,
                                                     gamma=gamma,
-                                                    eta=params['eta'],
-                                                    kappa=params['kappa'],
                                                     looptext='dataset {} Fold {} train'.format(params['dataset'], epoch),
                                                     tqdm_flag=True)
 
@@ -138,8 +135,6 @@ def run_cv(params):
                                            model, beta, epoch, 
                                            train=False, 
                                             gamma=gamma,
-                                            eta=eta,
-                                            kappa=kappa,
                                             looptext='dataset {} Fold {} val'.format(params['dataset'], epoch),
                                             tqdm_flag=True)
 
@@ -174,8 +169,6 @@ def run_cv(params):
             failed = True
             break 
 
-        # dump training curve 
-
     if not failed: 
         test_true_xyzs, test_recon_xyzs, test_cg_xyzs,test_all_valid_ratio, test_heavy_valid_ratio, test_all_ged, test_heavy_ged= get_all_true_reconstructed_structures(testloader, 
                                                                                          device,
@@ -187,8 +180,6 @@ def run_cv(params):
                                    model, beta, epoch, 
                                    train=False, 
                                     gamma=gamma,
-                                    eta=eta,
-                                    kappa=kappa,
                                     looptext='dataset {} Fold {} test'.format(params['dataset'], epoch),
                                     tqdm_flag=True)
 
@@ -197,8 +188,6 @@ def run_cv(params):
                            model, beta, epoch, 
                            train=False, 
                             gamma=gamma,
-                            eta=eta,
-                            kappa=kappa,
                             looptext='dataset {} Fold {} train'.format(params['dataset'], epoch),
                             tqdm_flag=True)
 
@@ -216,7 +205,7 @@ def run_cv(params):
 
         save_selected_recon(testloader, model, device ,split_dir )
 
-        return cv_stats_pd['test_heavy_recon'].mean()
+        return cv_stats_pd['test_heavy_recon'].mean(), failed
 
 if __name__ == '__main__':
 
@@ -241,19 +230,12 @@ if __name__ == '__main__':
     parser.add_argument("-beta", type=float, default=0.0)
     parser.add_argument("-gamma", type=float, default=0.0)
     parser.add_argument("-threshold", type=float, default=1e-3)
-    parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("-patience", type=int, default=15)
     parser.add_argument("-factor", type=float, default=0.6)
-    parser.add_argument("--tqdm_flag", action='store_true', default=False
+    parser.add_argument("--tqdm_flag", action='store_true', default=False)
     params = vars(parser.parse_args())
     params['savemodel'] = True
-
-    # add more info about this job 
-    if params['det']:
-        task = 'recon'
-    else:
-        task = 'sample'
     
-    params['logdir'] = annotate_job(params['cg_method'] +  task + '_ndata{}'.format(params['ndata']), params['logdir'], params['dataset'])
+    params['logdir'] = annotate_job(params['cg_method'] + '_ndata{}'.format(params['ndata']), params['logdir'], params['dataset'])
  
     run_cv(params)
