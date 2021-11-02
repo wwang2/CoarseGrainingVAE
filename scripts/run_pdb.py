@@ -36,9 +36,7 @@ def run_cv(params):
     device  = params['device']
     n_basis  = params['n_basis']
     n_rbf  = params['n_rbf']
-    atom_cutoff = params['atom_cutoff']
     cg_cutoff = params['cg_cutoff']
-    enc_nconv  = params['enc_nconv']
     dec_nconv  = params['dec_nconv']
     batch_size  = params['batch_size']
     beta  = params['beta']
@@ -49,15 +47,10 @@ def run_cv(params):
     activation = params['activation']
     optim = optim_dict[params['optimizer']]
     dataset_label = params['dataset']
-    shuffle_flag = params['shuffle']
-    cg_mp_flag = params['cg_mp']
     tqdm_flag = params['tqdm_flag']
-    det = params['det']
     gamma = params['gamma']
     factor = params['factor']
     patience = params['patience']
-    eta = params['eta']
-    kappa = params['kappa']
     threshold = params['threshold']
 
     failed = False
@@ -83,11 +76,11 @@ def run_cv(params):
     valdata = CGDataset(val_props.copy())
     testdata = CGDataset(test_props.copy())
 
-    traindata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
+    traindata.generate_neighbor_list(atom_cutoff=0.5,
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
-    valdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
+    valdata.generate_neighbor_list(atom_cutoff=0.5,
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
-    testdata.generate_neighbor_list(atom_cutoff=params['atom_cutoff'], 
+    testdata.generate_neighbor_list(atom_cutoff=0.5,
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
 
     trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
@@ -101,8 +94,7 @@ def run_cv(params):
     # register encoder 
 
     decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
-                                  cutoff=params['cg_cutoff'], num_conv = dec_nconv, activation=activation, cross_flag=True,
-                                  atomwise_z=False)
+                                  cutoff=params['cg_cutoff'], num_conv = dec_nconv, activation=activation, cross_flag=True)
 
     model = PCN(decoder,  feature_dim=n_basis,  offset=False).to(device)
 
@@ -190,7 +182,6 @@ def run_cv(params):
                                                                                          model,
                                                                                          None,
                                                                                          n_cg=None,
-                                                                                         atomwise_z=None,
                                                                                          tqdm_flag=tqdm_flag, reflection=False)
         test_loss, mean_kl_test, mean_recon_test, mean_graph_test, xyz_test, xyz_test_recon = loop(testloader, optimizer, device,
                                    model, beta, epoch, 
@@ -225,6 +216,8 @@ def run_cv(params):
 
         save_selected_recon(testloader, model, device ,split_dir )
 
+        return cv_stats_pd['test_heavy_recon'].mean()
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -239,29 +232,19 @@ if __name__ == '__main__':
     parser.add_argument("-n_rbf", type=int, default=8)
     parser.add_argument("-n_basis", type=int, default=512)
     parser.add_argument("-activation", type=str, default='swish')
-    parser.add_argument("-atom_cutoff", type=float, default=3.5)
     parser.add_argument("-optimizer", type=str, default='adam')
     parser.add_argument("-cg_cutoff", type=float, default=12.5)
-    parser.add_argument("-enc_nconv", type=int, default=2)
     parser.add_argument("-dec_nconv", type=int, default=6)
     parser.add_argument("-batch_size", type=int, default=1)
     parser.add_argument("-nepochs", type=int, default=2)
     parser.add_argument("-ndata", type=int, default=200)
     parser.add_argument("-beta", type=float, default=0.0)
     parser.add_argument("-gamma", type=float, default=0.0)
-    parser.add_argument("-eta", type=float, default=0.0)
-    parser.add_argument("-kappa", type=float, default=0.0)
     parser.add_argument("-threshold", type=float, default=1e-3)
     parser.add_argument("-nsplits", type=int, default=5)
     parser.add_argument("-patience", type=int, default=15)
     parser.add_argument("-factor", type=float, default=0.6)
-    parser.add_argument("--cross", action='store_true', default=False)
-    parser.add_argument("--graph_eval", action='store_true', default=False)
-    parser.add_argument("--shuffle", action='store_true', default=False)
-    parser.add_argument("--cg_mp", action='store_true', default=False)
-    parser.add_argument("--tqdm_flag", action='store_true', default=False)
-    parser.add_argument("--det", action='store_true', default=False)
-
+    parser.add_argument("--tqdm_flag", action='store_true', default=False
     params = vars(parser.parse_args())
     params['savemodel'] = True
 
