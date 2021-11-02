@@ -125,12 +125,12 @@ def compute_bond_cutoff(atoms, scale=1.3):
     
     return cutoff_array
 
-def compute_distance_mat(atoms):
+def compute_distance_mat(atoms, device='cpu'):
     
-    xyz = torch.Tensor( atoms.get_positions() )
+    xyz = torch.Tensor( atoms.get_positions() ).to(device)
     dist = (xyz[:, None, :] - xyz[None, :, :]).pow(2).sum(-1).sqrt()
     
-    return dist 
+    return dist
 
 def dropH(atoms):
     
@@ -156,13 +156,15 @@ def compare_graph(ref_atoms, atoms):
     
     return diff
 
-def get_bond_graphs(atoms):
-    dist = compute_distance_mat(atoms)
+def get_bond_graphs(atoms, device='cpu'):
+    dist = compute_distance_mat(atoms, device=device)
     cutoff = compute_bond_cutoff(atoms)
-    bond_mat = (dist < cutoff)
+    bond_mat = (dist < cutoff.to(device))
     bond_mat[np.diag_indices(len(atoms))] = 0
     
-    return bond_mat.to(torch.long)
+    del dist, cutoff
+
+    return bond_mat.to(torch.long).to('cpu')
 
 # compare graphs 
 
