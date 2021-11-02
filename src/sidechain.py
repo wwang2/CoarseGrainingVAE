@@ -183,6 +183,9 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
         msk = data_dict['msk'][i]
         crd = data_dict['crd'][i].reshape(-1, 14, 3) 
 
+        seq_len = len(seq)
+        msk_ratio = len( [1 for pos in msk if pos == '+']) / seq_len
+
         cg_type = []
         ca_xyzs = []
         mapping = []
@@ -219,60 +222,61 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
         # xyzs = torch.Tensor( crd.reshape(-1, 14 ,3))[filter_idx[:,0 ], filter_idx[:,1]]
         # ca_xyzs = torch.Tensor( crd.reshape(-1, 14 ,3))[ca_filter_idx, 1] 
 
+        if seq_len <= 1000 and msk_ratio == 1.0:
 
-        for j, res in enumerate(seq): 
-            if data_dict['msk'][i][j] == "+":
-                cg_type.append(RES2IDX[res])
+            for j, res in enumerate(seq): 
+                if data_dict['msk'][i][j] == "+":
+                    cg_type.append(RES2IDX[res])
 
-        msk_seq = mask_seq(seq, msk)
-        map = 0
-        for j, res_xyz in enumerate(crd):
-            zmap = ATOM_MAP_14[seq[j]]
-            if data_dict['msk'][i][j] == "+":
-                ca_xyzs.append(res_xyz[1]) # the 2nd atom is the alpha carbon 
-                for k, xyz in enumerate(res_xyz):
-                    if xyz.sum() != 0:
-                        # also need to retrieve 
-                        xyzs.append(xyz)
-                        mapping.append(map)
-                        atom_type.append(ATOM2IDX[zmap[k]])
-                        atom_num.append(ATOM2Z[zmap[k]]) 
-                map += 1 
+            msk_seq = mask_seq(seq, msk)
+            map = 0
+            for j, res_xyz in enumerate(crd):
+                zmap = ATOM_MAP_14[seq[j]]
+                if data_dict['msk'][i][j] == "+":
+                    ca_xyzs.append(res_xyz[1]) # the 2nd atom is the alpha carbon 
+                    for k, xyz in enumerate(res_xyz):
+                        if xyz.sum() != 0:
+                            # also need to retrieve 
+                            xyzs.append(xyz)
+                            mapping.append(map)
+                            atom_type.append(ATOM2IDX[zmap[k]])
+                            atom_num.append(ATOM2Z[zmap[k]]) 
+                    map += 1 
 
-        xyzs = np.vstack(xyzs)
-        
-        # compute bond_graphs 
-        
-        if compute_graph:
-            atoms = Atoms(positions=xyzs, numbers=atom_num)        
-            edges = get_bond_graphs(atoms, device="cpu").nonzero()
-            graph_data[i] = edges
-        else: 
-            edges = graph_data[i]
+            xyzs = np.vstack(xyzs)
+            
+            # compute bond_graphs 
+            
+            if compute_graph:
+                atoms = Atoms(positions=xyzs, numbers=atom_num)        
+                edges = get_bond_graphs(atoms, device="cpu").nonzero()
+                graph_data[i] = edges
+            else: 
+                edges = graph_data[i]
 
-        if params['edgeorder'] > 1: 
-            edges = get_high_order_edge(edges, params['edgeorder'], xyzs.shape[0])
+            if params['edgeorder'] > 1: 
+                edges = get_high_order_edge(edges, params['edgeorder'], xyzs.shape[0])
 
-        ca_xyzs = np.array(ca_xyzs)
-        atom_type = np.array(atom_type)
-        cg_type = np.array(cg_type)
-        mapping = np.array(mapping)
+            ca_xyzs = np.array(ca_xyzs)
+            atom_type = np.array(atom_type)
+            cg_type = np.array(cg_type)
+            mapping = np.array(mapping)
 
-        num_atoms.append(torch.LongTensor([xyzs.shape[0]]))
-        num_CGs.append(torch.LongTensor([ca_xyzs.shape[0]]))
-        
-        nxyz = np.hstack([np.array(atom_num).reshape(-1, 1), np.array(xyzs)])
-        cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyzs)])
+            num_atoms.append(torch.LongTensor([xyzs.shape[0]]))
+            num_CGs.append(torch.LongTensor([ca_xyzs.shape[0]]))
+            
+            nxyz = np.hstack([np.array(atom_num).reshape(-1, 1), np.array(xyzs)])
+            cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyzs)])
 
-        all_seqs.append(data_dict['seq'][i])
-        all_msks.append(data_dict['msk'][i])
-        all_nxyzs.append(torch.Tensor(nxyz))
-        all_cg_nxyz.append(torch.Tensor(cg_nxyz))
-        all_mapping.append(torch.LongTensor(mapping))
-        bond_edges_list.append(torch.LongTensor(edges))
-        # compute bond graphs 
+            all_seqs.append(data_dict['seq'][i])
+            all_msks.append(data_dict['msk'][i])
+            all_nxyzs.append(torch.Tensor(nxyz))
+            all_cg_nxyz.append(torch.Tensor(cg_nxyz))
+            all_mapping.append(torch.LongTensor(mapping))
+            bond_edges_list.append(torch.LongTensor(edges))
+            # compute bond graphs 
 
-        #import ipdb; ipdb.set_trace()
+            #import ipdb; ipdb.set_trace()
         
     if compute_graph:
         pickle.dump( graph_data, open( graph_data_path, "wb" ) )
