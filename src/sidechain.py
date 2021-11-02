@@ -261,7 +261,7 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
         num_atoms.append(torch.LongTensor([xyzs.shape[0]]))
         num_CGs.append(torch.LongTensor([ca_xyzs.shape[0]]))
         
-        nxyz = np.hstack([np.array(atom_type).reshape(-1, 1), np.array(xyzs)])
+        nxyz = np.hstack([np.array(atom_num).reshape(-1, 1), np.array(xyzs)])
         cg_nxyz = np.hstack([np.array(cg_type).reshape(-1, 1), np.array(ca_xyzs)])
 
         all_seqs.append(data_dict['seq'][i])
