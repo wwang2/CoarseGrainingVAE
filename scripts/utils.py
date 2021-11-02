@@ -10,7 +10,7 @@ import torch.autograd.profiler as profiler
 from sampling import *
 from sklearn.utils import shuffle
 
-EPS = 1e-1
+EPS = 1e-6
 
 def shuffle_traj(traj):
     full_idx = list(range(len(traj)))
@@ -145,7 +145,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
             loss.backward()
 
             # perfrom gradient clipping 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
 
             optimizer.step()
 
