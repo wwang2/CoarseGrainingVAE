@@ -48,7 +48,7 @@ class ENDecoder(nn.Module):
         return s_i, v_i 
 
 class EquivariantDecoder(nn.Module):
-    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True):   
         
         nn.Module.__init__(self)
 
@@ -121,8 +121,7 @@ class EquiEncoder(nn.Module):
              activation,
              cutoff,
              dir_mp=False,
-             cg_mp=False,
-             atomwise_z=False):
+             cg_mp=False):
         super().__init__()
 
         self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
@@ -183,7 +182,6 @@ class EquiEncoder(nn.Module):
         self.n_conv = n_conv
         self.dir_mp = dir_mp
         self.cg_mp = cg_mp
-        self.atomwise_z = atomwise_z
         self.n_atom_basis = n_atom_basis
     
     def forward(self, z, xyz, cg_xyz, mapping, nbr_list, cg_nbr_list):
@@ -331,7 +329,6 @@ class CGequiVAE(nn.Module):
                      atom_munet, atom_sigmanet,
                      n_cgs, feature_dim,
                     prior_net=None, 
-                    atomwise_z=False,
                     det=False, equivariant=True, offset=True):
         nn.Module.__init__(self)
         self.encoder = encoder
@@ -489,7 +486,7 @@ class ENDecoder(nn.Module):
         return s_i, v_i 
 
 class EquivariantDecoder(nn.Module):
-    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True, atomwise_z=False):   
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True):   
         
         nn.Module.__init__(self)
 
@@ -562,8 +559,7 @@ class EquiEncoder(nn.Module):
              activation,
              cutoff,
              dir_mp=False,
-             cg_mp=False,
-             atomwise_z=False):
+             cg_mp=False):
         super().__init__()
 
         self.atom_embed = nn.Embedding(100, n_atom_basis, padding_idx=0)
@@ -624,7 +620,6 @@ class EquiEncoder(nn.Module):
         self.n_conv = n_conv
         self.dir_mp = dir_mp
         self.cg_mp = cg_mp
-        self.atomwise_z = atomwise_z
         self.n_atom_basis = n_atom_basis
     
     def forward(self, z, xyz, cg_xyz, mapping, nbr_list, cg_nbr_list):
