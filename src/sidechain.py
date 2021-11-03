@@ -223,7 +223,7 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
         # xyzs = torch.Tensor( crd.reshape(-1, 14 ,3))[filter_idx[:,0 ], filter_idx[:,1]]
         # ca_xyzs = torch.Tensor( crd.reshape(-1, 14 ,3))[ca_filter_idx, 1] 
 
-        if seq_len <= 2500 and seq not in SEQ_BLACKLIST:
+        if seq not in SEQ_BLACKLIST:
 
             for j, res in enumerate(seq): 
                 if data_dict['msk'][i][j] == "+":
