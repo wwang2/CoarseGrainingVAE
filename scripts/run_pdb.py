@@ -14,21 +14,38 @@ from sidechain import *
 from sampling import get_bond_graphs
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 
-
 def save_selected_recon(loader, model, device, path):
-    for i, batch in enumerate(loader):
-        if i <= 4: 
-            batch = batch_to(batch, device)
-            mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
-            
-            # only get the first protein 
-            xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
-            seq = batch['seq'][0]
-            msk = batch['msk'][0]
 
-            pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])
-            
-            save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}.pdb'.format(path, seq[:30]))
+    test_results = {'id':[], 'rmsd':[], 'len': [], 'ged':[], 'time':[]}
+    df = pd.DataFrame(test_results)
+
+    for i, batch in enumerate(loader):
+
+        batch = batch_to(batch, device)
+        start_time = time.time()
+        mu, sigma, H_prior_mu, H_prior_sigma, xyz, xyz_recon = model(batch)
+        dt = time.time() - start_time
+
+        # only get the first protein 
+        xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
+        seq = batch['seq'][0]
+        msk = batch['msk'][0]
+        z = batch['nxyz'][:, 0].detach().cpu().numpy()
+
+        # compute rmsd: 
+        rmsd = (xyz_recon - xyz).pow(2).mean().sqrt().item()
+        ref_atoms = Atoms(numbers=z, positions=xyz.detach().cpu().numpy())
+        recon_atoms =  Atoms(numbers=z, positions=xyz_recon.detach().cpu().numpy())
+        all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, [recon_atoms])
+    
+        result = {'id': i , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq)}
+        df = df.append(result, ignore_index=True)
+
+        pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])    
+        save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}_backmap.pdb'.format(path, i))
+
+    df.to_csv('{}/egnn_test_results.csv'.format(path))
+        # save results 
 
 
 def run_cv(params):
@@ -58,22 +75,41 @@ def run_cv(params):
     split_dir = working_dir
     create_dir(split_dir)
 
-
     if params['dataset'] == 'debug':
         data = scn.load( params['dataset'] )
+        train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
+        val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
+        test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
     elif params['dataset'] == 'casp12':
-        data = scn.load(casp_version=12, thinning=params['thinning'])
-    elif params['dataset'] == 'casp14':
-        data = scn.load(casp_version=14, thinning=params['thinning'])
+        data_path = '../data/casp12_{}_30_all.pkl'
+        train_props = pickle.load(open(data_path.format('train'), "rb" ) )
+        val_props = pickle.load(open(data_path.format('val'), "rb" ) )
+        test_props = pickle.load(open(data_path.format('test'), "rb" ) )
 
+    #train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
+    #val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
+    #test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
 
-    train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
-    val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
-    test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
 
     traindata = CGDataset(train_props.copy())
     valdata = CGDataset(val_props.copy())
     testdata = CGDataset(test_props.copy())
+
+
+    # remove problemic structures 
+    valid_ids = []
+    for i, edge in enumerate(train_props['bond_edge_list']):
+        natoms = train_props['nxyz'][i].shape[0]
+        nedges = edge.shape[0]
+        ratio = nedges/ natoms 
+        if ratio <= 3.0 and ratio != 0.0:
+            valid_ids.append(i)
+
+    traindata = get_subset_by_indices(valid_ids, traindata)
+
+    all_idx = list( range(len(traindata.props['nxyz'])) )
+    random.shuffle(all_idx)
+    traindata = get_subset_by_indices(all_idx[:params['n_data']], traindata)
 
     traindata.generate_neighbor_list(atom_cutoff=0.5,
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
@@ -84,7 +120,7 @@ def run_cv(params):
 
     trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
     valloader = DataLoader(valdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
-    testloader = DataLoader(testdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
+    testloader = DataLoader(testdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
     # initialize model 
     atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
@@ -189,7 +225,8 @@ def run_cv(params):
                            train=False, 
                             gamma=gamma,
                             looptext='dataset {} Fold {} train'.format(params['dataset'], epoch),
-                            tqdm_flag=True)
+                            tqdm_flag=True) 
+
 
         test_stats = {} 
         test_stats['train_heavy_recon'] = mean_recon_train
@@ -202,6 +239,8 @@ def run_cv(params):
         cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
         cv_stats_pd.to_csv(os.path.join(split_dir, 'cv_stats.csv'),  index=False)
 
+
+        # record test results one by one 
 
         save_selected_recon(testloader, model, device ,split_dir )
 
@@ -222,8 +261,8 @@ if __name__ == '__main__':
     parser.add_argument("-n_basis", type=int, default=512)
     parser.add_argument("-activation", type=str, default='swish')
     parser.add_argument("-optimizer", type=str, default='adam')
-    parser.add_argument("-cg_cutoff", type=float, default=12.5)
-    parser.add_argument("-dec_nconv", type=int, default=6)
+    parser.add_argument("-cg_cutoff", type=float, default=15.5)
+    parser.add_argument("-dec_nconv", type=int, default=9)
     parser.add_argument("-batch_size", type=int, default=1)
     parser.add_argument("-nepochs", type=int, default=2)
     parser.add_argument("-ndata", type=int, default=200)
