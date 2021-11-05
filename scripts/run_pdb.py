@@ -30,19 +30,20 @@ def save_selected_recon(loader, model, device, path):
         xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
         seq = batch['seq'][0]
         msk = batch['msk'][0]
+        id = batch['id'][0]
         z = batch['nxyz'][:, 0].detach().cpu().numpy()
 
         # compute rmsd: 
-        rmsd = (xyz_recon - xyz).pow(2).mean().sqrt().item()
+        rmsd = torch.sqrt(((xyz_recon - xyz)**2).sum(axis=1).mean()).item()
         ref_atoms = Atoms(numbers=z, positions=xyz.detach().cpu().numpy())
         recon_atoms =  Atoms(numbers=z, positions=xyz_recon.detach().cpu().numpy())
         all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, [recon_atoms])
     
-        result = {'id': i , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq)}
+        result = {'id': id , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq)}
         df = df.append(result, ignore_index=True)
 
         pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])    
-        save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}_backmap.pdb'.format(path, i))
+        save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}_backmap.pdb'.format(path, id))
 
     df.to_csv('{}/egnn_test_results.csv'.format(path))
         # save results 
@@ -81,7 +82,7 @@ def run_cv(params):
         val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
         test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
     elif params['dataset'] == 'casp12':
-        data_path = '../data/casp12_{}_30_all.pkl'
+        data_path = '../data/casp12_{}_' + str(params['thinning']) + '_all.pkl'
         train_props = pickle.load(open(data_path.format('train'), "rb" ) )
         val_props = pickle.load(open(data_path.format('val'), "rb" ) )
         test_props = pickle.load(open(data_path.format('test'), "rb" ) )
