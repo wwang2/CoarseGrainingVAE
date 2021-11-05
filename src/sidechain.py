@@ -163,6 +163,7 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
 
     all_seqs = []
     all_msks = []
+    all_ids = []
 
 
     # generate random index and take first n 
@@ -184,6 +185,7 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
         seq = data_dict['seq'][i]
         msk = data_dict['msk'][i]
         crd = data_dict['crd'][i].reshape(-1, 14, 3) 
+        id = data_dict['ids'][i]
 
         seq_len = len(seq)
         msk_ratio = len( [1 for pos in msk if pos == '+']) / seq_len
@@ -229,6 +231,8 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
             for j, res in enumerate(seq): 
                 if data_dict['msk'][i][j] == "+":
                     cg_type.append(RES2IDX[res])
+
+            all_ids.append(id)
 
             msk_seq = mask_seq(seq, msk)
             map = 0
@@ -286,4 +290,4 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
     return {'nxyz': all_nxyzs, 'CG_nxyz': all_cg_nxyz,
             'CG_mapping': all_mapping, 'num_atoms': num_atoms,
             'num_CGs': num_CGs, 'bond_edge_list': bond_edges_list, 
-            'seq': all_seqs, 'msk':all_msks}
+            'seq': all_seqs, 'msk':all_msks, 'id': all_ids}
