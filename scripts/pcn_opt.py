@@ -91,10 +91,6 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial =  suggestion.assignments
 
 
-    suggestion = conn.experiments(experiment.id).suggestions().create()
-    trial =  suggestion.assignments
-
-
     run_params = dict(params,**trial)
 
     print("Suggestion ID: {}".format(suggestion.id))
