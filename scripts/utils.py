@@ -139,6 +139,11 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
         loss =  loss_recon + loss_kl * beta+ loss_graph * gamma 
 
+        memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
+
+        if loss.item() >= 100.0:
+            continue 
+
         # optimize 
         if train:
             optimizer.zero_grad()
@@ -146,7 +151,6 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
             # perfrom gradient clipping 
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
-
             optimizer.step()
 
         else:
@@ -166,8 +170,6 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # mean_norm = np.array(norm_loss).mean()
         mean_graph = np.array(graph_loss).mean()
         mean_total_loss = np.array(total_loss).mean()
-        
-        memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
         postfix = ['total={:.3f}'.format(mean_total_loss),
                     'KL={:.4f}'.format(mean_kl) , 
