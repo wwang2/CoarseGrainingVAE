@@ -245,7 +245,9 @@ def run_cv(params):
 
         save_selected_recon(testloader, model, device ,split_dir )
 
-        return cv_stats_pd['test_heavy_recon'].mean(), failed
+        return cv_stats_pd['test_heavy_recon'].mean(), cv_stats_pd['recon_heavy_ged'].mean(), failed
+    else:
+        return 0.0, 0.0, True 
 
 if __name__ == '__main__':
 
