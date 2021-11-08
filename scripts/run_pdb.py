@@ -35,11 +35,19 @@ def save_selected_recon(loader, model, device, path):
 
         # compute rmsd: 
         rmsd = torch.sqrt(((xyz_recon - xyz)**2).sum(axis=1).mean()).item()
+
+        # compute graph ged 
         ref_atoms = Atoms(numbers=z, positions=xyz.detach().cpu().numpy())
         recon_atoms =  Atoms(numbers=z, positions=xyz_recon.detach().cpu().numpy())
         all_rmsds, heavy_rmsds, valid_ratio, valid_hh_ratio, graph_val_ratio, graph_hh_val_ratio = eval_sample_qualities(ref_atoms, [recon_atoms])
-    
-        result = {'id': id , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq)}
+
+        # compute bond deviation
+        bondpairs = get_bond_graphs(ref_atoms).triu().nonzero()
+        bond_ref = (xyz[bondpairs[:, 0]] - xyz[bondpairs[:, 1]]).pow(2).sum(-1).sqrt()
+        bond_recon = (xyz_recon[bondpairs[:, 0]] - xyz_recon[bondpairs[:, 1]]).pow(2).sum(-1).sqrt()
+        bond_diff = (bond_ref - bond_recon).abs().mean()
+
+        result = {'id': id , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq), 'bond_diff': bond_diff.item()}
         df = df.append(result, ignore_index=True)
 
         pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])    
@@ -240,10 +248,12 @@ def run_cv(params):
         cv_stats_pd = cv_stats_pd.append(test_stats, ignore_index=True)
         cv_stats_pd.to_csv(os.path.join(split_dir, 'cv_stats.csv'),  index=False)
 
-
         # record test results one by one 
-
         save_selected_recon(testloader, model, device ,split_dir )
+
+        # save model 
+        model = model.to('cpu')
+        torch.save(model.state_dict(), os.path.join(split_dir, 'model.pt'))
 
         return cv_stats_pd['test_heavy_recon'].mean(), cv_stats_pd['recon_heavy_ged'].mean(), failed
     else:
