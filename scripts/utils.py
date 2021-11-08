@@ -141,7 +141,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
-        if loss.item() >= 100.0:
+        if loss.item() >= gamma * 5.0 or torch.isnan(loss):
             continue 
 
         # optimize 
