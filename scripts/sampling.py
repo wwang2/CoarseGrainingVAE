@@ -136,7 +136,6 @@ def dropH(atoms):
     
     positions = atoms.get_positions()
     atomic_nums = atoms.get_atomic_numbers()
-    
     mask = atomic_nums != 1
     
     heavy_pos = positions[mask]
@@ -146,19 +145,19 @@ def dropH(atoms):
     
     return new_atoms
 
-def compare_graph(ref_atoms, atoms):
+def compare_graph(ref_atoms, atoms, scale):
 
-    ref_bonds = get_bond_graphs(ref_atoms)
+    ref_bonds = get_bond_graphs(ref_atoms, scale=scale)
 
-    bonds = get_bond_graphs(atoms)
+    bonds = get_bond_graphs(atoms, scale=scale)
 
     diff = (bonds != ref_bonds).sum().item()
     
     return diff
 
-def get_bond_graphs(atoms, device='cpu'):
+def get_bond_graphs(atoms, device='cpu', scale=1.3):
     dist = compute_distance_mat(atoms, device=device)
-    cutoff = compute_bond_cutoff(atoms)
+    cutoff = compute_bond_cutoff(atoms, scale=scale)
     bond_mat = (dist < cutoff.to(device))
     bond_mat[np.diag_indices(len(atoms))] = 0
     
@@ -168,7 +167,7 @@ def get_bond_graphs(atoms, device='cpu'):
 
 # compare graphs 
 
-def count_valid_graphs(ref_atoms, atoms_list, heavy_only=True):
+def count_valid_graphs(ref_atoms, atoms_list, heavy_only=True, scale=1.3):
     
     if heavy_only:
         ref_atoms = dropH(ref_atoms)
@@ -181,11 +180,11 @@ def count_valid_graphs(ref_atoms, atoms_list, heavy_only=True):
         if heavy_only:
             atoms = dropH(atoms)
 
-        if compare_graph(ref_atoms, atoms) == 0:
+        if compare_graph(ref_atoms, atoms, scale=scale) == 0:
             valid_ids.append(idx)
 
-        gen_graph = get_bond_graphs(atoms)
-        ref_graph = get_bond_graphs(ref_atoms)
+        gen_graph = get_bond_graphs(atoms, scale=scale)
+        ref_graph = get_bond_graphs(ref_atoms, scale=scale )
 
         graph_diff_ratio = (ref_graph - gen_graph).sum().abs() / ref_graph.sum()
         graph_diff_ratio_list.append(graph_diff_ratio.item())
@@ -322,10 +321,10 @@ def count_valid_smiles(true_smiles, inferred_smiles):
     return valid_ids, valid_ratio
 
 
-def eval_sample_qualities(ref_atoms, atoms_list): 
+def eval_sample_qualities(ref_atoms, atoms_list, scale=1.3): 
 
-    valid_ids, valid_ratio, graph_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=True)
-    valid_allatom_ids, valid_allatom_ratio, graph_allatom_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=False)
+    valid_ids, valid_ratio, graph_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=True, scale=scale)
+    valid_allatom_ids, valid_allatom_ratio, graph_allatom_val_ratio = count_valid_graphs(ref_atoms, atoms_list, heavy_only=False, scale=scale)
 
     # keep track of heavy and all-atom rmsds separately
     heavy_rmsds = compute_rmsd(atoms_list, ref_atoms, valid_ids) # rmsds for valid heavy atom graphs 
