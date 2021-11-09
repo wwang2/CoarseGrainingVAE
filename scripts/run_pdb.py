@@ -11,8 +11,10 @@ sys.path.append("../src/")
 from run_ala import * 
 from utils import * 
 from sidechain import * 
+from datasets import * 
 from sampling import get_bond_graphs
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
+from sklearn.model_selection import train_test_split
 
 def save_selected_recon(loader, model, device, path):
 
@@ -84,26 +86,42 @@ def run_cv(params):
     split_dir = working_dir
     create_dir(split_dir)
 
+
+    # generate propos dictionary 
+
     if params['dataset'] == 'debug':
         data = scn.load( params['dataset'] )
         train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
         val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
         test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
     elif params['dataset'] == 'casp12':
-        data_path = '../data/casp12_{}_' + str(params['thinning']) + '_all.pkl'
+        data_path = os.path.join( params['datadir'] , 'casp12_{}_' + str(params['thinning']) + '_all.pkl')
         train_props = pickle.load(open(data_path.format('train'), "rb" ) )
         val_props = pickle.load(open(data_path.format('val'), "rb" ) )
         test_props = pickle.load(open(data_path.format('test'), "rb" ) )
 
+    # cases for alanine and dipeptide 
+    elif params['dataset'] in PROTEINFILES.keys(): 
+        traj = load_protein_traj(params['dataset'])
+        traj = shuffle_traj(traj)
+        atomic_nums, protein_index = get_atomNum(traj)
+        n_atoms = atomic_nums.shape[0]
+
+        params['cg_method'] = 'alpha'
+
+        # split train, val, test 
+        train_val_idx, test_idx = train_test_split( list(range(params['n_data'])))
+
+        import ipdb; ipdb.set_trace()
+
+
+
     #train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
     #val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
     #test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
-
-
     traindata = CGDataset(train_props.copy())
     valdata = CGDataset(val_props.copy())
     testdata = CGDataset(test_props.copy())
-
 
     # remove problemic structures 
     valid_ids = []
@@ -263,6 +281,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-logdir", type=str)
+    parser.add_argument("-datadir", type=str)
     parser.add_argument("-device", type=int)
     parser.add_argument("-lr", type=float, default=1e-3)
     parser.add_argument("-dataset", type=str, default='debug')
