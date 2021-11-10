@@ -16,9 +16,23 @@ from sampling import get_bond_graphs
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sklearn.model_selection import train_test_split
 
+
+def compute_drmsd(xyz1, xyz2):
+    '''
+        definition based on https://aip.scitation.org/doi/abs/10.1063/1.1289822
+    '''
+    dist1 = (xyz1.unsqueeze(0) - xyz1.unsqueeze(1)).pow(2).sum(-1).sqrt().triu()
+    dist2 = (xyz2.unsqueeze(0) - xyz2.unsqueeze(1)).pow(2).sum(-1).sqrt().triu()
+    triu_idx = dist1.nonzero()
+    
+    dist1 = dist1[triu_idx[:, 0 ], triu_idx[:, 1]]
+    dist2 = dist2[triu_idx[:, 0 ], triu_idx[:, 1]]
+    
+    return ((dist1 - dist2).pow(2).mean().sqrt())
+
 def save_selected_recon(loader, model, device, path):
 
-    test_results = {'id':[], 'rmsd':[], 'len': [], 'ged':[], 'time':[]}
+    test_results = {'id':[], 'rmsd':[], 'len': [], 'ged':[], 'time':[], 'bond_diff': [], "drmsd":[]}
     df = pd.DataFrame(test_results)
 
     for i, batch in enumerate(loader):
@@ -37,6 +51,8 @@ def save_selected_recon(loader, model, device, path):
 
         # compute rmsd: 
         rmsd = torch.sqrt(((xyz_recon - xyz)**2).sum(axis=1).mean()).item()
+        # compute drmsd 
+        drmsd = compute_drmsd(xyz_recon, xyz).item()
 
         # compute graph ged 
         ref_atoms = Atoms(numbers=z, positions=xyz.detach().cpu().numpy())
@@ -49,7 +65,7 @@ def save_selected_recon(loader, model, device, path):
         bond_recon = (xyz_recon[bondpairs[:, 0]] - xyz_recon[bondpairs[:, 1]]).pow(2).sum(-1).sqrt()
         bond_diff = (bond_ref - bond_recon).abs().mean()
 
-        result = {'id': id , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq), 'bond_diff': bond_diff.item()}
+        result = {'id': id , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq), 'bond_diff': bond_diff.item(), "drmsd": drmsd}
         df = df.append(result, ignore_index=True)
 
         pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])    
@@ -106,19 +122,15 @@ def run_cv(params):
         traj = shuffle_traj(traj)
         atomic_nums, protein_index = get_atomNum(traj)
         n_atoms = atomic_nums.shape[0]
-
         params['cg_method'] = 'alpha'
-
         # split train, val, test 
         train_val_idx, test_idx = train_test_split( list(range(params['n_data'])))
-
         import ipdb; ipdb.set_trace()
-
-
 
     #train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
     #val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
     #test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
+
     traindata = CGDataset(train_props.copy())
     valdata = CGDataset(val_props.copy())
     testdata = CGDataset(test_props.copy())
