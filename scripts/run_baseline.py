@@ -376,8 +376,8 @@ def run(params):
         test_all_dxyz = (all_test_xyz_data - all_test_xyz_recon).reshape(-1)
         test_heavy_dxyz = (all_test_xyz_data - all_test_xyz_recon)[:, heavy_filter, :].reshape(-1)
 
-        test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).mean())
-        test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
+        test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).sum(-1).mean())
+        test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).sum(-1).mean())
 
         # dump train recon 
         dump_numpy2xyz(all_test_xyz_recon[:32], props['z'][0].numpy(), os.path.join(split_dir, 'test_recon.xyz'))

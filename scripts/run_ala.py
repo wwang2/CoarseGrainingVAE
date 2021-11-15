@@ -321,14 +321,18 @@ def run_cv(params):
             # dump_numpy2xyz(test_recon_xyzs[:nsamples], atomic_nums, os.path.join(split_dir, 'test_recon.xyz'))
             # dump_numpy2xyz(test_cg_xyzs[:nsamples], np.array([6] * n_cgs), os.path.join(split_dir, 'test_cg.xyz'))
 
-            # compute loss and metrics 
+            # compute test rmsds 
             heavy_filter = atomic_nums != 1.
             test_all_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1)
-            # need reshape here 
             test_heavy_dxyz = (test_recon_xyzs - test_true_xyzs).reshape(-1, n_atoms, 3)[:, heavy_filter, :].reshape(-1)
+            unaligned_test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).sum(-1).mean())
+            unaligned_test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).sum(-1).mean())
 
-            unaligned_test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).mean())
-            unaligned_test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).mean())
+            # compute train rmsd
+            train_all_dxyz = (train_recon_xyzs - train_true_xyzs).reshape(-1)
+            train_heavy_dxyz = (train_recon_xyzs - train_true_xyzs).reshape(-1, n_atoms, 3)[:, heavy_filter, :].reshape(-1)
+            unaligned_train_all_rmsd = np.sqrt(np.power(train_all_dxyz, 2).sum(-1).mean())
+            unaligned_train_heavy_rmsd = np.sqrt(np.power(train_heavy_dxyz, 2).sum(-1).mean())
 
             # dump test rmsd 
             np.savetxt(os.path.join(split_dir, 'test_all_rmsd{:.4f}.txt'.format(unaligned_test_all_rmsd)), np.array([unaligned_test_all_rmsd]))
@@ -367,7 +371,8 @@ def run_cv(params):
                 mean_graph_diff = np.array(sample_graph_val_ratio_list).mean()
                 mean_graph_allatom_diff = np.array(sample_graph_allatom_val_ratio_list).mean()
 
-            test_stats = { 'train_recon': mean_recon_train,
+            test_stats = { 'train_all_recon': unaligned_train_all_rmsd,
+                    'train_all_recon': unaligned_train_heavy_rmsd,
                     'test_all_recon': unaligned_test_all_rmsd,
                     'test_heavy_recon': unaligned_test_heavy_rmsd,
                     'train_KL': mean_kl_train, 'test_KL': mean_kl_test, 
