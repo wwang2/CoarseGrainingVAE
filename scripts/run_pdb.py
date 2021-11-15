@@ -110,30 +110,22 @@ def run_cv(params):
         train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
         val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
         test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
+        casp14_props = get_CASP14_targets()
     elif params['dataset'] == 'casp12':
         data_path = os.path.join( params['datadir'] , 'casp12_{}_' + str(params['thinning']) + '_all.pkl')
         train_props = pickle.load(open(data_path.format('train'), "rb" ) )
         val_props = pickle.load(open(data_path.format('val'), "rb" ) )
         test_props = pickle.load(open(data_path.format('test'), "rb" ) )
-
-    # cases for alanine and dipeptide 
-    elif params['dataset'] in PROTEINFILES.keys(): 
-        traj = load_protein_traj(params['dataset'])
-        traj = shuffle_traj(traj)
-        atomic_nums, protein_index = get_atomNum(traj)
-        n_atoms = atomic_nums.shape[0]
-        params['cg_method'] = 'alpha'
-        # split train, val, test 
-        train_val_idx, test_idx = train_test_split( list(range(params['n_data'])))
-        import ipdb; ipdb.set_trace()
-
-    #train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
-    #val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
-    #test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
-
+        #casp14_props = get_CASP14_targets()
+        # data = scn.load(casp_version=12 )
+        # train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
+        # val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
+        # test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
+ 
     traindata = CGDataset(train_props.copy())
     valdata = CGDataset(val_props.copy())
     testdata = CGDataset(test_props.copy())
+    caspt14data = CGDataset(casp14_props.copy())
 
     # remove problemic structures 
     valid_ids = []
@@ -156,10 +148,13 @@ def run_cv(params):
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
     testdata.generate_neighbor_list(atom_cutoff=0.5,
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
+    # caspt14data.generate_neighbor_list(atom_cutoff=0.5,
+    #                                cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
 
     trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
     valloader = DataLoader(valdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
     testloader = DataLoader(testdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
+    # casp14loader = DataLoader(caspt14data, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
     # initialize model 
     atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
@@ -280,6 +275,7 @@ def run_cv(params):
 
         # record test results one by one 
         save_selected_recon(testloader, model, device ,split_dir )
+        #save_selected_recon(casp14loader, model, device ,split_dir )
 
         # save model 
         model = model.to('cpu')
