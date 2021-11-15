@@ -15,6 +15,7 @@ import numpy.ma as ma
 import itertools
 import re
 import pandas as pd
+import glob
 
 import math
 def get_cv_stats( csvs, column):
@@ -48,7 +49,7 @@ def retrieve_frames(exp_dir, variable_names):
     data_list = []
     data_frame = []
     for variable in variable_names:
-        res, mean, se  = get_cv_stats( cvs, variable, 5) 
+        res, mean, se  = get_cv_stats( cvs, variable) 
         data_frame.append( mean ) 
         data_frame.append( se ) 
 
