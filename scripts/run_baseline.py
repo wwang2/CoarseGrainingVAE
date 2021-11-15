@@ -373,8 +373,8 @@ def run(params):
         atomic_nums = props['z'][0].numpy()
         heavy_filter = atomic_nums != 1.
 
-        test_all_dxyz = (all_test_xyz_data - all_test_xyz_recon).reshape(-1)
-        test_heavy_dxyz = (all_test_xyz_data - all_test_xyz_recon)[:, heavy_filter, :].reshape(-1)
+        test_all_dxyz = (all_test_xyz_data - all_test_xyz_recon) #.reshape(-1)
+        test_heavy_dxyz = (all_test_xyz_data - all_test_xyz_recon)[:, heavy_filter, :]#.reshape(-1)
 
         test_all_rmsd = np.sqrt(np.power(test_all_dxyz, 2).sum(-1).mean())
         test_heavy_rmsd = np.sqrt(np.power(test_heavy_dxyz, 2).sum(-1).mean())
