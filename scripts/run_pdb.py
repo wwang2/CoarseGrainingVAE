@@ -125,7 +125,7 @@ def run_cv(params):
     traindata = CGDataset(train_props.copy())
     valdata = CGDataset(val_props.copy())
     testdata = CGDataset(test_props.copy())
-    caspt14data = CGDataset(casp14_props.copy())
+    #caspt14data = CGDataset(casp14_props.copy())
 
     # remove problemic structures 
     valid_ids = []
