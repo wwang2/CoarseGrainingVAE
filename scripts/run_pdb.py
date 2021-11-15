@@ -305,7 +305,6 @@ if __name__ == '__main__':
     parser.add_argument("-dec_nconv", type=int, default=9)
     parser.add_argument("-batch_size", type=int, default=1)
     parser.add_argument("-nepochs", type=int, default=2)
-    parser.add_argument("-ndata", type=int, default=200)
     parser.add_argument("-beta", type=float, default=0.0)
     parser.add_argument("-gamma", type=float, default=0.0)
     parser.add_argument("-threshold", type=float, default=1e-3)
@@ -315,6 +314,6 @@ if __name__ == '__main__':
     params = vars(parser.parse_args())
     params['savemodel'] = True
     
-    params['logdir'] = annotate_job(params['cg_method'] + '_ndata{}'.format(params['ndata']), params['logdir'], params['dataset'])
+    params['logdir'] = annotate_job(params['cg_method'] + '_ndata{}'.format(params['n_data']), params['logdir'], params['dataset'])
  
     run_cv(params)
