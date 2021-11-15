@@ -84,7 +84,6 @@ def run_cv(params):
     dec_nconv  = params['dec_nconv']
     batch_size  = params['batch_size']
     beta  = params['beta']
-    ndata = params['ndata']
     nepochs = params['nepochs']
     lr = params['lr']
     activation = params['activation']
