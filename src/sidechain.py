@@ -369,13 +369,13 @@ def get_CASP14_targets():
 
         all_edges.append(edges)
         all_nxyz.append(nxyz)
-        all_CG_nxyz.append(all_CG_nxyz)
+        all_CG_nxyz.append(CG_nxyz)
         all_mapping.append(mapping)
         all_seq.append(seq)
         all_msk.append(msk)
         all_id.append(id)
-        num_atoms.append(nxyz.shape[0])
-        num_CGs.append(CG_nxyz.shape[0])
+        num_atoms.append(torch.LongTensor([nxyz.shape[0]]))
+        num_CGs.append(torch.LongTensor([CG_nxyz.shape[0]]))
 
     props = {'nxyz': all_nxyz, 'CG_nxyz': all_CG_nxyz, 'CG_mapping': all_mapping,
              'seq': all_seq, "msk": all_msk, 'id': all_id, 'bond_edge_list': all_edges,
