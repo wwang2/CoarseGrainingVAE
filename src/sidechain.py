@@ -21,6 +21,30 @@ import pickle
 
 from sidechainnet.structure.PdbBuilder import PdbBuilder, ATOM_MAP_14
 
+
+THREE_LETTER_TO_ONE = {
+    "ARG": "R", 
+    "HIS": "H", 
+    "LYS": "K", 
+    "ASP": "D", 
+    "GLU": "E", 
+    "SER": "S", 
+    "THR": "T", 
+    "ASN": "N", 
+    "GLN": "Q", 
+    "CYS": "C", 
+    "GLY": "G", 
+    "PRO": "P", 
+    "ALA": "A", 
+    "VAL": "V", 
+    "ILE": "I", 
+    "LEU": "L", 
+    "MET": "M", 
+    "PHE": "F", 
+    "TYR": "Y", 
+    "TRP": "W"
+}
+
 RES2IDX = {'N': 0,
              'H': 1,
              'A': 2,
@@ -185,7 +209,7 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
         seq = data_dict['seq'][i]
         msk = data_dict['msk'][i]
         crd = data_dict['crd'][i].reshape(-1, 14, 3) 
-        id = data_dict['ids'][i]
+        id = str(data_dict['ids'][i])
 
         seq_len = len(seq)
         msk_ratio = len( [1 for pos in msk if pos == '+']) / seq_len
@@ -291,3 +315,70 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
             'CG_mapping': all_mapping, 'num_atoms': num_atoms,
             'num_CGs': num_CGs, 'bond_edge_list': bond_edges_list, 
             'seq': all_seqs, 'msk':all_msks, 'id': all_ids}
+
+
+
+
+def get_CASP14_targets():
+    
+    all_nxyz = []
+    all_CG_nxyz = []
+    all_mapping = [] 
+    all_seq = []
+    all_msk = []
+    all_id = []
+    all_edges = []
+    num_atoms = []
+    num_CGs = []
+
+    for file in glob.glob("../data/casp14.targets.T.public_11.29.2020/*.pdb"):
+        pdb = md.load_pdb(file)
+
+        z = []
+        mapping = []
+        cg_type = []
+        seq = ''
+        msk = ''
+        id = file.split("/")[-1].split(".pdb")[0]
+
+        # collect CA positions 
+        ca_index = pdb.top.select("name CA")
+
+        ca_xyz = pdb.xyz[0, ca_index] * 10.0 
+        xyz = pdb.xyz[0] * 10.0 
+
+        # also need to collect mapping 
+        pdb.atom_slice(ca_index).save_pdb("ca_test.pdb")
+
+        for i, res in enumerate(pdb.top.residues):
+            res_letter = THREE_LETTER_TO_ONE[ res.name ]
+            cg_type.append( RES2IDX[res_letter] )
+            seq += res_letter
+            msk += '+'
+
+            for atom in res.atoms:
+                z.append(atom.element.atomic_number)
+                mapping.append(i)
+
+        CG_nxyz = torch.Tensor(np.hstack((np.array(cg_type)[:, None], ca_xyz )))
+        nxyz = torch.Tensor(np.hstack((np.array(z)[:, None], xyz )))
+        mapping = torch.LongTensor(mapping)
+
+        atoms = Atoms(positions=xyz, numbers=z)        
+        edges = get_bond_graphs(atoms, device="cpu").nonzero()
+
+        all_edges.append(edges)
+        all_nxyz.append(nxyz)
+        all_CG_nxyz.append(all_CG_nxyz)
+        all_mapping.append(mapping)
+        all_seq.append(seq)
+        all_msk.append(msk)
+        all_id.append(id)
+        num_atoms.append(nxyz.shape[0])
+        num_CGs.append(CG_nxyz.shape[0])
+
+    props = {'nxyz': all_nxyz, 'CG_nxyz': all_CG_nxyz, 'CG_mapping': all_mapping,
+             'seq': all_seq, "msk": all_msk, 'id': all_id, 'bond_edge_list': all_edges,
+             'num_CGs': num_CGs, 'num_atoms': num_atoms
+              }
+    return props 
