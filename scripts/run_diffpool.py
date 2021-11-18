@@ -179,8 +179,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
 
         xyz, xyz_recon, assign, adj, cg_xyz, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
         
-        # compute a loss that penalize atoms that assigned too far away 
-
+        # compute a loss that penalize atoms that assigned too far away
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean()
         loss_entropy = soft_cg_adj.diagonal(dim1=1, dim2=2).std(-1).mean()# -(assign * torch.log(assign)).sum(-1).mean()
@@ -197,13 +196,13 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         #loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
-        loss = eta * loss_adj + loss_recon + gamma * loss_graph #+ beta * loss_kl
+        loss = eta * loss_adj + loss_recon + gamma * loss_graph + beta * loss_kl
 
 
 
-        if  torch.isnan(loss):
-            del loss_recon, loss_kl, loss_adj, loss_entropy
-            continue 
+        # if  torch.isnan(loss):
+        #     del loss_recon, loss_kl, loss_adj, loss_entropy
+        #     continue 
         #if epoch % 5 == 0:
         #    print(H_prior_mu.mean().item(), H_prior_sigma.mean().item(), H_mu.mean().item(), H_sigma.mean().item())
         if train:
@@ -227,7 +226,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         mean_KL = np.array(KL_loss).mean()
         mean_loss = np.array(all_loss).mean()
         
-        del loss_recon, loss_kl, loss_adj, loss_entropy
+        del loss_recon, loss_kl, loss_adj, loss_entropy, adj, cg_xyz, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma
 
         postfix = ['avg. total loss={:.4f}'.format(mean_loss),
                     'avg. recon loss={:.4f}'.format(mean_recon),
@@ -383,10 +382,10 @@ def run(params):
                 model.train()
                 graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
 
-                # if np.isnan(graph_loss):
-                #     print("NaN encoutered, exiting...")
-                #     failed = True
-                #     break 
+                if np.isnan(graph_loss):
+                    print("NaN encoutered, exiting...")
+                    failed = True
+                    break 
 
                 if epoch % 5 == 0:
                     map_save_path = os.path.join(split_dir, 'pretrain_map_{}.png'.format(epoch) )
@@ -407,7 +406,7 @@ def run(params):
             mean_val_loss, mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
                                             beta, eta, gamma,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
-            if np.isnan(mean_train_loss):
+            if np.isnan(mean_train_recon):
                 print("NaN encoutered, exiting...")
                 failed = True
                 break 
