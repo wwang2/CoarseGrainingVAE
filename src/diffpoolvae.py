@@ -96,7 +96,7 @@ class DiffPoolVAE(nn.Module):
 
         x_recon = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) - cg_offset_lift + dx
 
-        return xyz, x_recon, soft_assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma
+        return xyz, x_recon, soft_assign, adj, cg_xyz, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma
 
 class CGpool(nn.Module):
     
