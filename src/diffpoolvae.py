@@ -413,7 +413,7 @@ class DenseCGPrior(nn.Module):
                                                    r_ij=r_ij,
                                                    nbrs=pad_nbr_list,
                                                    # normalize by node degree
-                                                   # edge_wgt= deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
+                                                   edge_wgt= deg_inv_sqrt[pad_nbr_list[:,0]] * deg_inv_sqrt[pad_nbr_list[:,1]]
                                                    )
             H_stack = H_stack + dH_message
             V_stack = V_stack + dV_message
