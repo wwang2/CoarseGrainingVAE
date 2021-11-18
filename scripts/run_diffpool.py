@@ -183,7 +183,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_entropy = soft_cg_adj.diagonal(dim1=1, dim2=2).std(-1).mean()# -(assign * torch.log(assign)).sum(-1).mean()
 
         node_sim_mat = assign.matmul(assign.transpose(1,2))
-        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).sqrt().mean()
+        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).mean()
        # loss_adj = soft_cg_adj.diagonal(dim1=1, dim2=2 ).mean()
         
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
@@ -194,7 +194,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         #loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
-        loss = loss_recon + loss_kl + gamma * loss_graph + eta * loss_adj
+        loss = eta * loss_adj + loss_recon + gamma * loss_graph #+ beta * loss_kl
 
         #if epoch % 5 == 0:
         #    print(H_prior_mu.mean().item(), H_prior_sigma.mean().item(), H_mu.mean().item(), H_sigma.mean().item())
@@ -399,9 +399,7 @@ def run(params):
             mean_val_loss, mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
                                             beta, eta, gamma,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
-
-
-            if np.isnan(mean_train_recon):
+            if np.isnan(mean_train_loss):
                 print("NaN encoutered, exiting...")
                 failed = True
                 break 
