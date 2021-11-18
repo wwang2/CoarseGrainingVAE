@@ -81,7 +81,7 @@ class DiffPoolVAE(nn.Module):
         H_z, V = self.encoder(h, H_chem, xyz, cg_xyz, soft_assign, nbr_list, cg_adj)
         H_mu = self.atom_munet(H_z)
         H_logvar = self.atom_sigmanet(H_z)
-        H_sigma = 1e-12 + torch.exp(H_logvar / 2)
+        H_sigma = 1e-9 + torch.exp(H_logvar / 2)
 
         if self.det:
             H_repar = H_mu 
@@ -153,7 +153,7 @@ class CGpool(nn.Module):
 
         if self.assign_idx is not None:
             for conv in self.update:
-                dh = torch.einsum('bif,bij->bjf', conv(h), adj)
+                dh = torch.einsum('bif,bij->bjf', conv(h), adj) /(adj.sum(-1).unsqueeze(-1))
                 h = h + dh 
 
             if self.assign_weights is None:
@@ -171,7 +171,7 @@ class CGpool(nn.Module):
 
         else:
             for conv in self.update:
-                dh = torch.einsum('bif,bij->bjf', conv(h), adj)
+                dh = torch.einsum('bif,bij->bjf', conv(h), adj) /(adj.sum(-1).unsqueeze(-1))
                 h = h + dh 
 
             assign_logits = self.cg_network(h)
