@@ -126,9 +126,12 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
     all_loss = []
     for i, batch in enumerate(loader):     
         batch = batch_to(batch, device=device)
-        xyz, xyz_recon, assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
+        xyz, xyz_recon, soft_assign, adj, cg_xyz, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
 
-        loss = (assign - target[None, ...]).pow(2).mean()
+        cg_xyz_lift = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) # soft_assign is not normalized 
+        
+        #loss = (cg_xyz_lift - xyz).pow(2).mean()
+        loss = (soft_assign - target[None, ...]).pow(2).mean()
 
         optimizer.zero_grad()
         loss.backward()
@@ -141,7 +144,7 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
-    return np.array(all_loss).mean(), assign
+    return np.array(all_loss).mean(), soft_assign
     
 def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         gamma, kappa, train=True, looptext='', tqdm_flag=True, recon_weight=1.0, tau_min=None):
@@ -174,7 +177,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         else:
             tau = tau_min
 
-        xyz, xyz_recon, assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
+        xyz, xyz_recon, assign, adj, cg_xyz, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
         
         # compute a loss that penalize atoms that assigned too far away 
 
@@ -196,6 +199,11 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         #loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
         loss = eta * loss_adj + loss_recon + gamma * loss_graph #+ beta * loss_kl
 
+
+
+        if  torch.isnan(loss):
+            del loss_recon, loss_kl, loss_adj, loss_entropy
+            continue 
         #if epoch % 5 == 0:
         #    print(H_prior_mu.mean().item(), H_prior_sigma.mean().item(), H_mu.mean().item(), H_sigma.mean().item())
         if train:
