@@ -142,7 +142,8 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
-        if loss.item() >= gamma * 5.0 or torch.isnan(loss):
+        if loss.item() >= gamma * 10.0 or torch.isnan(loss):
+            del loss, loss_graph, loss_kl, loss_recon, S_mu, S_sigma, H_prior_mu, H_prior_sigma
             continue 
 
         # optimize 
@@ -182,8 +183,8 @@ def loop(loader, optimizer, device, model, beta, epoch,
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
 
-        del loss, loss_graph, loss_kl, loss_recon
-
+        del loss, loss_graph, loss_kl, loss_recon, S_mu, S_sigma, H_prior_mu, H_prior_sigma
+        
     for result in postfix:
         print(result)
     
