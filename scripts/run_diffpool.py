@@ -136,7 +136,7 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
 
         all_loss.append(loss.item())
 
-        postfix = ['avg. newman loss={:.4f}'.format(np.array(all_loss).mean())]
+        postfix = ['avg. loss={:.4f}'.format(np.array(all_loss).mean())]
 
         if tqdm_flag:
             loader.set_postfix_str(' '.join(postfix))
@@ -176,23 +176,25 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
 
         xyz, xyz_recon, assign, adj, soft_cg_adj, H_prior_mu, H_prior_sigma, H_mu, H_sigma = model(batch, tau)
         
+        # compute a loss that penalize atoms that assigned too far away 
+
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean()
         loss_entropy = soft_cg_adj.diagonal(dim1=1, dim2=2).std(-1).mean()# -(assign * torch.log(assign)).sum(-1).mean()
 
         node_sim_mat = assign.matmul(assign.transpose(1,2))
-#        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).sqrt().mean()
-        loss_adj = soft_cg_adj.diagonal(dim1=1, dim2=2 ).mean()
+        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).sqrt().mean()
+       # loss_adj = soft_cg_adj.diagonal(dim1=1, dim2=2 ).mean()
         
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
         
         nbr_list = batch['hyperedges']
-        gen_dist = (xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
-        data_dist = (xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1).sqrt()
+        gen_dist = ((xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1) + 1e-6).sqrt()
+        data_dist = ((xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1) + 1e-6).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         #loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
-        loss = 0.0 * loss_recon + 0.0  * loss_kl +0.0 * gamma * loss_graph + eta * loss_adj
+        loss = loss_recon + loss_kl + gamma * loss_graph + eta * loss_adj
 
         #if epoch % 5 == 0:
         #    print(H_prior_mu.mean().item(), H_prior_sigma.mean().item(), H_mu.mean().item(), H_sigma.mean().item())
@@ -293,7 +295,9 @@ def run(params):
     elif cg_method == 'diff':
         assign_idx = None
 
-    props = get_diffpool_data(N_cg, [traj], n_data=n_data, edgeorder=params['edgeorder'], pdb=PROTEINFILES[label]['pdb_path'])
+    props = get_diffpool_data(N_cg, [traj], n_data=n_data, edgeorder=params['edgeorder'],
+                             pdb=None #PROTEINFILES[label]['pdb_path']
+                             )
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
@@ -369,13 +373,12 @@ def run(params):
         if cg_method == 'diff':
             for epoch in range(params['n_pretrain']):
                 model.train()
-
                 graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
 
-                if np.isnan(graph_loss):
-                    print("NaN encoutered, exiting...")
-                    failed = True
-                    break 
+                # if np.isnan(graph_loss):
+                #     print("NaN encoutered, exiting...")
+                #     failed = True
+                #     break 
 
                 if epoch % 5 == 0:
                     map_save_path = os.path.join(split_dir, 'pretrain_map_{}.png'.format(epoch) )
@@ -473,7 +476,6 @@ def run(params):
 
         print("train msd : {:.4f}".format(mean_train_recon))
         print("test msd : {:.4f}".format(mean_test_recon))
-
 
         test_stats = { 'train_recon': mean_train_recon, 'test_recon': mean_test_recon,
                 'train_KL': mean_train_KL, 'test_KL': mean_test_KL, 
