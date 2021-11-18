@@ -105,10 +105,8 @@ while experiment.progress.observation_count < experiment.observation_budget:
     if not failed:
         base_recon, base_geds, failed_baseline, assign = run(baseline_param)
 
-    if params['det']:
-        value = exp_recon
-    else:
-        value = exp_geds
+    #if params['det']:
+    value = exp_recon
 
     if not failed:
         conn.experiments(experiment.id).observations().create(
