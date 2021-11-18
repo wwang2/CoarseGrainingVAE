@@ -96,8 +96,8 @@ def DiffPool_collate(dicts):
 
     hyperedges = [dict['hyperedge'] for dict in dicts]
     nbrs = [dict['nbr_list'] for dict in dicts]
-    angles = [dict['angle'] for dict in dicts]
-    dihedrals = [dict['dihedral'] for dict in dicts]
+    #angles = [dict['angle'] for dict in dicts]
+    #dihedrals = [dict['dihedral'] for dict in dicts]
     
     # definitely can refactor this part 
     for i, bond in enumerate(bonds):
@@ -112,29 +112,30 @@ def DiffPool_collate(dicts):
         batch_index = torch.LongTensor([i] * nbr.shape[0])        
         nbrs_batch.append((torch.cat( (batch_index.unsqueeze(-1), nbr),dim=-1 ) )) 
 
-    for i, angle in enumerate(angles):
-        batch_index = torch.LongTensor([i] * angle.shape[0])
-        if angle is not None:
-            angles_batch.append((torch.cat( (batch_index.unsqueeze(-1), angle),dim=-1 ) ))      
-        else:
-            angles_batch.append(None)
+    # for i, angle in enumerate(angles):
+    #     batch_index = torch.LongTensor([i] * angle.shape[0])
+    #     if angle is not None:
+    #         angles_batch.append((torch.cat( (batch_index.unsqueeze(-1), angle),dim=-1 ) ))      
+    #     else:
+    #         angles_batch.append(None)
 
-    for i, dihedral in enumerate(dihedrals):
-        batch_index = torch.LongTensor([i] * dihedral.shape[0])
-        if dihedral is not None:
-            dihedrals_batch.append((torch.cat( (batch_index.unsqueeze(-1), dihedral),dim=-1 ) ))    
-        else:
-            dihedrals_batch.append(None)
+    # for i, dihedral in enumerate(dihedrals):
+    #     batch_index = torch.LongTensor([i] * dihedral.shape[0])
+    #     if dihedral is not None:
+    #         dihedrals_batch.append((torch.cat( (batch_index.unsqueeze(-1), dihedral),dim=-1 ) ))    
+    #     else:
+    #         dihedrals_batch.append(None)
         
     nbrs_batch = torch.cat(nbrs_batch)
     bonds_batch = torch.cat(bonds_batch)
     hyperedge_batch = torch.cat(hyperedge_batch)
-    angles_batch = torch.cat(angles_batch)
-    dihedrals_batch = torch.cat(dihedrals_batch)
+    #angles_batch = torch.cat(angles_batch)
+    #dihedrals_batch = torch.cat(dihedrals_batch)
 
         
     return {'z':zs, 'xyz': xyzs, 'nbr_list': nbrs_batch, 'bonds': bonds_batch, 
-                'angles': angles_batch, 'dihedrals':dihedrals_batch,
+                #'angles': angles_batch, 
+                #'dihedrals':dihedrals_batch,
                 'hyperedges': hyperedge_batch,  'pad': z_pad}
 
 

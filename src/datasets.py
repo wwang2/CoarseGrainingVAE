@@ -13,6 +13,7 @@ import mdshare
 import pyemma
 from sklearn.utils import shuffle
 import random
+import tqdm
 
 atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7, 'S':16, 'Se': 34}
 
@@ -128,7 +129,7 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None)
         dihedrals = None
         angles = None
 
-    for traj in trajs:
+    for traj in tqdm.tqdm(trajs):
         atomic_nums, protein_index = get_atomNum(traj)
         n_atoms = len(atomic_nums)
         frames = traj.xyz[:, protein_index, :] * 10.0 # from nm to Angstrom
@@ -141,7 +142,7 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None)
             if recenter:
                 xyz = xyz - xyz.mean(0)[None, ...]
 
-            xyz = random_rotation(xyz)
+            #xyz = random_rotation(xyz)
             z_data.append(torch.Tensor(atomic_nums))
             coord = torch.Tensor(xyz)
 
@@ -155,7 +156,7 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None)
             num_cgs.append(torch.LongTensor([N_cg]))
             num_atoms.append(torch.LongTensor([n_atoms]))
 
-    z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data, angle_data, dihedral_data = shuffle( z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data, angle_data, dihedral_data)
+    #z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data, angle_data, dihedral_data = shuffle( z_data, xyz_data, num_atoms, num_cgs, bond_data, hyperedge_data, angle_data, dihedral_data)
 
 
     props = {'z': z_data[:n_data],
@@ -164,8 +165,6 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None)
          'num_CGs':num_cgs[:n_data],
          'bond': bond_data[:n_data],
          'hyperedge': hyperedge_data[:n_data],
-         'angle': angle_data[:n_data],
-         'dihedral': dihedral_data[:n_data]
         }
 
     return props
