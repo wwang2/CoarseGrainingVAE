@@ -530,7 +530,7 @@ if __name__ == '__main__':
     parser.add_argument('-gamma', type=float, default= 0.1)
     parser.add_argument('-eta', type=float, default= 0.1)
     parser.add_argument('-kappa', type=float, default= 0.1)
-    parser.add_argument('-lr', type=float, default=1e-4)
+    parser.add_argument('-lr', type=float, default=5e-5)
     parser.add_argument("--tqdm_flag", action='store_true', default=False)
     parser.add_argument("--det", action='store_true', default=False)
     parser.add_argument("-cg_method", type=str, default='diff')
