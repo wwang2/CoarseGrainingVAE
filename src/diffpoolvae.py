@@ -191,7 +191,9 @@ class CGpool(nn.Module):
 
         Ncg = H.shape[1]
         # compute weighted adjacency 
-        cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
+        #cg_adj = assign.transpose(1,2).matmul(adj).matmul(assign)
+        cg_adj = torch.ones(H.shape[0], self.n_cgs, self.n_cgs) - torch.diag_embed(torch.ones(H.shape[0], self.n_cgs))
+        cg_adj = cg_adj.to(H.device) 
 
         dist = (cg_xyz.unsqueeze(-2) - cg_xyz.unsqueeze(-3)).pow(2).sum(-1).sqrt()
         value, knbrs = dist.sort(dim=-1, descending=False)
