@@ -25,6 +25,12 @@ class Baseline(nn.Module):
                                                                    tau=0.0,
                                                                    gumbel=True)
 
+        # recenter xyz and CG xyz 
+        shift = xyz.mean(1).unsqueeze(1)
+
+        xyz = xyz - shift 
+        cg_xyz = cg_xyz - shift
+
         x_recon = torch.einsum("bce,ca->bae", cg_xyz, self.B)
         
         return soft_assign, xyz, x_recon
