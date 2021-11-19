@@ -107,7 +107,7 @@ def backbone_partition(traj, n_cgs, skip=100):
     return mapping 
 
 
-def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None, rotate=False):
+def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, shift=True, pdb=None, rotate=False):
     props = {}
 
     num_cgs = []
@@ -139,9 +139,8 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, recenter=True, pdb=None,
         hyper_edges = get_high_order_edge(bond_edges, edgeorder, n_atoms)
 
         for xyz in frames: 
-            if recenter:
-                xyz = xyz - xyz.mean(0)[None, ...]
-
+            if shift:
+                xyz = xyz - np.random.randn(1, 3)
             if rotate:
                 xyz = random_rotation(xyz)
             z_data.append(torch.Tensor(atomic_nums))
