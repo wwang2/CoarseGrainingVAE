@@ -44,7 +44,7 @@ if params['id'] == 0:
             dict(name='edgeorder', type='int', bounds=dict(min=1, max=4)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
             dict(name='cutoff', type='double', bounds=dict(min=4.0, max=9.0)),
-            dict(name='cg_cutoff', type='double', bounds=dict(min=5.0, max=20.0)),
+            dict(name='cg_cutoff', type='double', bounds=dict(min=20.0, max=30.0)),
             dict(name='nconv_pool', type='int', bounds=dict(min=2, max=7)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
