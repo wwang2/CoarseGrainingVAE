@@ -48,9 +48,9 @@ if params['id'] == 0:
             dict(name='nconv_pool', type='int', bounds=dict(min=2, max=7)),
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
-            dict(name='n_pretrain', type='int', bounds=dict(min=0, max=10)),
+            dict(name='n_pretrain', type='int', bounds=dict(min=0, max=30)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
-            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=30.0), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='kappa', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='eta', type='double', bounds=dict(min=0.0001, max=5.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.00002, max=0.0002), transformation="log"),
@@ -106,7 +106,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
         base_recon, base_geds, failed_baseline, assign = run(baseline_param)
 
     #if params['det']:
-    value = exp_recon
+    value = exp_geds
 
     if not failed:
         conn.experiments(experiment.id).observations().create(
