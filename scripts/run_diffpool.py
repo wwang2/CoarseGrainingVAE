@@ -131,7 +131,9 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
         cg_xyz_lift = torch.einsum('bce,bac->bae', cg_xyz, soft_assign) # soft_assign is not normalized 
         
         #loss = (cg_xyz_lift - xyz).pow(2).mean()
-        loss = (soft_assign - target[None, ...]).pow(2).mean()
+
+        #loss = (soft_assign - target[None, ...]).pow(2).mean()
+        loss = (model.pooler.assign_map - target * 3.0).pow(2).mean()
 
         optimizer.zero_grad()
         loss.backward()
@@ -182,10 +184,10 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         # compute a loss that penalize atoms that assigned too far away
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean()
-        loss_entropy = soft_cg_adj.diagonal(dim1=1, dim2=2).std(-1).mean()# -(assign * torch.log(assign)).sum(-1).mean()
+        loss_entropy = -(assign * torch.log(assign)).sum(-1).mean()
 
         node_sim_mat = assign.matmul(assign.transpose(1,2))
-        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).mean()
+        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).sqrt().mean()
        # loss_adj = soft_cg_adj.diagonal(dim1=1, dim2=2 ).mean()
         
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
@@ -196,10 +198,10 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         #loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
-        loss = eta * loss_adj + loss_recon + gamma * loss_graph + beta * loss_kl
+        loss = eta * loss_adj + loss_recon +  gamma * loss_graph + beta * loss_kl
 
 
-
+        loss_main = (loss_recon +  gamma * loss_graph + beta * loss_kl).item()
         # if  torch.isnan(loss):
         #     del loss_recon, loss_kl, loss_adj, loss_entropy
         #     continue 
@@ -212,7 +214,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         else:
             loss.backward()
 
-        all_loss.append(loss.item())
+        all_loss.append(loss_main)
         recon_loss.append(loss_recon.item())
         adj_loss.append(loss_adj.item())
         ent_loss.append(loss_entropy.item())
@@ -372,7 +374,7 @@ def run(params):
                                                                 factor=0.6, verbose=True, 
                                                                 threshold=1e-4,  min_lr=1e-8)
 
-        early_stopping = EarlyStopping(patience=10)
+        early_stopping = EarlyStopping(patience=params['patience'])
         
         failed = False 
 
@@ -380,14 +382,14 @@ def run(params):
         if cg_method == 'diff':
             for epoch in range(params['n_pretrain']):
                 model.train()
-                graph_loss, assign = pretrain(trainloader, optimizer, device, model, tau_pre, newman_mapping, tqdm_flag=tqdm_flag)
+                graph_loss, assign = pretrain(trainloader, optimizer, device, model, 0.1, newman_mapping, tqdm_flag=tqdm_flag)
 
                 if np.isnan(graph_loss):
                     print("NaN encoutered, exiting...")
                     failed = True
                     break 
 
-                if epoch % 5 == 0:
+                if epoch % 1 == 0:
                     map_save_path = os.path.join(split_dir, 'pretrain_map_{}.png'.format(epoch) )
                     plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
@@ -406,7 +408,7 @@ def run(params):
             mean_val_loss, mean_val_recon, mean_val_graph, mean_val_KL, assign, val_xyz, val_xyz_recon = loop(valloader, optimizer, device, model, tau_val_sched, epoch, 
                                             beta, eta, gamma,  kappa, train=False, looptext='', tqdm_flag=tqdm_flag)
 
-            if np.isnan(mean_train_recon):
+            if np.isnan(mean_train_loss):
                 print("NaN encoutered, exiting...")
                 failed = True
                 break 
@@ -509,6 +511,7 @@ if __name__ == '__main__':
     parser.add_argument('-num_features',  type=int, default=512)
     parser.add_argument('-batch_size', type=int,default= 32)
     parser.add_argument('-n_data', type=int, default= 1000)
+    parser.add_argument('-patience', type=int, default= 10)
     parser.add_argument('-N_cg', type=int, default= 3)
     parser.add_argument('-nsplits', type=int, default=1)
     parser.add_argument('-nconv_pool', type=int, default= 7)
