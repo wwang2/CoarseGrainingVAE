@@ -85,6 +85,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['det'] = params['det']
     trial['mapsavefreq'] = 15
     trial['nsplits'] = 1
+    trial['patience'] = 10
     if params['pretrain'] == False:
         trial['n_pretrain'] = 0
 
