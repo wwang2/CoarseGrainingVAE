@@ -3,6 +3,8 @@ from torch import nn
 from conv import * 
 from torch_scatter import scatter_mean, scatter_add
 
+EPS = 1e-3
+
 class DiffPoolVAE(nn.Module):
     def __init__(self, encoder, decoder, pooler, atom_munet, atom_sigmanet, prior, det):
         nn.Module.__init__(self)
@@ -195,7 +197,7 @@ class CGpool(nn.Module):
         cg_adj = torch.ones(H.shape[0], self.n_cgs, self.n_cgs) - torch.diag_embed(torch.ones(H.shape[0], self.n_cgs))
         cg_adj = cg_adj.to(H.device) 
 
-        dist = (cg_xyz.unsqueeze(-2) - cg_xyz.unsqueeze(-3)).pow(2).sum(-1).sqrt()
+        dist = ((cg_xyz.unsqueeze(-2) - cg_xyz.unsqueeze(-3)).pow(2).sum(-1) + EPS).sqrt()
         value, knbrs = dist.sort(dim=-1, descending=False)
         knbrs = knbrs.cpu()
         value = value.cpu()
@@ -241,14 +243,14 @@ class DenseContract(nn.Module):
         # assign: b x n x N 
           
         r_iI = (xyz.unsqueeze(1) - cg_xyz.unsqueeze(2))
-        d_iI = r_iI.pow(2).sum(-1).sqrt()
+        d_iI = (r_iI.pow(2).sum(-1) + EPS).sqrt()
         unit_iI = r_iI / d_iI.unsqueeze(-1)
         
         
         #V_I = torch.zeros(H.shape[0], H.shape[1], H.shape[2], 3).to(h.device)
         
         r_iI = (xyz.unsqueeze(1) - cg_xyz.unsqueeze(2))
-        d_iI = r_iI.pow(2).sum(-1).sqrt()
+        d_iI = (r_iI.pow(2).sum(-1) + EPS).sqrt()
         unit = r_iI / d_iI.unsqueeze(-1)
         
         phi = self.inv_dense(h)
@@ -397,7 +399,7 @@ class DenseCGPrior(nn.Module):
         
         deg = cg_adj.sum(-1)
         deg_stack = deg.view(-1)
-        deg_inv_sqrt = deg_stack.reciprocal().sqrt()
+        deg_inv_sqrt = (deg_stack.reciprocal() + EPS).sqrt()
         
         cg_nbr_list = (cg_adj > 0.0).nonzero()
         pad_nbr_list = (cg_nbr_list[:, 0] * H.shape[1]).unsqueeze(1) + cg_nbr_list[:, 1:]
@@ -483,7 +485,7 @@ class DenseEquivariantDecoder(nn.Module):
         
         deg = cg_adj.sum(-1)
         deg_stack = deg.view(-1)
-        deg_inv_sqrt = deg_stack.reciprocal().sqrt()
+        deg_inv_sqrt = (deg_stack.reciprocal() + EPS).sqrt()
         
         cg_nbr_list = (cg_adj > 0.0).nonzero()
         pad_nbr_list = (cg_nbr_list[:, 0] * H.shape[1]).unsqueeze(1) + cg_nbr_list[:, 1:]

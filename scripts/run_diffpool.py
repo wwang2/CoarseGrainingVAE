@@ -132,8 +132,8 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
         
         #loss = (cg_xyz_lift - xyz).pow(2).mean()
 
-        #loss = (soft_assign - target[None, ...]).pow(2).mean()
-        loss = (model.pooler.assign_map - target * 3.0).pow(2).mean()
+        loss = (soft_assign - target[None, ...]).pow(2).mean()
+        #loss = (model.pooler.assign_map - target * 3.0).pow(2).mean()
 
         optimizer.zero_grad()
         loss.backward()
@@ -187,18 +187,18 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_entropy = -(assign * torch.log(assign)).sum(-1).mean()
 
         node_sim_mat = assign.matmul(assign.transpose(1,2))
-        loss_adj = (node_sim_mat - adj).pow(2).sum(-1).sum(-1).sqrt().mean()
+        loss_adj = ((node_sim_mat - adj).pow(2).sum(-1).sum(-1) + EPS).sqrt().mean()
        # loss_adj = soft_cg_adj.diagonal(dim1=1, dim2=2 ).mean()
         
         loss_kl = KL(H_mu, H_sigma, H_prior_mu, H_prior_sigma) 
         
         nbr_list = batch['hyperedges']
-        gen_dist = ((xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1) + 1e-6).sqrt()
-        data_dist = ((xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1) + 1e-6).sqrt()
+        gen_dist = ((xyz_recon[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz_recon[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1) + EPS).sqrt()
+        data_dist = ((xyz[nbr_list[:, 0 ], nbr_list[:, 1]] - xyz[nbr_list[:, 0], nbr_list[:, 2]]).pow(2).sum(-1) + EPS).sqrt()
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         #loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
-        loss = eta * loss_adj + loss_recon +  gamma * loss_graph + beta * loss_kl
+        loss = eta * loss_adj + loss_recon +  gamma * loss_graph + beta * loss_kl + kappa * loss_entropy
 
 
         loss_main = (loss_recon +  gamma * loss_graph + beta * loss_kl).item()
@@ -382,14 +382,14 @@ def run(params):
         if cg_method == 'diff':
             for epoch in range(params['n_pretrain']):
                 model.train()
-                graph_loss, assign = pretrain(trainloader, optimizer, device, model, 0.1, newman_mapping, tqdm_flag=tqdm_flag)
+                graph_loss, assign = pretrain(trainloader, optimizer, device, model, params['tau_pre'], newman_mapping, tqdm_flag=tqdm_flag)
 
                 if np.isnan(graph_loss):
                     print("NaN encoutered, exiting...")
                     failed = True
                     break 
 
-                if epoch % 1 == 0:
+                if epoch % params['mapsavefreq'] == 0:
                     map_save_path = os.path.join(split_dir, 'pretrain_map_{}.png'.format(epoch) )
                     plot_map(assign[0], props['z'][0].numpy(), map_save_path)
 
