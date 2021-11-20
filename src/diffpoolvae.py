@@ -183,7 +183,7 @@ class CGpool(nn.Module):
                 assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
 
             coord_assign = assign * assign_weights
-            assign_norm = coord_assign / coord_assign.sum(1).unsqueeze(-2) 
+            assign_norm = coord_assign / coord_assign.sum(1).unsqueeze(1) 
 
         H = torch.einsum('bnj,bnf->bjf', assign_norm, h)
         # get coordinates 
