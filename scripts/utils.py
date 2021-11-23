@@ -142,7 +142,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
-        if loss.item() >= gamma * 10.0 or torch.isnan(loss):
+        if loss.item() >= gamma * 50.0 or torch.isnan(loss):
             del loss, loss_graph, loss_kl, loss_recon, S_mu, S_sigma, H_prior_mu, H_prior_sigma
             continue 
 
