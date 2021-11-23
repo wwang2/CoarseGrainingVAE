@@ -3,6 +3,8 @@ import numpy as np
 import networkx as nx
 import itertools
 from data import *
+from utils import * 
+from torch.utils.data import DataLoader
 from torch_scatter import scatter_mean, scatter_add
 from moleculekit.molecule import Molecule
 import glob 
@@ -14,6 +16,8 @@ import pyemma
 from sklearn.utils import shuffle
 import random
 import tqdm
+
+from cgae import * 
 
 atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7, 'S':16, 'Se': 34}
 
@@ -129,7 +133,7 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, shift=True, pdb=None, ro
         dihedrals = None
         angles = None
 
-    for traj in tqdm.tqdm(trajs):
+    for traj in trajs:
         atomic_nums, protein_index = get_atomNum(traj)
         n_atoms = len(atomic_nums)
         frames = traj.xyz[:, protein_index, :] * 10.0 # from nm to Angstrom
@@ -188,7 +192,70 @@ def load_protein_traj(label, ntraj=200):
                    
     return traj
 
-def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
+
+def learn_map(traj, reg_weight, n_cgs, n_atoms ,
+              n_data=100, n_epochs=1500, 
+              lr=1e-3, batch_size=32):
+    device = 0 
+    props = get_diffpool_data(n_cgs, [traj], n_data=n_data, edgeorder=1)
+    dataset = DiffPoolDataset(props)
+    dataset.generate_neighbor_list(8.0)
+    train_index, test_index = train_test_split(list(range(len(traj)))[:n_data], test_size=0.1)
+    trainset = get_subset_by_indices(train_index,dataset)
+    testset = get_subset_by_indices(test_index,dataset)
+
+    trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True, pin_memory=True)
+    testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True, pin_memory=True)
+    
+    ae = cgae(n_atoms, n_cgs).to(device)
+    optimizer = torch.optim.Adam(list(ae.parameters()), lr=2e-3)
+    
+    
+    tau = 1.0
+
+    for epoch in range(n_epochs):
+        all_loss = []
+        all_reg = []
+        all_recon = [] 
+
+        trainloader = trainloader
+
+        for i, batch in enumerate(trainloader):
+
+            batch = batch_to(batch, device)
+            xyz = batch['xyz']
+
+            shift = xyz.mean(1)
+            xyz = xyz - shift.unsqueeze(1)
+
+            xyz, xyz_recon, M, cg_xyz = ae(xyz, tau)
+            xyz_recon = torch.einsum('bnj,ni->bij', cg_xyz, ae.decode)
+            X_lift = torch.einsum('bij,ni->bnj', cg_xyz, M)
+
+            loss_reg = (xyz - X_lift).pow(2).sum(-1).mean()
+            loss_recon = (xyz - xyz_recon).pow(2).mean() 
+            loss = loss_recon + reg_weight * loss_reg
+
+            all_reg.append(loss_reg.item())
+            all_recon.append(loss_recon.item())
+            all_loss.append(loss.item())
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            all_loss.append(loss.item())
+
+        if tau >= 0.025:
+            tau -= 0.001
+
+        if epoch % 50 == 0:
+            print(epoch, tau, np.array(all_recon).mean(), np.array(all_reg).mean())
+
+    return M.argmax(-1).detach().cpu()
+
+
+def get_cg_and_xyz(traj, params, cg_method='backone', n_cgs=None, mapshuffle=0.0, mapping=None):
 
     atomic_nums, protein_index = get_atomNum(traj)
     n_atoms = len(atomic_nums)
@@ -238,6 +305,17 @@ def get_cg_and_xyz(traj, cg_method='backone', n_cgs=None, mapshuffle=0.0):
     elif cg_method == 'backbonepartition': 
         mapping = backbone_partition(traj, n_cgs)
         cg_coord = None
+
+    elif cg_method == 'cgae':
+        
+        if mapping == None:
+            print("learning CG mapping")
+            mapping = learn_map(traj, reg_weight=params['cgae_reg_weight'], n_cgs=n_cgs, n_atoms=n_atoms)
+            print(mapping)
+        else:
+            mapping = mapping 
+
+        cg_coord = None 
 
     elif cg_method == 'seqpartition':
         partition = random.sample(range(n_atoms), n_cgs - 1 )
