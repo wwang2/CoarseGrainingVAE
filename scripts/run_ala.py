@@ -32,11 +32,12 @@ from sidechain import *
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
-
+ 
 def build_split_dataset(traj, params, mapping=None):
 
     atomic_nums, protein_index = get_atomNum(traj)
-    new_mapping, frames, cg_coord = get_cg_and_xyz(traj, cg_method=params['cg_method'], n_cgs=params['n_cgs'], mapshuffle=params['mapshuffle'])
+    new_mapping, frames, cg_coord = get_cg_and_xyz(traj, params=params, cg_method=params['cg_method'], n_cgs=params['n_cgs'],
+                                                     mapshuffle=params['mapshuffle'], mapping=mapping)
 
     if mapping is None:
         mapping = new_mapping
@@ -58,11 +59,6 @@ def build_split_dataset(traj, params, mapping=None):
     # if auxcutoff is defined, use the aux cutoff
     if params['auxcutoff'] > 0.0:
         dataset.generate_aux_edges(params['auxcutoff'])
-
-    # check CG nbr_list connectivity 
-    if not check_CGgraph(dataset):
-        print("CG graph not connected")
-        return np.NaN, np.NaN, True
 
     return dataset, mapping
 
@@ -435,6 +431,7 @@ if __name__ == '__main__':
     parser.add_argument("-patience", type=int, default=5)
     parser.add_argument("-factor", type=float, default=0.6)
     parser.add_argument("-mapshuffle", type=float, default=0.0)
+    parser.add_argument("-cgae_reg_weight", type=float, default=0.25)
     parser.add_argument("--dec_type", type=str, default='EquivariantDecoder')
     parser.add_argument("--cross", action='store_true', default=False)
     parser.add_argument("--graph_eval", action='store_true', default=False)
