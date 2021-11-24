@@ -82,15 +82,9 @@ def backbone_partition(traj, n_cgs, skip=100):
         partition = list(range(1, n_cgs))
     else:
         partition = random.sample(range(indices.shape[0]), n_cgs - 1 )
+        partition = np.array(partition)
         partition = np.sort(partition)
         segment_sizes = (partition[1:] - partition[:-1]).tolist() + [indices.shape[0] - partition[-1]] + [partition[0]]
-
-        while np.std( segment_sizes) > 1.:
-            partition = random.sample(range(indices.shape[0]), n_cgs - 1 )
-            partition = np.sort(partition)
-            segment_sizes = (partition[1:] - partition[:-1]).tolist() + [indices.shape[0] - partition[-1]] + [partition[0]]
-
-#            print('backbone segment sizes:', segment_sizes)
 
     mapping = np.zeros(indices.shape[0])
     mapping[partition] = 1
