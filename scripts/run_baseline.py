@@ -149,7 +149,6 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
         # compute loss
         loss_recon = (xyz_recon - xyz).pow(2).mean() # recon loss
         loss_dist = dist_loss(xyz, xyz_recon, nbr_list) # distance loss 
-        loss_methyl = compute_HCH(xyz_recon, tetra_index) # methyl cap loss 
         loss = loss_recon + gamma * loss_dist
 
         if train:
@@ -162,13 +161,11 @@ def loop(loader, optimizer, device, model, epoch, gamma, kappa, tetra_index, tra
 
         epoch_recon_loss.append(loss_recon.item())
         epoch_dist_loss.append(loss_dist.item())
-        epoch_methyl_loss.append(loss_methyl.item())
 
         mean_recon = np.array(epoch_recon_loss).mean()
         mean_dist = np.array(epoch_dist_loss).mean()
-        mean_methyl = np.array(epoch_methyl_loss).mean()
         
-        del loss, loss_dist, loss_methyl
+        del loss, loss_dist, 
 
         postfix = ['avg. recon loss={:.4f}'.format(mean_recon),
                     'avg. dist loss={:.4f}'.format(mean_dist)]
@@ -270,15 +267,14 @@ def run(params):
             mapping = get_random_mapping(N_cg, n_atoms)
             assign_idx = torch.LongTensor( np.array(mapping) )
 
+        elif cg_method == 'cgae':
+            print("learning CG mapping")
+            mapping = learn_map(traj, reg_weight=0.25, n_cgs=N_cg, n_atoms=n_atoms)
+            assign_idx = torch.LongTensor( np.array(mapping) )
+
         elif cg_method == 'backbonepartition': 
             mapping = backbone_partition(trajs[0], N_cg)
             true_n_cgs = len(list(set(mapping.tolist())))
-            
-            if true_n_cgs < N_cg:
-                while true_n_cgs < N_cg:
-                    mapping = backbone_partition(trajs[0], N_cg)
-                    true_n_cgs = len(list(set(mapping.tolist())))
-
             assign_idx = torch.LongTensor( np.array(mapping) )
 
         # shuffle if mapshuffle is on 

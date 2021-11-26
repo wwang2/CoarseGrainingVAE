@@ -61,15 +61,17 @@ class DiffPoolVAE(nn.Module):
     
         xyz = batch['xyz']        
         device = xyz.device
+
+        xyz = xyz - xyz.mean(1).unsqueeze(1)
         
         z = batch['z'] # torch.ones_like( batch['z'] ) 
         nbr_list = batch['nbr_list']
 
         soft_assign, assign_norm, h, H_chem, adj, cg_xyz, soft_cg_adj, knbrs = self.pooler(z, 
-                                                                   batch['xyz'], 
-                                                                   batch['bonds'], 
-                                                                   tau=tau,
-                                                                   gumbel=True)
+                                                           xyz, 
+                                                           batch['bonds'], 
+                                                           tau=tau,
+                                                           gumbel=True)
 
         #cg_adj = (soft_cg_adj > 0.0001).to(torch.float).to(device)
         cg_adj = soft_cg_adj
@@ -108,8 +110,8 @@ class CGpool(nn.Module):
              n_atoms,
              n_cgs,
              assign_idx=None,
-             assign_weights=None,
-             trainable_weights=False):
+             trainable_weights=False,
+             assign_map=None):
         super().__init__()
 
 
@@ -138,14 +140,12 @@ class CGpool(nn.Module):
         self.n_cgs = n_cgs
         self.assign_idx = assign_idx
 
-        assign_weights = torch.ones(n_atoms)
-
-        if trainable_weights:
-            self.assign_weights = nn.Parameter(assign_weights)
+        if assign_map is not None:
+            self.assign_map = nn.Parameter(assign_map)
         else:
-            self.register_buffer("assign_weights", assign_weights)
+            self.assign_map = assign_map
 
-    def forward(self, atoms_nodes, xyz, bonds, tau, gumbel=False):  
+    def forward(self, atoms_nodes, xyz, bonds, tau, gumbel=False): 
 
         h = self.atom_embed(atoms_nodes.to(torch.long))
 
@@ -154,42 +154,32 @@ class CGpool(nn.Module):
         adj[bonds[:, 0], bonds[:,2], bonds[:,1]] = 1
 
         if self.assign_idx is not None:
+            # mapping is given 
             for conv in self.update:
                 dh = torch.einsum('bif,bij->bjf', conv(h), adj) /(adj.sum(-1).unsqueeze(-1))
                 h = h + dh 
 
-            if self.assign_weights is None:
-                assign_logits = self.cg_network(h)
-                assign_weights = self.cg_weights(h)
-            else:
-                assign_weights = self.assign_weights
-
-            assign = torch.zeros(h.shape[0], h.shape[1], self.n_cgs).to(h.device)
-            assign[:, torch.LongTensor(list(range(h.shape[1]))), torch.LongTensor(self.assign_idx)] = 1.
-
-            coord_assign = assign * assign_weights.unsqueeze(-1).unsqueeze(0)
-
-            assign_norm = assign / assign.sum(1).unsqueeze(-2) 
+            M = torch.zeros(h.shape[0], h.shape[1], self.n_cgs).to(h.device)
+            M[:, torch.LongTensor(list(range(h.shape[1]))), torch.LongTensor(self.assign_idx)] = 1.
 
         else:
+            # mapping not given 
             for conv in self.update:
                 dh = torch.einsum('bif,bij->bjf', conv(h), adj) /(adj.sum(-1).unsqueeze(-1))
                 h = h + dh 
 
             assign_logits = self.cg_network(h)
-            assign_weights = self.cg_weights(h)
 
-            if gumbel:
-                assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
+            #assign = F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
+            if self.assign_map is not None:
+                M = F.gumbel_softmax(self.assign_map, tau=tau, dim=-1, hard=False)
+                M = M.unsqueeze(0).repeat(h.shape[0], 1, 1)
             else:
-                assign = F.softmax(assign_logits * (1/tau) , dim=-1) 
+                M =  F.gumbel_softmax(assign_logits, tau=tau, dim=-1, hard=False)
 
-            coord_assign = assign * assign_weights
-            assign_norm = coord_assign / coord_assign.sum(1).unsqueeze(1) 
-
-        H = torch.einsum('bnj,bnf->bjf', assign_norm, h)
-        # get coordinates 
-        cg_xyz = torch.einsum("bin,bij->bjn", xyz, assign_norm)
+        M_norm = M / M.sum(-2).unsqueeze(-2) 
+        H = torch.einsum('bnj,bnf->bjf', M_norm, h)
+        cg_xyz = torch.einsum("bin,bij->bjn", xyz, M_norm)
 
         Ncg = H.shape[1]
         # compute weighted adjacency 
@@ -202,7 +192,7 @@ class CGpool(nn.Module):
         knbrs = knbrs.cpu()
         value = value.cpu()
 
-        return assign, assign_norm,  h, H, adj, cg_xyz, cg_adj, knbrs
+        return M, M_norm, h, H, adj, cg_xyz, cg_adj, knbrs
 
 
 class DenseContract(nn.Module):
