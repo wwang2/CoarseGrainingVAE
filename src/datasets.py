@@ -188,7 +188,7 @@ def load_protein_traj(label, ntraj=200):
 
 
 def learn_map(traj, reg_weight, n_cgs, n_atoms ,
-              n_data=100, n_epochs=1500, 
+              n_data=1000, n_epochs=1000, 
               lr=1e-3, batch_size=32):
     device = 0 
     props = get_diffpool_data(n_cgs, [traj], n_data=n_data, edgeorder=1)
@@ -202,7 +202,7 @@ def learn_map(traj, reg_weight, n_cgs, n_atoms ,
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True, pin_memory=True)
     
     ae = cgae(n_atoms, n_cgs).to(device)
-    optimizer = torch.optim.Adam(list(ae.parameters()), lr=2e-3)
+    optimizer = torch.optim.Adam(list(ae.parameters()), lr=4e-3)
     
     
     tau = 1.0
@@ -246,7 +246,7 @@ def learn_map(traj, reg_weight, n_cgs, n_atoms ,
         if epoch % 50 == 0:
             print(epoch, tau, np.array(all_recon).mean(), np.array(all_reg).mean())
 
-    return M.argmax(-1).detach().cpu()
+    return ae.assign_map.argmax(-1).detach().cpu()
 
 
 def get_cg_and_xyz(traj, params, cg_method='backone', n_cgs=None, mapshuffle=0.0, mapping=None):
