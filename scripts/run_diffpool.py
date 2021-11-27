@@ -117,6 +117,7 @@ def pretrain(loader, optimizer, device, model, tau, target_mapping, tqdm_flag):
     natoms = target_mapping.shape[0]
     target = torch.zeros(natoms, target_mapping.max() + 1)
     target[list(range(natoms)), target_mapping] = 1. # n X N
+
     target = target.to(device)
 
     if tqdm_flag:
@@ -157,6 +158,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
     ent_loss = []
     KL_loss = []
     graph_loss = []
+    reg_loss = []
     
     if train:
         model.train()
@@ -183,6 +185,10 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         
         # compute a loss that penalize atoms that assigned too far away
         # compute loss
+        cg_xyz_lift = torch.einsum('bce,bac->bae', cg_xyz, assign) # assign shouldn't be normalized 
+
+        loss_reg = (cg_xyz_lift - xyz).pow(2).sum(-1).mean()
+
         loss_recon = (xyz_recon - xyz).pow(2).mean()
         loss_entropy = -(assign * torch.log(assign)).sum(-1).mean()
 
@@ -198,7 +204,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         loss_graph = (gen_dist - data_dist).pow(2).mean()
 
         #loss = recon_weight * loss_recon + beta * loss_kl +  gamma * loss_graph + eta * loss_adj #+  kappa * loss_entropy #+ 0.0001 * prior_reg
-        loss = eta * loss_adj + loss_recon +  gamma * loss_graph + beta * loss_kl + kappa * loss_entropy
+        loss = loss_reg + loss_recon + beta * loss_kl #eta * loss_adj + loss_recon +  gamma * loss_graph + beta * loss_kl + kappa * loss_entropy + loss_reg
 
 
         loss_main = (loss_recon +  gamma * loss_graph + beta * loss_kl).item()
@@ -214,6 +220,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         else:
             loss.backward()
 
+        reg_loss.append(loss_reg.item())
         all_loss.append(loss_main)
         recon_loss.append(loss_recon.item())
         adj_loss.append(loss_adj.item())
@@ -221,6 +228,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         KL_loss.append(loss_kl.item())
         graph_loss.append(loss_graph.item())
 
+        mean_reg = np.array(reg_loss).mean()
         mean_recon = np.array(recon_loss).mean()
         mean_graph = np.array(graph_loss).mean()
         mean_adj = np.array(adj_loss).mean()
@@ -233,6 +241,7 @@ def loop(loader, optimizer, device, model, tau_sched, epoch, beta, eta,
         postfix = ['avg. total loss={:.4f}'.format(mean_loss),
                     'avg. recon loss={:.4f}'.format(mean_recon),
                     'avg. graph loss={:.4f}'.format(mean_graph),
+                   'avg. reg loss={:.4f}'.format(mean_reg),
                     'avg. KL loss={:.4f}'.format(mean_KL),
                    'avg. adj loss={:.4f}'.format(mean_adj),
                    'avg. entropy loss={:.4f}'.format(mean_ent),
@@ -348,7 +357,12 @@ def run(params):
         tau_train_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_train_iters)) + tau_min
         tau_val_sched = (tau_0 - tau_min) * np.exp(-tau_rate * torch.linspace(0, n_train_iters-1, n_val_iters)) + tau_min
 
-        pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx)
+
+        # mapping_ini =  torch.zeros(n_atoms, N_cg)
+        # mapping_ini[list(range(n_atoms)), newman_mapping] = 5. # n X N
+        mapping_ini = torch.randn(n_atoms, N_cg)
+
+        pooler = CGpool(nconv_pool, num_features, n_atoms=n_atoms, n_cgs=N_cg, assign_idx=assign_idx, assign_map=mapping_ini)
         
         encoder = DenseEquiEncoder(n_conv=enc_nconv, 
                                n_atom_basis=num_features,
