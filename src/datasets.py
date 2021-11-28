@@ -105,7 +105,7 @@ def backbone_partition(traj, n_cgs, skip=100):
     return mapping 
 
 
-def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, shift=True, pdb=None, rotate=False):
+def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, shift=False, pdb=None, rotate=False):
     props = {}
 
     num_cgs = []
@@ -188,9 +188,9 @@ def load_protein_traj(label, ntraj=200):
 
 
 def learn_map(traj, reg_weight, n_cgs, n_atoms ,
-              n_data=1000, n_epochs=1000, 
-              lr=1e-3, batch_size=32):
-    device = 0 
+              n_data=1000, n_epochs=1500, 
+              lr=4e-3, batch_size=32, device=0):
+
     props = get_diffpool_data(n_cgs, [traj], n_data=n_data, edgeorder=1)
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(8.0)
@@ -202,7 +202,7 @@ def learn_map(traj, reg_weight, n_cgs, n_atoms ,
     testloader = DataLoader(testset, batch_size=batch_size, collate_fn=DiffPool_collate, shuffle=True, pin_memory=True)
     
     ae = cgae(n_atoms, n_cgs).to(device)
-    optimizer = torch.optim.Adam(list(ae.parameters()), lr=4e-3)
+    optimizer = torch.optim.Adam(list(ae.parameters()), lr=lr)
     
     
     tau = 1.0
@@ -304,7 +304,7 @@ def get_cg_and_xyz(traj, params, cg_method='backone', n_cgs=None, mapshuffle=0.0
         
         if mapping == None:
             print("learning CG mapping")
-            mapping = learn_map(traj, reg_weight=params['cgae_reg_weight'], n_cgs=n_cgs, n_atoms=n_atoms)
+            mapping = learn_map(traj, reg_weight=params['cgae_reg_weight'], n_cgs=n_cgs, n_atoms=n_atoms, batch_size=32)
             print(mapping)
         else:
             mapping = mapping 

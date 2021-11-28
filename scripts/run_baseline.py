@@ -207,10 +207,10 @@ def run(params):
     file_type = PROTEINFILES[dataset_label]['file_type']
 
     trajs = [md.load_xtc(file,
-                top=pdb_file, stride=50) for file in traj_files]
+                top=pdb_file) for file in traj_files]
 
-    traj = trajs[0]
-
+    traj = md.join(trajs)
+    
     atomic_nums, protein_index = get_atomNum(trajs[0])
     n_atoms = len(atomic_nums)
 
@@ -218,7 +218,7 @@ def run(params):
     protein_top = trajs[0].top.subset(protein_index)
     g = protein_top.to_bondgraph()
 
-    props = get_diffpool_data(N_cg, trajs[:n_data], n_data=n_data, edgeorder=edgeorder, pdb=pdb_file, rotate=True)
+    props = get_diffpool_data(N_cg, trajs, n_data=n_data, edgeorder=edgeorder, pdb=pdb_file, rotate=True)
 
     dataset = DiffPoolDataset(props)
     dataset.generate_neighbor_list(cutoff)
@@ -269,7 +269,7 @@ def run(params):
 
         elif cg_method == 'cgae':
             print("learning CG mapping")
-            mapping = learn_map(traj, reg_weight=0.25, n_cgs=N_cg, n_atoms=n_atoms)
+            mapping = learn_map(traj, reg_weight=0.25, n_cgs=N_cg, n_atoms=n_atoms, batch_size=32)
             assign_idx = torch.LongTensor( np.array(mapping) )
 
         elif cg_method == 'backbonepartition': 
