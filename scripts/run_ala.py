@@ -280,7 +280,7 @@ def run_cv(params):
                                                                                                  model,
                                                                                                  atomic_nums,
                                                                                                  n_cg=n_cgs,
-                                                                                                 tqdm_flag=tqdm_flag, reflection=params['reflectiontest'])
+                                                                                                 tqdm_flag=tqdm_flag, reflection=False)
 
             # sample geometries 
             #train_samples = sample(trainloader, mu, sigma, device, model, atomic_nums, n_cgs)
@@ -368,7 +368,7 @@ def run_cv(params):
                 mean_graph_allatom_diff = np.array(sample_graph_allatom_val_ratio_list).mean()
 
             test_stats = { 'train_all_recon': unaligned_train_all_rmsd,
-                    'train_all_recon': unaligned_train_heavy_rmsd,
+                    'train_heavy_recon': unaligned_train_heavy_rmsd,
                     'test_all_recon': unaligned_test_all_rmsd,
                     'test_heavy_recon': unaligned_test_heavy_rmsd,
                     'train_KL': mean_kl_train, 'test_KL': mean_kl_test, 
