@@ -919,18 +919,32 @@ class PCN(nn.Module):
         #this constraint is only true for geometrical mean
         # need to include weights 
 
-        if self.offset:
-          decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
-          xyz_rel = xyz_rel - decode_offsets[mapping]
+        # if self.offset:
+        #   decode_offsets = scatter_mean(xyz_rel, mapping, dim=0)
+        #   xyz_rel = xyz_rel - decode_offsets[mapping]
 
+        # recentering 
+        ca_idx = self.get_ca_idx(mapping)
+        xyz_rel[ca_idx] -= xyz_rel[ca_idx]
+
+        # reconstruct coordinates 
         xyz_recon = xyz_rel + cg_xyz[mapping]
         
         return xyz_recon
+
+    def get_ca_idx(self, mapping):
+        ca_idx = [1]
+        current = 0
+        for i, item in enumerate(mapping):
+            if item.item() != current:
+                ca_idx.append(i + 1)
+            current = item.item()
+
+        return torch.LongTensor(ca_idx)
         
     def forward(self, batch):
-
         atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
-    
+
         S_I = self.embedding(cg_z.to(torch.long))
         xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
         
