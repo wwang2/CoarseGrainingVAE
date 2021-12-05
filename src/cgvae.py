@@ -81,7 +81,7 @@ class EquivariantDecoder(nn.Module):
         self.n_atom_basis = n_atom_basis
 
     
-    def forward(self, cg_xyz, CG_nbr_list, mapping, H, h):
+    def forward(self, cg_xyz, CG_nbr_list, mapping, H):
     
         CG_nbr_list, _ = make_directed(CG_nbr_list)
         r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
@@ -382,7 +382,7 @@ class CGequiVAE(nn.Module):
             
     def decoder(self, cg_xyz, CG_nbr_list, S_I, s_i, mapping, num_CGs):
         
-        cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I, s_i)
+        cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I)
 
         CG2atomChannel = self.CG2ChannelIdx(mapping)
 
@@ -909,7 +909,7 @@ class PCN(nn.Module):
             
     def decoder(self, cg_xyz, CG_nbr_list, S_I, mapping, num_CGs):
         
-        cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping,S_I)
+        cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping, S_I)
 
         CG2atomChannel = self.CG2ChannelIdx(mapping)
 
