@@ -205,6 +205,8 @@ def get_sidechainet_props(data_dict, params, n_data=10000, split='train', thinni
         graph_data = {}
         print("computing graph on the fly ")
 
+    compute_graph= True 
+
     for i in tqdm.tqdm(idx[:n_data]):
         seq = data_dict['seq'][i]
         msk = data_dict['msk'][i]
