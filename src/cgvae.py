@@ -925,7 +925,7 @@ class PCN(nn.Module):
 
         # recentering 
         ca_idx = self.get_ca_idx(mapping)
-        xyz_rel[ca_idx] -= xyz_rel[ca_idx]
+        xyz_rel[ca_idx] = 0.0#-= xyz_rel[ca_idx]
 
         # reconstruct coordinates 
         xyz_recon = xyz_rel + cg_xyz[mapping]
