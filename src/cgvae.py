@@ -47,6 +47,67 @@ class ENDecoder(nn.Module):
             
         return s_i, v_i 
 
+
+
+class EquivariantPsuedoDecoder(nn.Module):
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation):   
+        
+        nn.Module.__init__(self)
+        
+        self.message_blocks = nn.ModuleList(
+                [EquiMessagePsuedo2(feat_dim=n_atom_basis,
+                              activation=activation,
+                              n_rbf=n_rbf,
+                              cutoff=cutoff,
+                              dropout=0.0)
+                 for _ in range(num_conv)]
+            )
+
+        self.update_blocks = nn.ModuleList(
+            [UpdateBlock(feat_dim=n_atom_basis,
+                         activation=activation,
+                         dropout=0.0)
+             for _ in range(num_conv)]
+        )
+
+        self.n_atom_basis = n_atom_basis
+
+    
+    def forward(self, cg_xyz, CG_nbr_list, mapping, H):
+    
+        CG_nbr_list, _ = make_directed(CG_nbr_list)
+        r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
+
+        V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
+        Sbar = torch.ones(H.shape[0], H.shape[1]).to(H.device)
+        Vbar = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
+
+        for i, message_block in enumerate(self.message_blocks):
+            
+            # message block
+            dH_message, dSbar, dV_message, dVbar = message_block(s_j=H,
+                                                   sbar_j = Sbar,
+                                                   v_j=V,
+                                                   vbar_j=Vbar,
+                                                   r_ij=r_ij,
+                                                   nbrs=CG_nbr_list,
+                                                   edge_wgt=None
+                                                   )
+            H = H + dH_message
+            Sbar = Sbar + dSbar
+            V = V + dV_message
+            Vbar = Vbar + dVbar 
+
+            # update block
+            dH_update, dV_update = self.update_blocks[i](s_i=H,
+                                                v_i=V)
+            H = H + dH_update
+            V = V + dV_update
+
+        return H, V 
+
+
+
 class EquivariantDecoder(nn.Module):
     def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, cross_flag=True):   
         
@@ -925,7 +986,11 @@ class PCN(nn.Module):
 
         # recentering 
         ca_idx = self.get_ca_idx(mapping)
-        xyz_rel[ca_idx] = 0.0#-= xyz_rel[ca_idx]
+
+        # edge case for some weird data
+        if ca_idx[-1].item() < xyz_rel.shape[0]:
+            offset = torch.clone( xyz_rel[ca_idx] ) 
+            xyz_rel[ca_idx] -= offset 
 
         # reconstruct coordinates 
         xyz_recon = xyz_rel + cg_xyz[mapping]
@@ -946,8 +1011,11 @@ class PCN(nn.Module):
         atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
 
         S_I = self.embedding(cg_z.to(torch.long))
-        xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
-        
+        try:
+            xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
+        except:
+            import ipdb; ipdb.set_trace()
+
         return None, None, None, None, xyz, xyz_recon
 
     

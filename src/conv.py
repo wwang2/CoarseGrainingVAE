@@ -161,6 +161,186 @@ class InvMessageBlock(nn.Module):
 
         return delta_s_i, v_j
 
+import sys
+sys.path.append("../")
+sys.path.append("../src")
+
+from conv import * 
+
+class EquiMessagePsuedo(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+        self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
+                                            out_feat_dim=feat_dim * 7, 
+                                            activation=activation,
+                                            n_rbf=n_rbf,
+                                            cutoff=cutoff,
+                                            dropout=dropout)
+
+    def forward(self,
+                s_j,
+                sbar_j,
+                v_j,
+                vbar_j, 
+                r_ij, 
+                nbrs, # directed edges that has both directions 
+                edge_wgt=None):
+        # edge_wgt the same size as 
+
+        dist, unit = preprocess_r(r_ij)
+        inv_out = self.inv_message(s_j=s_j,
+                                   dist=dist,
+                                   nbrs=nbrs)
+
+        inv_out = inv_out.reshape(inv_out.shape[0], 7, s_j.shape[1])
+
+        split_0 = inv_out[:, 0, :].unsqueeze(-1) # update v
+        split_1 = inv_out[:, 1, :]
+        split_2 = inv_out[:, 2, :].unsqueeze(-1) # update e_ij
+        split_3 = inv_out[:, 3, :].unsqueeze(-1) # update v cross vbar 
+        split_4 = inv_out[:, 4, :].unsqueeze(-1) # update v cross v
+        split_5 = inv_out[:, 5, :].unsqueeze(-1) # update vbar cross vbar 
+        split_6 = inv_out[:, 6, :].unsqueeze(-1) # update vbar 
+        
+        d_s_ij = split_1
+        d_sbar_ij = (v_j[nbrs[:, 0]] * vbar_j[nbrs[:, 1]]).sum(-1) # dot product between vbar and v 
+
+        
+        d_v_ij = split_2 * unit.unsqueeze(1) + \
+                 split_0 * v_j[nbrs[:, 1]] + \
+                 split_3 * torch.cross( v_j[nbrs[:, 0]],  vbar_j[nbrs[:, 1]]) + \
+                 sbar_j[nbrs[:, 0]].unsqueeze(-1) * vbar_j[nbrs[:,1]]
+
+        d_vbar_ij = split_6 * vbar_j[nbrs[:, 1]] + \
+                    split_4 * torch.cross( v_j[nbrs[:, 0]],  v_j[nbrs[:, 1]]) + \
+                    split_5 * torch.cross( vbar_j[nbrs[:, 0]],  vbar_j[nbrs[:, 1]]) 
+        # add results from neighbors of each node
+        
+        graph_size = s_j.shape[0]
+        dv = scatter_add(src=d_v_ij,
+                                index=nbrs[:, 0],  
+                                dim=0,
+                                dim_size=graph_size)
+        dvbar = scatter_add(src=d_vbar_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+        
+        dh = scatter_add(src=d_s_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+        
+        dhbar = scatter_add(src=d_sbar_ij,
+                        index=nbrs[:, 0],
+                        dim=0,
+                        dim_size=graph_size)
+
+        return dh, dhbar, dv, dvbar
+
+
+
+class EquiMessagePsuedo2(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 n_rbf,
+                 cutoff,
+                 dropout):
+        super().__init__()
+        self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
+                                            out_feat_dim=feat_dim * 4, 
+                                            activation=activation,
+                                            n_rbf=n_rbf,
+                                            cutoff=cutoff,
+                                            dropout=dropout)
+        
+        self.mix_dvbar = nn.Linear(feat_dim * 4, feat_dim, bias=False)
+        self.mix_dv = nn.Linear(feat_dim * 3, feat_dim, bias=False)
+
+    def forward(self,
+                s_j,
+                sbar_j,
+                v_j,
+                vbar_j, 
+                r_ij, 
+                nbrs, # directed edges that has both directions 
+                edge_wgt=None):
+        # edge_wgt the same size as 
+
+        dist, unit = preprocess_r(r_ij)
+        inv_out = self.inv_message(s_j=s_j,
+                                   dist=dist,
+                                   nbrs=nbrs)
+
+        inv_out = inv_out.reshape(inv_out.shape[0], 4, s_j.shape[1])
+
+        # split invariant messages for different updates
+        split_0 = inv_out[:, 0, :].unsqueeze(-1) # update v
+        split_1 = inv_out[:, 1, :]
+        split_2 = inv_out[:, 2, :].unsqueeze(-1) # update e_ij
+        split_3 = inv_out[:, 3, :] # update e_ij
+        
+        # update ds using invariant message 
+        d_s_ij = split_1
+        
+        # update dsbar 1 interactions 
+        d_sbar_ij = split_3 * (v_j[nbrs[:, 0]] * vbar_j[nbrs[:, 1]]).sum(-1) # dot product between vbar and v 
+
+        
+        # update dvbar 4 interactions 
+        dvbar_new1 = s_j.unsqueeze(-1)[nbrs[:, 0]] * vbar_j[nbrs[:, 1]]
+        dvbar_new2 = sbar_j.unsqueeze(-1)[nbrs[:, 0]] * v_j[nbrs[:, 1]]
+        dvbar_new3 = torch.cross( v_j[nbrs[:, 0]],  v_j[nbrs[:, 1]])
+        dvbar_new4 = torch.cross( vbar_j[nbrs[:, 0]],  vbar_j[nbrs[:, 1]])
+        dvbar_cat = torch.cat([dvbar_new1, dvbar_new2, dvbar_new3, dvbar_new4], dim=-2)
+        
+        # transform dvar
+        dvbar = self.mix_dvbar(torch.transpose(dvbar_cat, -1, -2))
+        dvbar_ij = torch.transpose(dvbar, -1, -2)
+
+        # update dv_ij 3 interactions 
+        dv_new1 = s_j[nbrs[:,0]].unsqueeze(-1) * v_j[nbrs[:,1]]
+        dv_new2 = sbar_j[nbrs[:,0]].unsqueeze(-1) * vbar_j[nbrs[:,1]]
+        dv_new3 = torch.cross(v_j[nbrs[:, 0]],  vbar_j[nbrs[:, 1]])
+        dv_cat = torch.cat([dv_new1, dv_new2, dv_new3], dim=-2)
+        
+        dv_ij = self.mix_dv(torch.transpose(dv_cat, -1, -2))
+        dvij = torch.transpose(dv_ij, -1, -2)
+        
+        d_v_ij = split_2 * unit.unsqueeze(1) + \
+                 split_0 * v_j[nbrs[:, 1]] + dvij
+
+
+        # add results from neighbors of each node
+        
+        graph_size = s_j.shape[0]
+        dv = scatter_add(src=d_v_ij,
+                                index=nbrs[:, 0],  
+                                dim=0,
+                                dim_size=graph_size)
+        dvbar = scatter_add(src=dvbar_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+        
+        dh = scatter_add(src=d_s_ij,
+                                index=nbrs[:, 0],
+                                dim=0,
+                                dim_size=graph_size)
+        
+        dhbar = scatter_add(src=d_sbar_ij,
+                        index=nbrs[:, 0],
+                        dim=0,
+                        dim_size=graph_size)
+
+        return dh, dhbar, dv, dvbar
+
 
 class EquiMessageCross(nn.Module):
     def __init__(self,
