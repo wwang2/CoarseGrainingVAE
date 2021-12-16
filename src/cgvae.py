@@ -50,12 +50,12 @@ class ENDecoder(nn.Module):
 
 
 class EquivariantPsuedoDecoder(nn.Module):
-    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation):   
+    def __init__(self, n_atom_basis, n_rbf, cutoff, num_conv, activation, breaksym=False):   
         
         nn.Module.__init__(self)
         
         self.message_blocks = nn.ModuleList(
-                [EquiMessagePsuedo2(feat_dim=n_atom_basis,
+                [EquiMessagePsuedo(feat_dim=n_atom_basis,
                               activation=activation,
                               n_rbf=n_rbf,
                               cutoff=cutoff,
@@ -70,6 +70,7 @@ class EquivariantPsuedoDecoder(nn.Module):
              for _ in range(num_conv)]
         )
 
+        self.breaksym = breaksym
         self.n_atom_basis = n_atom_basis
 
     
@@ -79,7 +80,10 @@ class EquivariantPsuedoDecoder(nn.Module):
         r_ij = cg_xyz[CG_nbr_list[:, 1]] - cg_xyz[CG_nbr_list[:, 0]]
 
         V = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
-        Sbar = torch.ones(H.shape[0], H.shape[1]).to(H.device)
+        if self.breaksym:
+            Sbar = torch.ones(H.shape[0], H.shape[1]).to(H.device)
+        else:
+            Sbar = torch.zeros(H.shape[0], H.shape[1]).to(H.device)
         Vbar = torch.zeros(H.shape[0], H.shape[1], 3 ).to(H.device)
 
         for i, message_block in enumerate(self.message_blocks):
