@@ -10,6 +10,8 @@ import torch.autograd.profiler as profiler
 from sampling import *
 from sklearn.utils import shuffle
 
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
 EPS = 1e-6
 
 def shuffle_traj(traj):
@@ -119,8 +121,11 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # loss
         if S_mu is not None:
             loss_kl = KL(S_mu, S_sigma, H_prior_mu, H_prior_sigma) 
+            kl_loss.append(loss_kl.item())
         else:
-            loss_kl = torch.zeros(1).to(device)
+            loss_kl = 0.0
+            kl_loss.append(0.0)
+
         loss_recon = (xyz_recon - xyz).pow(2).mean()
 
         # add graph loss 
@@ -161,7 +166,6 @@ def loop(loader, optimizer, device, model, beta, epoch,
 
         # logging 
         recon_loss.append(loss_recon.item())
-        kl_loss.append(loss_kl.item())
         # orient_loss.append(loss_dx_orient.item())
         # norm_loss.append(loss_dx_norm.item())
         graph_loss.append(loss_graph.item())
