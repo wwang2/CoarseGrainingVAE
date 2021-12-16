@@ -176,7 +176,7 @@ class EquiMessagePsuedo(nn.Module):
                  dropout):
         super().__init__()
         self.inv_message = InvariantMessage(in_feat_dim=feat_dim,
-                                            out_feat_dim=feat_dim * 7, 
+                                            out_feat_dim=feat_dim * 9, 
                                             activation=activation,
                                             n_rbf=n_rbf,
                                             cutoff=cutoff,
@@ -197,28 +197,31 @@ class EquiMessagePsuedo(nn.Module):
                                    dist=dist,
                                    nbrs=nbrs)
 
-        inv_out = inv_out.reshape(inv_out.shape[0], 7, s_j.shape[1])
+        inv_out = inv_out.reshape(inv_out.shape[0], 9, s_j.shape[1])
 
-        split_0 = inv_out[:, 0, :].unsqueeze(-1) # update v
-        split_1 = inv_out[:, 1, :]
+        split_0 = inv_out[:, 0, :] # update v
+        split_1 = inv_out[:, 1, :].unsqueeze(-1)
         split_2 = inv_out[:, 2, :].unsqueeze(-1) # update e_ij
         split_3 = inv_out[:, 3, :].unsqueeze(-1) # update v cross vbar 
         split_4 = inv_out[:, 4, :].unsqueeze(-1) # update v cross v
         split_5 = inv_out[:, 5, :].unsqueeze(-1) # update vbar cross vbar 
         split_6 = inv_out[:, 6, :].unsqueeze(-1) # update vbar 
+        split_7 = inv_out[:, 7, :].unsqueeze(-1) # update vbar cross vbar 
+        split_8 = inv_out[:, 8, :].unsqueeze(-1) # update vbar 
         
-        d_s_ij = split_1
+        d_s_ij = split_0 * s_j[nbrs[:, 0]]
         d_sbar_ij = (v_j[nbrs[:, 0]] * vbar_j[nbrs[:, 1]]).sum(-1) # dot product between vbar and v 
 
         
-        d_v_ij = split_2 * unit.unsqueeze(1) + \
-                 split_0 * v_j[nbrs[:, 1]] + \
+        d_v_ij = split_1 * unit.unsqueeze(1) + \
+                 split_2 * v_j[nbrs[:, 1]] + \
                  split_3 * torch.cross( v_j[nbrs[:, 0]],  vbar_j[nbrs[:, 1]]) + \
-                 sbar_j[nbrs[:, 0]].unsqueeze(-1) * vbar_j[nbrs[:,1]]
+                 split_4 * sbar_j[nbrs[:, 0]].unsqueeze(-1) * vbar_j[nbrs[:,1]]
 
-        d_vbar_ij = split_6 * vbar_j[nbrs[:, 1]] + \
-                    split_4 * torch.cross( v_j[nbrs[:, 0]],  v_j[nbrs[:, 1]]) + \
-                    split_5 * torch.cross( vbar_j[nbrs[:, 0]],  vbar_j[nbrs[:, 1]]) 
+        d_vbar_ij = split_5 * vbar_j[nbrs[:, 1]] + \
+                    split_6 * sbar_j[nbrs[:, 0]].unsqueeze(-1) * v_j[nbrs[:,1]]  + \
+                    split_7 * torch.cross( v_j[nbrs[:, 0]],  v_j[nbrs[:, 1]]) + \
+                    split_8 * torch.cross( vbar_j[nbrs[:, 0]],  vbar_j[nbrs[:, 1]]) 
         # add results from neighbors of each node
         
         graph_size = s_j.shape[0]

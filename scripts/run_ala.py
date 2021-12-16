@@ -179,6 +179,13 @@ def run_cv(params):
                                       cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, 
                                       cross_flag=params['cross'])
 
+        # if n_cgs == 3:
+        #     breaksym= True 
+        # else:
+        #     breaksym = False
+        # decoder = EquivariantPsuedoDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
+        #                                cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, breaksym=breaksym)
+
         encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                        n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
                                         cg_mp=cg_mp_flag, dir_mp=False)
