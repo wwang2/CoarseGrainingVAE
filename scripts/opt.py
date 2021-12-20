@@ -71,7 +71,7 @@ if params['id'] == 0:
             dict(name='enc_nconv', type='int', bounds=dict(min=2, max=4)),
             dict(name='dec_nconv', type='int', bounds=dict(min=2, max=7)),
             dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.1), transformation="log"),
-            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=30.0), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=0.5, max=30.0), transformation="log"),
             # dict(name='eta', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             # dict(name='kappa', type='double', bounds=dict(min=0.0001, max=1.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.00001, max=0.0001), transformation="log"),
@@ -129,6 +129,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
     trial['mapshuffle'] = params['mapshuffle']
     trial['threshold'] = params['threshold']
     trial['savemodel'] = False
+    trial['reflectiontest'] = False
     trial['auxcutoff'] = 0.0
     trial['invariantdec'] = False
 
