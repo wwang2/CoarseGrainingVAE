@@ -423,12 +423,8 @@ def sample(loader, device, model, atomic_nums, n_cgs, tqdm_flag=False):
         # sample latent vectors
         z = sample_normal(H_prior_mu, H_prior_sigma)
 
-        if atomwise_z:
-            H = scatter_mean(z, mapping, dim=0)
-            h = z 
-        else: 
-            H = z 
-            h = z 
+        H = z 
+        h = z 
 
         xyz_recon = model.decoder(cg_xyz, CG_nbr_list, H, z, mapping, num_CGs)
             
