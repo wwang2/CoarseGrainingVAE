@@ -30,7 +30,7 @@ def compute_drmsd(xyz1, xyz2):
     
     return ((dist1 - dist2).pow(2).mean().sqrt())
 
-def save_selected_recon(loader, model, device, path):
+def save_selected_recon(loader, model, device, path, fn='equipcn'):
 
     test_results = {'id':[], 'rmsd':[], 'len': [], 'ged':[], 'time':[], 'bond_diff': [], "drmsd":[]}
     df = pd.DataFrame(test_results)
@@ -69,7 +69,7 @@ def save_selected_recon(loader, model, device, path):
         df = df.append(result, ignore_index=True)
 
         pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])    
-        save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}_backmap.pdb'.format(path, id))
+        save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}_{}.pdb'.format(path, id, fn))
 
     df.to_csv('{}/egnn_test_results.csv'.format(path))
         # save results 
@@ -140,6 +140,7 @@ def run_cv(params):
     all_idx = list( range(len(traindata.props['nxyz'])) )
     random.shuffle(all_idx)
     traindata = get_subset_by_indices(all_idx[:params['n_data']], traindata)
+    visdata = get_subset_by_indices([0], traindata) # sample for visualizing training sample 
 
     traindata.generate_neighbor_list(atom_cutoff=0.5,
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
@@ -147,12 +148,15 @@ def run_cv(params):
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
     testdata.generate_neighbor_list(atom_cutoff=0.5,
                                    cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
+    visdata.generate_neighbor_list(atom_cutoff=0.5,
+                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
     # caspt14data.generate_neighbor_list(atom_cutoff=0.5,
     #                                cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
 
     trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
     valloader = DataLoader(valdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
     testloader = DataLoader(testdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
+    visloader = DataLoader(visdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
     # casp14loader = DataLoader(caspt14data, batch_size=1, collate_fn=CG_collate, shuffle=False)
 
     # initialize model 
@@ -206,6 +210,8 @@ def run_cv(params):
                                             gamma=gamma,
                                             looptext='dataset {} Fold {} val'.format(params['dataset'], epoch),
                                             tqdm_flag=True)
+
+        save_selected_recon(visloader, model, device ,split_dir, fn='recon_{}'.format(epoch) )
 
         stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                 'train_loss': train_loss, 'val_loss': val_loss, 
