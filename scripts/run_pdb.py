@@ -211,7 +211,7 @@ def run_cv(params):
                                             looptext='dataset {} Fold {} val'.format(params['dataset'], epoch),
                                             tqdm_flag=True)
 
-        save_selected_recon(visloader, model, device ,split_dir, fn='recon_{}'.format(epoch) )
+        save_selected_recon(visloader, model, device ,split_dir, fn='recon_{}'.format(str(epoch).zfill(3)) )
 
         stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                 'train_loss': train_loss, 'val_loss': val_loss, 
