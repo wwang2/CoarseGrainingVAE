@@ -1015,10 +1015,7 @@ class PCN(nn.Module):
         atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
 
         S_I = self.embedding(cg_z.to(torch.long))
-        try:
-            xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
-        except:
-            import ipdb; ipdb.set_trace()
+        xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
 
         return None, None, None, None, xyz, xyz_recon
 
