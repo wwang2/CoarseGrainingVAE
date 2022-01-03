@@ -605,8 +605,7 @@ class UpdateBlock(nn.Module):
         v_v_norm = ((v_v ** 2 + 1e-10).sum(-1)) ** 0.5
         s_stack = torch.cat([s_i, v_v_norm], dim=-1)
 
-        split = (self.s_dense(s_stack)
-                 .reshape(s_i.shape[0], 3, -1))
+        split = self.s_dense(s_stack).reshape(s_i.shape[0], 3, -1)
 
         # delta v update
         a_vv = split[:, 0, :].unsqueeze(-1)
@@ -620,6 +619,64 @@ class UpdateBlock(nn.Module):
         delta_s_i = inner * a_sv + a_ss
 
         return delta_s_i, delta_v_i
+
+
+class PseudoUpdateBlock(nn.Module):
+    def __init__(self,
+                 feat_dim,
+                 activation,
+                 dropout):
+        super().__init__()
+        self.u_mat = Dense(in_features=feat_dim,
+                           out_features=feat_dim,
+                           bias=False)
+        self.v_mat = Dense(in_features=feat_dim,
+                           out_features=feat_dim,
+                           bias=False)
+        self.s_dense = nn.Sequential(Dense(in_features=2 * feat_dim,
+                                           out_features=feat_dim,
+                                           bias=True,
+                                           dropout_rate=dropout,
+                                           activation=to_module(activation)),
+                                     Dense(in_features=feat_dim,
+                                           out_features=3*feat_dim,
+                                           bias=True,
+                                           dropout_rate=dropout))
+
+    def forward(self,
+                s_i,
+                v_i):
+
+        v_tranpose = v_i.transpose(1, 2).reshape(-1, v_i.shape[1])
+
+        num_feats = v_i.shape[1]
+        u_v = (self.u_mat(v_tranpose).reshape(-1, 3, num_feats)
+               .transpose(1, 2))
+        v_v = (self.v_mat(v_tranpose).reshape(-1, 3, num_feats)
+               .transpose(1, 2))
+
+        v_v_norm = ((v_v ** 2 + 1e-10).sum(-1)) ** 0.5
+
+        vector = (s_i.unsqueeze(-1) * v_i ) # product of pseudovector and pseudoscalar is vector 
+        vector_norm = ((vector ** 2 + 1e-10).sum(-1)) ** 0.5
+
+        s_stack = torch.cat([vector_norm, v_v_norm], dim=-1)
+
+        split = self.s_dense(s_stack).reshape(s_i.shape[0], 3, -1)
+
+        # pseduovector update 
+        a_vv = split[:, 0, :].unsqueeze(-1)
+        delta_v_i = u_v * a_vv
+
+        # pseduoscalar update 
+        a_sv = split[:, 1, :] * s_i
+        a_ss = split[:, 2, :] * s_i 
+
+        inner = (u_v * v_v).sum(-1)
+        delta_s_i = inner * a_sv + a_ss
+
+        return delta_s_i, delta_v_i
+
 
 
 class ContractiveMessageBlock(nn.Module):
