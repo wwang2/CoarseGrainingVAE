@@ -18,6 +18,28 @@ def binarize(x):
     return torch.where(x > 0, torch.ones_like(x), torch.zeros_like(x))
 
 
+def knbrs(G, start, k):
+    nbrs = set([start])
+    for l in range(k):
+        nbrs = list(set((nbr for n in nbrs for nbr in G[n])))
+    return nbrs
+
+
+def get_k_hop_graph(g, k=2):
+    twonbrs = []
+    nodelist = list(g.nodes)
+    for n in nodelist:
+        twonbrs.append([n.index, [nbr.index for nbr in knbrs(g, n, k)]])
+    _twonbrs = []
+    for n in twonbrs:
+        for n2 in n[1]:
+            if n[0] != n2 and n[0] < n2: 
+                _twonbrs.append([n[0], n2])
+    k_hop_edge_pair = torch.LongTensor(_twonbrs)
+    
+    return k_hop_edge_pair
+
+
 def get_higher_order_adj_matrix(adj, order):
     """
     from https://github.com/MinkaiXu/ConfVAE-ICML21/blob/main/utils/transforms.py
@@ -317,7 +339,7 @@ def SCNCG_collate(dicts):
             )
     return batch
 
-    
+
 
 def split_train_test(dataset,
                      test_size=0.2):
