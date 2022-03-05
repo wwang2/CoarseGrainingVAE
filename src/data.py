@@ -263,6 +263,62 @@ def CG_collate(dicts):
 
     return batch
 
+
+class SCNCGDataset(Dataset):
+    
+    def __init__(self,
+                 props):
+        self.props = props
+
+    def __len__(self):
+        return len(self.props['seq'])
+
+    def __getitem__(self, idx):
+        return {key: val[idx] for key, val in self.props.items()}
+    
+    def generate_neighbor_list(self, cg_cutoff, device='cpu', undirected=True, use_bond=False):
+        cg_nbr_list = []
+   
+        for xyz in self.props['ca_xyz']:
+            cg_nbr_list.append(get_neighbor_list(xyz, device, cg_cutoff, undirected).to("cpu"))
+        
+        self.props['CG_nbr_list'] = cg_nbr_list
+
+
+def SCNCG_collate(dicts):
+    # new indices for the batch: the first one is zero and the
+    # last does not matter
+
+    cumulative_atoms = np.cumsum([0] + [len(d['xyz']) for d in dicts])[:-1]
+    cumulative_CGs = np.cumsum([0] + [len(d['ca_xyz']) for d in dicts])[:-1]
+    for n, d in zip(cumulative_atoms, dicts):
+        d['edges'] = d['edges'] + int(n)
+        d['dihe_idxs'] = d['dihe_idxs'] + int(n)
+        
+    for n, d in zip(cumulative_CGs, dicts):
+        d['cg_map'] = d['cg_map'] + int(n)
+        d['CG_nbr_list'] = d['CG_nbr_list'] + int(n)
+        
+    # batching the data
+    batch = {}
+    for key, val in dicts[0].items():
+        if hasattr(val, 'shape') and len(val.shape) > 0:
+            batch[key] = torch.cat([
+                data[key]
+                for data in dicts
+            ], dim=0)
+
+        elif type(val) == str: 
+            batch[key] = [data[key] for data in dicts]
+        else:
+            batch[key] = torch.stack(
+                [data[key] for data in dicts],
+                dim=0
+            )
+    return batch
+
+    
+
 def split_train_test(dataset,
                      test_size=0.2):
 
