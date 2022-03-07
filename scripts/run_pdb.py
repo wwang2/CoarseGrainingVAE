@@ -9,13 +9,13 @@ sys.path.append("../scripts/")
 sys.path.append("../src/")
 
 from run_ala import * 
-from utils import * 
 from sidechain import * 
 from datasets import * 
+from torch.utils.data import Dataset, DataLoader
 from sampling import get_bond_graphs
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sklearn.model_selection import train_test_split
-
+from pcn_utils import * 
 
 def compute_drmsd(xyz1, xyz2):
     '''
@@ -43,11 +43,11 @@ def save_selected_recon(loader, model, device, path, fn='equipcn'):
         dt = time.time() - start_time
 
         # only get the first protein 
-        xyz_recon_first = xyz_recon[: batch['num_atoms'][0].item()]
+        xyz_recon_first = xyz_recon[: batch['num_atoms'][0]]
         seq = batch['seq'][0]
-        msk = batch['msk'][0]
+        msk = '+' * len(seq) #batch['msk'][0]
         id = batch['id'][0]
-        z = batch['nxyz'][:, 0].detach().cpu().numpy()
+        z = batch['z'].detach().cpu().numpy()
 
         # compute rmsd: 
         rmsd = torch.sqrt(((xyz_recon - xyz)**2).sum(axis=1).mean()).item()
@@ -68,11 +68,165 @@ def save_selected_recon(loader, model, device, path, fn='equipcn'):
         result = {'id': id , 'rmsd': rmsd, 'ged': graph_val_ratio[0],  'time': dt , 'len': len(seq), 'bond_diff': bond_diff.item(), "drmsd": drmsd}
         df = df.append(result, ignore_index=True)
 
-        pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0].item(),  batch['CG_mapping'][: batch['num_atoms'][0].item()])    
+        pad_xyz = dense2pad_crd(xyz_recon_first, batch['num_CGs'][0],  batch['cg_map'][: batch['num_atoms'][0]])    
         save_pdb(msk, seq, pad_xyz.reshape(-1, 3), '{}/{}_{}.pdb'.format(path, id, fn))
 
     df.to_csv('{}/egnn_test_results.csv'.format(path))
         # save results 
+
+
+
+def get_scncgdataset(data):
+    loader = tqdm(data['crd'])
+
+    seqs = []
+    ress = []
+    cg_map = []
+    ca_xyz = []
+    ca_idxs = []
+    dihe_idxs = []
+    edges = []
+    xyz = [] 
+    num_atoms = []
+    num_cgs = []
+    zs = []
+    ids = [] 
+
+    for i, crd in enumerate( loader):
+        seq = data['seq'][i]
+        id = data['ids'][i]
+        pdb = PdbBuilder(seq=seq, coords=crd.reshape(-1, 3))
+        pdb.save_pdb("./tmp.pdb")
+        pdb = md.load_pdb('./tmp.pdb')
+
+        md.geometry.indices_chi1(pdb.top)
+
+        g = pdb.top.to_bondgraph()
+        bond_idx = get_k_hop_graph(g )
+
+
+        omg_idx = torch.LongTensor( md.geometry.indices_omega(pdb.top) )
+        phi_idx = torch.LongTensor( md.geometry.indices_phi(pdb.top) )
+        psi_idx = torch.LongTensor( md.geometry.indices_psi(pdb.top) )
+
+        dihe_idx = torch.vstack([omg_idx, phi_idx, psi_idx])
+
+        mapping = []
+        ca_idx = []
+        seq = ''
+        residue = []
+        z = []
+        for i, res in enumerate(pdb.top.residues):
+            for atom in res.atoms:
+                mapping.append(i)
+                z.append(atom.element.atomic_number)
+                if atom.name == 'CA':
+                    ca_idx.append(atom.index)
+            seq += THREE_LETTER_TO_ONE[res.name]
+            residue.append(RES2IDX[THREE_LETTER_TO_ONE[res.name]])
+
+        num_cg = len(seq)
+        num_atom = pdb.xyz[0].shape[0]
+
+        if seq not in SEQ_BLACKLIST:
+            ids.append(id)
+            cg_map.append(torch.LongTensor(mapping))    
+            ca_idxs.append(torch.LongTensor(ca_idx))
+            seqs.append(seq)
+            ress.append(torch.LongTensor(residue))
+            xyz.append(torch.Tensor(pdb.xyz[0]) * 10.0 ) 
+            zs.append(torch.LongTensor(z))
+            ca_xyz.append(torch.Tensor(pdb.xyz[0])[torch.LongTensor(ca_idx)] * 10.0 )
+            edges.append(bond_idx)
+            dihe_idxs.append(dihe_idx)
+            num_atoms.append(num_atom)
+            num_cgs.append(num_cg)
+
+
+    props = {'cg_map': cg_map, 
+             'seq':  seqs,
+             'res': ress,
+             'ca_idx': ca_idxs,
+             'ca_xyz': ca_xyz,
+             'xyz': xyz, 
+             'z': zs,
+             'dihe_idxs': dihe_idxs ,
+             'bond_edge_list': edges, 
+             'num_atoms': num_atoms, 
+             'num_CGs': num_cgs,
+             'id': ids}
+    
+    return props 
+
+
+
+
+from functools import partial
+from tqdm.contrib.concurrent import process_map
+from itertools import repeat
+from collections import ChainMap
+from multiprocessing import Pool, freeze_support, cpu_count
+
+def get_single_protein(i, label, version):
+
+    data = scn.load(version, thinning=100)[label]
+    
+    crd = data['crd'][i]
+    seq = data['seq'][i]
+    id = data['ids'][i]
+    pdb = PdbBuilder(seq=seq, coords=crd.reshape(-1, 3))
+    pdb.save_pdb(f"./{i}.pdb")
+    pdb = md.load_pdb(f'./{i}.pdb')
+    os.remove(f'./{i}.pdb')
+    
+    md.geometry.indices_chi1(pdb.top)
+
+    g = pdb.top.to_bondgraph()
+    bond_idx = np.array(get_k_hop_graph(g )).astype(int)
+
+
+    omg_idx = md.geometry.indices_omega(pdb.top)
+    phi_idx = md.geometry.indices_phi(pdb.top)
+    psi_idx = md.geometry.indices_psi(pdb.top)
+
+    dihe_idx = np.vstack([omg_idx, phi_idx, psi_idx])
+
+    mapping = []
+    ca_idx = []
+    seq = ''
+    residue = []
+    z = []
+    for i, res in enumerate(pdb.top.residues):
+        for atom in res.atoms:
+            mapping.append(i)
+            z.append(atom.element.atomic_number)
+            if atom.name == 'CA':
+                ca_idx.append(atom.index)
+        seq += THREE_LETTER_TO_ONE[res.name]
+        residue.append(RES2IDX[THREE_LETTER_TO_ONE[res.name]])
+
+    num_cg = len(seq)
+    num_atom = pdb.xyz[0].shape[0]
+    
+    ca_xyz = (pdb.xyz[0])[torch.LongTensor(ca_idx)] * 10.0
+    xyz = (pdb.xyz[0])
+
+
+    props = {'cg_map': mapping, 
+             'seq':  seq,
+             'res': residue,
+             'ca_idx': ca_idx,
+             'ca_xyz': ca_xyz,
+             'xyz': xyz, 
+             'z': z,
+             'dihe_idxs': dihe_idx ,
+             'bond_edge_list': bond_idx, 
+             'num_atoms': num_atom, 
+             'num_CGs': num_cg,
+             'id': id}
+    return props
+
+
 
 
 def run_cv(params):
@@ -104,64 +258,71 @@ def run_cv(params):
 
     # generate propos dictionary 
 
-    if params['dataset'] == 'debug':
-        data = scn.load( params['dataset'] )
-        train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
-        val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
-        test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
+    #if params['dataset'] == 'debug':
+    
+
+    alldata = scn.load( params['dataset'], thinning=30)
+
+    # # load train data 
+    # data = alldata['train']    
+    # ndata = len(data['seq'])
+    # res = process_map(partial(get_single_protein, version=params['dataset'], label='train'), list(range(ndata)), max_workers=cpu_count(), chunksize=1)
+    # train_props = merge_dicts(res)
+
+    # val_props = get_scncgdataset(data['valid-10'])
+    # test_props = get_scncgdataset(data['test'])
+
+
         #casp14_props = get_CASP14_targets()
-    elif params['dataset'] == 'casp12':
-        data_path = os.path.join( params['datadir'] , 'casp12_{}_' + str(params['thinning']) + '_all.pkl')
-        train_props = pickle.load(open(data_path.format('train'), "rb" ) )
-        val_props = pickle.load(open(data_path.format('val'), "rb" ) )
-        test_props = pickle.load(open(data_path.format('test'), "rb" ) )
+    # elif params['dataset'] == 'casp12':
+    #     data_path = os.path.join( params['datadir'] , 'casp12_{}_' + str(params['thinning']) + '_all.pkl')
+    #     train_props = pickle.load(open(data_path.format('train'), "rb" ) )
+    #     val_props = pickle.load(open(data_path.format('val'), "rb" ) )
+    #     test_props = pickle.load(open(data_path.format('test'), "rb" ) )
         #casp14_props = get_CASP14_targets()
         # data = scn.load(casp_version=12, thinning=params['thinning'])
         # train_props = get_sidechainet_props(data['train'], params, n_data=params['n_data'], split='train', thinning=params['thinning'])
         # val_props = get_sidechainet_props(data['valid-10'], params, n_data=params['n_data'], split='valid-10', thinning=params['thinning'])
         # test_props = get_sidechainet_props(data['test'], params, n_data=params['n_data'], split='test', thinning=params['thinning'])
- 
-    traindata = CGDataset(train_props.copy())
-    valdata = CGDataset(val_props.copy())
-    testdata = CGDataset(test_props.copy())
+
+    traindata = SCNCGDataset(alldata['train'], cg_cutoff=params['cg_cutoff'])
+    valdata = SCNCGDataset(alldata['valid-10'], cg_cutoff=params['cg_cutoff'])
+    testdata = SCNCGDataset(alldata['test'], cg_cutoff=params['cg_cutoff'])
     #caspt14data = CGDataset(casp14_props.copy())
 
-    # remove problemic structures 
-    valid_ids = []
-    for i, edge in enumerate(train_props['bond_edge_list']):
-        natoms = train_props['nxyz'][i].shape[0]
-        nedges = edge.shape[0]
-        ratio = nedges/ natoms 
-        if ratio <= 3.0 and ratio != 0.0:
-            valid_ids.append(i)
+    # # remove problemic structures 
+    # valid_ids = []
+    # for i, edge in enumerate(train_props['bond_edge_list']):
+    #     natoms = train_props['xyz'][i].shape[0]
+    #     nedges = edge.shape[0]
+    #     ratio = nedges/ natoms 
+    #     if ratio <= 3.0 and ratio != 0.0:
+    #         valid_ids.append(i)
 
-    traindata = get_subset_by_indices(valid_ids, traindata)
+    # traindata = get_subset_by_indices(valid_ids, traindata)
 
-    all_idx = list( range(len(traindata.props['nxyz'])) )
-    random.shuffle(all_idx)
-    traindata = get_subset_by_indices(all_idx[:params['n_data']], traindata)
-    visdata = get_subset_by_indices([0], traindata) # sample for visualizing training sample 
+    # all_idx = list( range(len(traindata.props['xyz'])) )
+    # random.shuffle(all_idx)
+    # traindata = get_subset_by_indices(all_idx[:params['n_data']], traindata)
+    # visdata = get_subset_by_indices([0, 1, 2], testdata) # sample for visualizing training sample 
 
-    traindata.generate_neighbor_list(atom_cutoff=0.5,
-                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
-    valdata.generate_neighbor_list(atom_cutoff=0.5,
-                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
-    testdata.generate_neighbor_list(atom_cutoff=0.5,
-                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
-    visdata.generate_neighbor_list(atom_cutoff=0.5,
-                                   cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
-    # caspt14data.generate_neighbor_list(atom_cutoff=0.5,
-    #                                cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
+    # traindata.generate_neighbor_list(
+    #                                cg_cutoff=cg_cutoff, device="cpu", undirected=True, use_bond=True)
+    # valdata.generate_neighbor_list(
+    #                                cg_cutoff=cg_cutoff, device="cpu", undirected=True, use_bond=True)
+    # testdata.generate_neighbor_list(
+    #                                cg_cutoff=cg_cutoff, device="cpu", undirected=True, use_bond=True)
+    # visdata.generate_neighbor_list(
+    #                                cg_cutoff=cg_cutoff, device="cpu", undirected=True, use_bond=True)
+    # # caspt14data.generate_neighbor_list(atom_cutoff=0.5,
+    # #                                cg_cutoff=None, device="cpu", undirected=True, use_bond=True)
 
-    trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
-    valloader = DataLoader(valdata, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
-    testloader = DataLoader(testdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
-    visloader = DataLoader(visdata, batch_size=1, collate_fn=CG_collate, shuffle=False)
-    # casp14loader = DataLoader(caspt14data, batch_size=1, collate_fn=CG_collate, shuffle=False)
+    trainloader = DataLoader(traindata, batch_size=batch_size, collate_fn=SCNCG_collate, shuffle=True, num_workers=4)
+    valloader = DataLoader(valdata, batch_size=batch_size, collate_fn=SCNCG_collate, shuffle=False)
+    testloader = DataLoader(testdata, batch_size=1, collate_fn=SCNCG_collate, shuffle=False)
+    #visloader = DataLoader(visdata, batch_size=1, collate_fn=SCNCG_collate, shuffle=False)
+    # casp14loader = DataLoader(caspt14data, batch_size=1, collate_fn=SCNCG_collate, shuffle=False)
 
-    # initialize model 
-    atom_mu = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
-    atom_sigma = nn.Sequential(nn.Linear(n_basis, n_basis), nn.ReLU(), nn.Linear(n_basis, n_basis))
 
     # register encoder 
 
@@ -196,6 +357,8 @@ def run_cv(params):
 
     for epoch in range(params['nepochs']):
 
+        #save_selected_recon(visloader, model, device ,split_dir, fn='recon_{}'.format(str(epoch).zfill(3)) )
+
         train_loss, mean_kl_train, mean_recon_train, mean_graph_train, xyz_train, xyz_train_recon = loop(trainloader, optimizer, device,
                                                    model, beta, epoch, 
                                                    train=True,
@@ -211,7 +374,6 @@ def run_cv(params):
                                             looptext='dataset {} Fold {} val'.format(params['dataset'], epoch),
                                             tqdm_flag=True)
 
-        save_selected_recon(visloader, model, device ,split_dir, fn='recon_{}'.format(str(epoch).zfill(3)) )
 
         stats = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'], 
                 'train_loss': train_loss, 'val_loss': val_loss, 
