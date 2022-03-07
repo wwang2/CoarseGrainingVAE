@@ -190,7 +190,7 @@ def loop(loader, optimizer, device, model, beta, epoch,
         # cg_xyz = batch['CG_nxyz'][:, 1:]
         # mapping = batch['CG_mapping']
 
-        loss =  loss_recon + loss_kl * beta+ loss_graph * gamma + loss_dihe
+        loss =  loss_recon + loss_kl * beta+ loss_graph * gamma + loss_dihe * kappa
 
         memory = torch.cuda.memory_allocated(device) / (1024 ** 2)
 
