@@ -245,6 +245,7 @@ def run_cv(params):
     dataset_label = params['dataset']
     tqdm_flag = params['tqdm_flag']
     gamma = params['gamma']
+    kappa = params['kappa']
     factor = params['factor']
     patience = params['patience']
     threshold = params['threshold']
@@ -363,6 +364,7 @@ def run_cv(params):
                                                    model, beta, epoch, 
                                                    train=True,
                                                     gamma=gamma,
+                                                    kappa=kappa, 
                                                     looptext='dataset {} Fold {} train'.format(params['dataset'], epoch),
                                                     tqdm_flag=True)
 
@@ -371,6 +373,7 @@ def run_cv(params):
                                            model, beta, epoch, 
                                            train=False, 
                                             gamma=gamma,
+                                            kappa=kappa, 
                                             looptext='dataset {} Fold {} val'.format(params['dataset'], epoch),
                                             tqdm_flag=True)
 
