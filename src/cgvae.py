@@ -524,21 +524,16 @@ class PCN(nn.Module):
         
     def get_inputs(self, batch):
 
-        xyz = batch['nxyz'][:, 1:]
-
-        cg_xyz = batch['CG_nxyz'][:, 1:]
-
-        cg_z = batch['CG_nxyz'][:, 0]
-        z = batch['nxyz'][:, 0]
-
-        mapping = batch['CG_mapping']
-
-        nbr_list = batch['nbr_list']
+        xyz = batch['xyz']
+        cg_xyz = batch['ca_xyz']
+        cg_z = batch['res']
+        mapping = batch['cg_map']
+        #dihe = batch['dihe_idxs']
+        nbr_list = batch['bond_edge_list']
         CG_nbr_list = batch['CG_nbr_list']
+        num_CGs = [len(seq) for seq in batch['seq']] 
         
-        num_CGs = batch['num_CGs']
-        
-        return z, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs
+        return cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs
         
     def CG2ChannelIdx(self, CG_mapping):
 
@@ -551,7 +546,7 @@ class PCN(nn.Module):
             
         return CG2atomChannel.detach()
             
-    def decoder(self, cg_xyz, CG_nbr_list, S_I, mapping, num_CGs):
+    def decoder(self, cg_xyz, CG_nbr_list, S_I, ca_idx, mapping, num_CGs):
         
         cg_s, cg_v = self.equivaraintconv(cg_xyz, CG_nbr_list, mapping, S_I)
 
@@ -568,7 +563,7 @@ class PCN(nn.Module):
         #   xyz_rel = xyz_rel - decode_offsets[mapping]
 
         # recentering 
-        ca_idx = self.get_ca_idx(mapping)
+        #ca_idx = batch['ca_idx'] #self.get_ca_idx(mapping)
 
         # edge case for some weird data
         if ca_idx[-1].item() < xyz_rel.shape[0]:
@@ -577,24 +572,24 @@ class PCN(nn.Module):
 
         # reconstruct coordinates 
         xyz_recon = xyz_rel + cg_xyz[mapping]
-        
+
         return xyz_recon
 
-    def get_ca_idx(self, mapping):
-        ca_idx = [1]
-        current = 0
-        for i, item in enumerate(mapping):
-            if item.item() != current:
-                ca_idx.append(i + 1)
-            current = item.item()
+    # def get_ca_idx(self, mapping):
+    #     ca_idx = [1]
+    #     current = 0
+    #     for i, item in enumerate(mapping):
+    #         if item.item() != current:
+    #             ca_idx.append(i + 1)
+    #         current = item.item()
 
-        return torch.LongTensor(ca_idx)
+    #     return torch.LongTensor(ca_idx)
         
     def forward(self, batch):
-        atomic_nums, cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs= self.get_inputs(batch)
+        cg_z, xyz, cg_xyz, nbr_list, CG_nbr_list, mapping, num_CGs = self.get_inputs(batch)
 
         S_I = self.embedding(cg_z.to(torch.long))
-        xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, mapping, num_CGs)
+        xyz_recon = self.decoder(cg_xyz, CG_nbr_list, S_I, batch['ca_idx'], mapping, num_CGs)
 
         return None, None, None, None, xyz, xyz_recon
 
