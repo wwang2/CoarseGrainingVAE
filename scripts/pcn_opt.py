@@ -22,9 +22,9 @@ parser.add_argument("-edgeorder", type=int, default=2)
 #parser.add_argument("-n_basis", type=int, default=512)
 #parser.add_argument("-activation", type=str, default='swish')
 parser.add_argument("-optimizer", type=str, default='adam')
-parser.add_argument("-cg_cutoff", type=float, default=12.5)
+#parser.add_argument("-cg_cutoff", type=float, default=12.5)
 parser.add_argument("-dec_nconv", type=int, default=6)
-parser.add_argument("-batch_size", type=int, default=16)
+parser.add_argument("-batch_size", type=int, default=4)
 parser.add_argument("-n_epochs", type=int, default=2)
 parser.add_argument("-ndata", type=int, default=200)
 parser.add_argument("-beta", type=float, default=0.0)
@@ -68,11 +68,11 @@ if params['id'] == 0:
             dict(name='n_basis', type='int', bounds=dict(min=128, max=700)),
             dict(name='n_rbf', type='int', bounds=dict(min=5, max=10)),
             dict(name='activation', type='categorical', categorical_values=["ReLU", "shifted_softplus", "LeakyReLU", "swish", "ELU"]),
-            dict(name='atom_cutoff', type='double', bounds=dict(min=7.0, max=9.5)),
+            dict(name='cg_cutoff', type='double', bounds=dict(min=5.0, max=9.5)),
             #dict(name='edgeorder', type='int', bounds=dict(min=1, max=3)),
-            dict(name='dec_nconv', type='int', bounds=dict(min=2, max=10)),
-            dict(name='beta', type='double', bounds=dict(min=0.0001, max=0.1), transformation="log"),
-            dict(name='gamma', type='double', bounds=dict(min=0.0001, max=30.0), transformation="log"),
+            dict(name='dec_nconv', type='int', bounds=dict(min=2, max=8)),
+            dict(name='kappa', type='double', bounds=dict(min=0.0001, max=10.0), transformation="log"),
+            dict(name='gamma', type='double', bounds=dict(min=1.0, max=30.0), transformation="log"),
             dict(name='lr', type='double', bounds=dict(min=0.0001, max=0.0005), transformation="log"),
             dict(name='factor', type='double', bounds=dict(min=0.1, max=0.9), transformation="log"),
             dict(name='patience', type='int', bounds=dict(min=1, max=10))
@@ -92,6 +92,7 @@ while experiment.progress.observation_count < experiment.observation_budget:
 
 
     run_params = dict(params,**trial)
+    run_params['logdir'] = os.path.join(params['logdir'], suggestion.id)
 
     print("Suggestion ID: {}".format(suggestion.id))
 
