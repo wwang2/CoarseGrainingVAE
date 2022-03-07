@@ -11,6 +11,7 @@ from torch.utils.data import Dataset as TorchDataset
 from tqdm import tqdm 
 import copy 
 import sys
+from sidechain import * 
 
 
 
@@ -286,25 +287,80 @@ def CG_collate(dicts):
     return batch
 
 
-class SCNCGDataset(Dataset):
+class SCNCGDataset(TorchDataset):
     
     def __init__(self,
-                 props):
-        self.props = props
+                 scndataset,
+                 cg_cutoff):
+        self.scndataset = scndataset
+        self.cg_cutoff = cg_cutoff
 
     def __len__(self):
-        return len(self.props['seq'])
+        return len(self.scndataset['seq'])
 
-    def __getitem__(self, idx):
-        return {key: val[idx] for key, val in self.props.items()}
-    
-    def generate_neighbor_list(self, cg_cutoff, device='cpu', undirected=True, use_bond=False):
-        cg_nbr_list = []
-   
-        for xyz in self.props['ca_xyz']:
-            cg_nbr_list.append(get_neighbor_list(xyz, device, cg_cutoff, undirected).to("cpu"))
+    def __getitem__(self, i):
         
-        self.props['CG_nbr_list'] = cg_nbr_list
+        crd = self.scndataset['crd'][i]
+        seq = self.scndataset['seq'][i]
+        id = self.scndataset['ids'][i]
+        
+        pdb = PdbBuilder(seq=seq, coords=crd.reshape(-1, 3))
+        pdb.save_pdb(f"./{i}.pdb")
+        pdb = md.load_pdb(f'./{i}.pdb')
+        os.remove(f'./{i}.pdb')
+
+        mapping = []
+        seq = ''
+        residue = []
+        z = []
+
+        atom_idx = []
+        ca_idx = pdb.top.select_atom_indices("alpha")
+        for res_i, idx in enumerate(ca_idx):
+            ca_atom = pdb.top.atom(idx)
+
+            seq += THREE_LETTER_TO_ONE[ca_atom.residue.name]
+            residue.append(RES2IDX[THREE_LETTER_TO_ONE[ca_atom.residue.name]])
+
+            for atom in ca_atom.residue.atoms:
+                mapping.append(res_i)
+                atom_idx.append(atom.index)
+                z.append(atom.element.atomic_number)
+
+        top = pdb.top.subset(atom_idx)
+
+        md.geometry.indices_chi1(top)
+
+        g = top.to_bondgraph()
+        bond_idx = np.array(get_k_hop_graph(g )).astype(int)
+
+
+        omg_idx = md.geometry.indices_omega(top)
+        phi_idx = md.geometry.indices_phi(top)
+        psi_idx = md.geometry.indices_psi(top)
+
+        dihe_idx = np.vstack([omg_idx, phi_idx, psi_idx])
+
+        num_cg = len(seq)
+        num_atom = pdb.xyz[0].shape[0]
+
+        ca_xyz = torch.Tensor(pdb.xyz[0])[torch.LongTensor(ca_idx)] * 10.0
+        xyz =  torch.Tensor(pdb.xyz[0])[torch.LongTensor(atom_idx)] * 10.0
+
+        props = {'cg_map': torch.LongTensor(mapping), 
+                 'seq':  seq,
+                 'res': torch.LongTensor(residue),
+                 'ca_idx': torch.LongTensor(ca_idx),
+                 'ca_xyz': ca_xyz,
+                 'CG_nbr_list': get_neighbor_list(ca_xyz, "cpu", self.cg_cutoff, True).to("cpu"),
+                 'xyz': xyz, 
+                 'z': torch.LongTensor(z),
+                 'dihe_idxs': torch.LongTensor(dihe_idx) ,
+                 'bond_edge_list': torch.LongTensor(bond_idx), 
+                 'num_atoms': num_atom, 
+                 'num_CGs': num_cg,
+                 'id': id}
+        return props    
 
 
 def SCNCG_collate(dicts):
@@ -314,7 +370,7 @@ def SCNCG_collate(dicts):
     cumulative_atoms = np.cumsum([0] + [len(d['xyz']) for d in dicts])[:-1]
     cumulative_CGs = np.cumsum([0] + [len(d['ca_xyz']) for d in dicts])[:-1]
     for n, d in zip(cumulative_atoms, dicts):
-        d['edges'] = d['edges'] + int(n)
+        d['bond_edge_list'] = d['bond_edge_list'] + int(n)
         d['dihe_idxs'] = d['dihe_idxs'] + int(n)
         
     for n, d in zip(cumulative_CGs, dicts):
@@ -330,7 +386,7 @@ def SCNCG_collate(dicts):
                 for data in dicts
             ], dim=0)
 
-        elif type(val) == str: 
+        elif type(val) == str or type(int): 
             batch[key] = [data[key] for data in dicts]
         else:
             batch[key] = torch.stack(
@@ -357,6 +413,11 @@ def get_subset_by_indices(indices, dataset):
 
     if isinstance(dataset, CGDataset):
         subset = CGDataset(
+            props={key: [val[i] for i in indices]
+                   for key, val in dataset.props.items()},
+        )
+    elif isinstance(dataset, SCNCGDataset):
+        subset = SCNCGDataset(
             props={key: [val[i] for i in indices]
                    for key, val in dataset.props.items()},
         )
