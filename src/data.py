@@ -11,12 +11,28 @@ from torch.utils.data import Dataset as TorchDataset
 from tqdm import tqdm 
 import copy 
 import sys
-from sidechain import * 
-
+#from sidechain import * 
 
 
 def binarize(x):
     return torch.where(x > 0, torch.ones_like(x), torch.zeros_like(x))
+    
+def get_higher_order_adj_matrix(adj, order):
+    """
+    from https://github.com/MinkaiXu/ConfVAE-ICML21/blob/main/utils/transforms.py
+    Args:
+        adj:        (N, N)
+    """
+    adj_mats = [torch.eye(adj.size(0)).long(), binarize(adj + torch.eye(adj.size(0)).long())]
+    for i in range(2, order+1):
+        adj_mats.append(binarize(adj_mats[i-1] @ adj_mats[1]))
+    # print(adj_mats)
+
+    order_mat = torch.zeros_like(adj)
+    for i in range(1, order+1):
+        order_mat += (adj_mats[i] - adj_mats[i-1]) * i
+
+    return order_mat
 
 
 def knbrs(G, start, k):
@@ -39,25 +55,6 @@ def get_k_hop_graph(g, k=2):
     k_hop_edge_pair = torch.LongTensor(_twonbrs)
     
     return k_hop_edge_pair
-
-
-def get_higher_order_adj_matrix(adj, order):
-    """
-    from https://github.com/MinkaiXu/ConfVAE-ICML21/blob/main/utils/transforms.py
-    Args:
-        adj:        (N, N)
-    """
-    adj_mats = [torch.eye(adj.size(0)).long(), binarize(adj + torch.eye(adj.size(0)).long())]
-    for i in range(2, order+1):
-        adj_mats.append(binarize(adj_mats[i-1] @ adj_mats[1]))
-    # print(adj_mats)
-
-    order_mat = torch.zeros_like(adj)
-    for i in range(1, order+1):
-        order_mat += (adj_mats[i] - adj_mats[i-1]) * i
-
-    return order_mat
-
 
 
 def get_neighbor_list(xyz, device='cpu', cutoff=5, undirected=True):

@@ -2,7 +2,8 @@ import torch
 import numpy as np 
 import networkx as nx
 import itertools
-from data import *
+from data import * 
+#from data import get_higher_order_adj_matrix
 from utils import * 
 from torch.utils.data import DataLoader
 from torch_scatter import scatter_mean, scatter_add
@@ -136,7 +137,7 @@ def get_diffpool_data(N_cg, trajs, n_data, edgeorder=1, shift=False, pdb=None, r
         bond_edges = torch.LongTensor( [[e[0].index, e[1].index] for e in bondgraph.edges] )# list of edge list 
         hyper_edges = get_high_order_edge(bond_edges, edgeorder, n_atoms)
 
-        for xyz in frames: 
+        for xyz in frames[:n_data]: 
             if shift:
                 xyz = xyz - np.random.randn(1, 3)
             if rotate:
