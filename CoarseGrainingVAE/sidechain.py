@@ -2,9 +2,8 @@ import torch
 import numpy as np 
 import networkx as nx
 import itertools
-from data import *
-from sampling import get_bond_graphs
-from datasets import get_high_order_edge
+from .data import *
+from .datasets import get_high_order_edge
 from torch_scatter import scatter_mean, scatter_add
 from moleculekit.molecule import Molecule
 import glob 
@@ -145,6 +144,17 @@ SEQ_BLACKLIST = ['MPEFLEDPSVLTKDKLKSELVANNVTLPAGEQRKDVYVQLYLQHLTARNRPPLPAGTNSKGP
 
 IDX2ATOM = {v: k for k, v in ATOM2IDX.items()}
 
+
+def get_bond_graphs(atoms, device='cpu', scale=1.3):
+    dist = compute_distance_mat(atoms, device=device)
+    cutoff = compute_bond_cutoff(atoms, scale=scale)
+    bond_mat = (dist < cutoff.to(device))
+    bond_mat[np.diag_indices(len(atoms))] = 0
+    
+    del dist, cutoff
+
+    return bond_mat.to(torch.long).to('cpu')
+    
 def idx2z(idxs):
     types = [IDX2ATOM[atom] for atom in idxs]
     z = [ATOM2Z[atom] for atom in types]  

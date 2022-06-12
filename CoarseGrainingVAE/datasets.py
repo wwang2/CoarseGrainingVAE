@@ -2,9 +2,8 @@ import torch
 import numpy as np 
 import networkx as nx
 import itertools
-from data import * 
-#from data import get_higher_order_adj_matrix
-from utils import * 
+from .data import * 
+#from .utils import * 
 from torch.utils.data import DataLoader
 from torch_scatter import scatter_mean, scatter_add
 from moleculekit.molecule import Molecule
@@ -18,7 +17,7 @@ from sklearn.utils import shuffle
 import random
 import tqdm
 
-from cgae import * 
+from .cgae import * 
 
 atomic_num_dict = {'C':6, 'H':1, 'O':8, 'N':7, 'S':16, 'Se': 34}
 

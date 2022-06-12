@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from conv import * 
+from .conv import * 
 from torch_scatter import scatter_mean, scatter_add
 
 EPS = 1e-3

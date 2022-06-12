@@ -85,11 +85,6 @@ def KL(mu1, std1, mu2, std2):
         return 0.5 * ( (std1.pow(2) / std2.pow(2)).sum(-1) + ((mu1 - mu2).pow(2) / std2).sum(-1) + \
             torch.log(std2.pow(2)).sum(-1) - torch.log(std1.pow(2)).sum(-1) - std1.shape[-1] ).mean()
 
-def batch_to(batch, device):
-    gpu_batch = dict()
-    for key, val in batch.items():
-        gpu_batch[key] = val.to(device) if hasattr(val, 'to') else val
-    return gpu_batch
 
 def loop(loader, optimizer, device, model, beta, epoch, 
         gamma, eta=0.0, kappa=0.0, train=True, looptext='', tqdm_flag=True):

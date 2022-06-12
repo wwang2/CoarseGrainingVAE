@@ -1,18 +1,21 @@
 import sys
-sys.path.append("../scripts/")
-sys.path.append("../src/")
+# sys.path.append("../scripts/")
+# sys.path.append("../src/")
 
 import os 
 import argparse 
-from data import *
-from cgvae import * 
-from conv import * 
-from datasets import * 
+import CoarseGrainingVAE
+from CoarseGrainingVAE.data import *
+from CoarseGrainingVAE.cgvae import * 
+from CoarseGrainingVAE.conv import * 
+from CoarseGrainingVAE.datasets import * 
 from utils import * 
-from visualization import xyz_grid_view, rotate_grid, save_rotate_frames
+from CoarseGrainingVAE.visualization import xyz_grid_view, rotate_grid, save_rotate_frames
+from CoarseGrainingVAE.sidechain import * 
+
 from sampling import * 
 from run_baseline import retrieve_recon_structures
-from utils import * 
+
 import torch
 from torch import nn
 from torch.nn import Sequential 
@@ -27,7 +30,6 @@ import time
 from datetime import timedelta
 import pandas as pd
 import statsmodels.api as sm
-from sidechain import * 
 
 
 # set random seed 

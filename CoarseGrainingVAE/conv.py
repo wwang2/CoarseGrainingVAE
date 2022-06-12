@@ -1,7 +1,8 @@
 import torch
 from torch import nn 
 
-from modules import * 
+from .modules import * 
+from .conv import * 
 
 from torch_scatter import scatter_mean, scatter_add
 from torch import nn
@@ -160,12 +161,6 @@ class InvMessageBlock(nn.Module):
                                 dim_size=s_j.shape[0])
 
         return delta_s_i, v_j
-
-import sys
-sys.path.append("../")
-sys.path.append("../src")
-
-from conv import * 
 
 class EquiMessagePsuedo(nn.Module):
     def __init__(self,

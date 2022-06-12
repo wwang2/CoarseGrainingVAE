@@ -1,18 +1,16 @@
-import sys
-sys.path.append("../scripts/")
-sys.path.append("../src/")
-
 import os 
 import argparse 
 
-from data import *
-from baseline import * 
-from diffpoolvae import * 
-from conv import * 
-from datasets import * 
+import CoarseGrainingVAE
+
+from CoarseGrainingVAE.data import *
+from CoarseGrainingVAE.baseline import * 
+from CoarseGrainingVAE.diffpoolvae import * 
+from CoarseGrainingVAE.conv import * 
+from CoarseGrainingVAE.datasets import * 
 from utils import * 
-from geometry import * 
-from visualization import xyz_grid_view, rotate_grid
+from CoarseGrainingVAE.geometry import * 
+from CoarseGrainingVAE.visualization import xyz_grid_view, rotate_grid
 from sampling import * 
 import torch
 from torch import nn
@@ -24,8 +22,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt 
 from tqdm import tqdm 
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split, KFold
 import re 
 import pandas as pd
 

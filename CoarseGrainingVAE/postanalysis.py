@@ -1,17 +1,13 @@
-import sys
-sys.path.append("../scripts/")
-sys.path.append("../src/")
-
 import os 
 import argparse 
 from data import *
-from cgvae import * 
-from conv import * 
-from datasets import * 
-from utils import * 
-from visualization import xyz_grid_view, rotate_grid
+from .cgvae import * 
+from .conv import * 
+from .datasets import * 
+from .utils import * 
+from .visualization import xyz_grid_view, rotate_grid
 #from plots import *
-from sampling import * 
+from .sampling import * 
 import torch
 from torch import nn
 from torch.nn import Sequential 
@@ -49,7 +45,7 @@ def tica(label, filename):
     distances_feat.add_distances(
         distances_feat.pairs(distances_feat.select_Backbone(), excluded_neighbors=2), periodic=False)
     smaple_distances_data = pyemma.coordinates.load([filename], features=distances_feat)
-    smaple_xyz_data = pyemma.coordinates.load([filename], top=top)
+    smaple_xyz_data = pyemma.coordinates.load([filename], top=protientop)
     labels += ['backbone atom\ndistances']
     
     tica = pyemma.coordinates.tica(true_distances_data, lag=100)
@@ -118,11 +114,11 @@ def test(exp_dir, label, skip=1000):
 
     decoder = EquivariantDecoder(n_atom_basis=n_basis, n_rbf = n_rbf, 
                                   cutoff=atom_cutoff, num_conv = dec_nconv, activation=activation, cross_flag=True,
-                                  atomwise_z=atom_decode_flag)
+                                )
 
     encoder = EquiEncoder(n_conv=enc_nconv, n_atom_basis=n_basis, 
                                    n_rbf=n_rbf, cutoff=cg_cutoff, activation=activation,
-                                    cg_mp=cg_mp_flag, dir_mp=dir_mp_flag, atomwise_z=atom_decode_flag)
+                                    cg_mp=cg_mp_flag, dir_mp=dir_mp_flag)
 
     # define prior 
     cgPrior = CGprior(n_conv=enc_nconv, n_atom_basis=n_basis, 
@@ -131,20 +127,20 @@ def test(exp_dir, label, skip=1000):
 
 
     model = CGequiVAE(encoder, decoder, atom_mu, atom_sigma, n_cgs, feature_dim=n_basis, prior_net=cgPrior,
-                        atomwise_z=atom_decode_flag).to(device)
+                      ).to(device)
 
     # load pretrained model 
     model.load_state_dict(torch.load(os.path.join(exp_dir, 'model.pt')))
 
     loader = DataLoader(dataset, batch_size=batch_size, collate_fn=CG_collate, shuffle=False)
 
-    true_xyzs, recon_xyzs, cg_xyzs, mu, sigma, _, _, _, _ = get_all_true_reconstructed_structures(loader, 
+    true_xyzs, recon_xyzs, cg_xyzs, mu, sigma, _, _, = get_all_true_reconstructed_structures(loader, 
                                                                                          device,
                                                                                          model,
                                                                                          atomic_nums,
                                                                                          n_cg=n_cgs,
-                                                                                         atomwise_z=atom_decode_flag)
+                                                                                       )
 
-    samples = sample(loader, mu, sigma, device, model, atomic_nums, n_cgs, atomwise_z=atom_decode_flag)
+    samples = sample(loader, device, model, atomic_nums, n_cgs)
     
     return recon_xyzs, cg_xyzs, true_xyzs, samples, atomic_nums
