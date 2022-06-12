@@ -10,7 +10,6 @@ from conv import *
 from datasets import * 
 from utils import * 
 from visualization import xyz_grid_view, rotate_grid, save_rotate_frames
-#from plots import *
 from sampling import * 
 from run_baseline import retrieve_recon_structures
 from utils import * 
@@ -29,6 +28,15 @@ from datetime import timedelta
 import pandas as pd
 import statsmodels.api as sm
 from sidechain import * 
+
+
+# set random seed 
+seed = 123
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+random.seed(seed)
 
 optim_dict = {'adam':  torch.optim.Adam, 'sgd':  torch.optim.SGD}
 
