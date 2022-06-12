@@ -6,6 +6,6 @@ setup(
    description='',
    author='Wujie Wang',
    author_email='wwj@mit.edu',
-   packages=['src'],  #same as name
+   packages=['cgvae'],  #same as name
    #install_requires=['wheel', 'bar', 'greek'], #external packages as dependencies
 )
