@@ -6,6 +6,6 @@ setup(
    description='',
    author='Wujie Wang',
    author_email='wwj@mit.edu',
-   packages=['cgvae'],  #same as name
+   packages=['CoarseGrainingVAE'],  #same as name
    #install_requires=['wheel', 'bar', 'greek'], #external packages as dependencies
 )
