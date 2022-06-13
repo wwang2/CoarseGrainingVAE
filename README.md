@@ -2,6 +2,20 @@
 
 ### Install packages 
 
+I highly recommend creating a dedicated conda environment via: 
+```
+conda create -n cgvae python=3.8
+```
+
+Download and install 
+```
+git clone https://github.com/wwang2/CoarseGrainingVAE.git
+cd CoarseGrainingVAE
+conda activate cgvae
+pip install -f requirement.txt # I have tested this, it should work 
+pip install -e . # -e is useful if you want to edit the source code
+```
+
 ### Download data 
 
 #### Alanine Dipeptide trajectories 
