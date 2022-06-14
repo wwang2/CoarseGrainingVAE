@@ -71,9 +71,11 @@ A set of coarse-graining mapping is first determined before the model training. 
 
 ```
 
-Feel free to change the desired CG resolution via `-n_cg`, it should work for a minimal of 3-bead coarse-graining representations. (My dream is to be able to backmap any geometries from representations of only 3-beads) 
+Feel free to change the desired CG resolution via `-n_cg`, it should work for a minimal of 3-bead coarse-graining representations. (My dream is to be able to backmap any molecular geometries from representations of only 3-beads, 3 beads are all you need?) 
 
 Evaluation stats is generated with 5-fold cross-validation. Feel free to change hyperparameters, it should not be very sensitive to hyperparameter choice. Generated samples also dumped for visualization. 
+
+The model work for larger systems and proteins, I have tested it on a covid spike protein before, but the training might take a while. 
 
 # 
 
