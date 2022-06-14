@@ -1,6 +1,10 @@
 # Coarse-Graining Variational Autoencoders(CGVAE)
 
-This is a repo accompanying our ICML 2022 paper "Generative Coarse-graining of Molecualr Conformations" ([arxiv link](https://arxiv.org/abs/2201.12176)). We propose a geometric generative model for backmmaping fine-grained coordinates from coarse-grained coordinates. 
+<p align="center">
+  <img src="assets/super_res.png" width="450" title="">
+</p>
+
+This is a repo accompanying our ICML 2022 paper "Generative Coarse-graining of Molecualr Conformations" ([arxiv link](https://arxiv.org/abs/2201.12176)). We propose a geometric generative model for backmmaping fine-grained coordinates from coarse-grained coordinates. It is essentially performing the geometric super-resolution task for molecular geometries. 
 
 Highlights:
 * :heavy_check_mark: Our model works for arbitrary coarse-graining mapping protocols
