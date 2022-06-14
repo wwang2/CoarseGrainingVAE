@@ -1,6 +1,7 @@
 # Coarse-Graining Variational Autoencoders(CGVAE)
 
 This is a repo accompanying our ICML 2022 paper "Generative Coarse-graining of Molecualr Conformations" ([arxiv link](https://arxiv.org/abs/2201.12176)). We propose a geometric generative model for backmmaping fine-grained coordinates from coarse-grained coordinates. 
+
 Highlights:
 * :heavy_check_mark: Our model works for arbitrary coarse-graining mapping protocols
 * :heavy_check_mark: Our model can backmap from very representations
@@ -76,19 +77,19 @@ Evaluation stats is generated with 5-fold cross-validation. Feel free to change 
 
 # 
 
-### Future Plans
+### Future plans
 
 There are many things I want to do with this tool for CG modeling, but I might not have the time to do it. Here are a few things:
 
-- [] provide flexible user input options for handling different coordinates format and coarse-graining mapping 
-- [] create a web-service for generating backmapping models 
-- [] better code structures 
+- [ ] provide flexible user input options for handling different coordinates format and coarse-graining mapping 
+- [ ] create a web-service for generating backmapping models 
+- [ ] better code structures 
 
 This repo is a reference implementation, and it might need some more work to incorporate this into a pipeline. I will try to maintain it even though I am planning on leaving academia. It is very likely that this project will be better packaged in another project for community use, depending how this field develops. If you want to contribute, please get in touch!
 
 # 
 
-### citation info
+### Citation info
 
 ```
 @inproceedings{
