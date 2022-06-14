@@ -2,12 +2,12 @@
 
 This is a repo accompanying our ICML 2022 paper "Generative Coarse-graining of Molecualr Conformations" ([arxiv link](https://arxiv.org/abs/2201.12176)). We propose a geometric generative model for backmmaping fine-grained coordinates from coarse-grained coordinates. 
 Highlights:
-* Our model works for arbitrary coarse-graining mapping protocols
-* Our model can backmap from very representations
-* Our model incoporates necessary geometric constraints 
-* Our model is generative 
+* :heavy_check_mark: Our model works for arbitrary coarse-graining mapping protocols
+* :heavy_check_mark: Our model can backmap from very representations
+* :heavy_check_mark: Our model incoporates necessary geometric constraints 
+* :heavy_check_mark: Our model is generative 
 
-* ### Install packages 
+### Install packages 
 
 I highly recommend creating a dedicated conda environment via: 
 ```
@@ -24,14 +24,14 @@ pip install -e . # -e is useful if you want to edit the source code
 ```
 #
 
-* ### Download data 
+### Download data 
 
 #### Alanine Dipeptide trajectories 
 
 trajectories will be automatically downloaded when running the script. The dataset is provided via `mdshare`
 
 
- #### Chignolin trajectories 
+#### Chignolin trajectories 
   
 Before downloading, make sure you have at least 1.3G diskspace.
 
