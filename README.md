@@ -47,7 +47,7 @@ tar -xf chignolin_trajectories.tar.gz
 
 Navigate to scripts directory
 
-To run experiment for alanine dipeptide trajecotires: 
+To run experiment for alanine dipeptide trajecotries: 
 
 ```
 python run_ala.py -logdir ./dipep_exp -dataset dipeptide -device 0 -n_cgs 3 -batch_size 32 -nsamples 20 -ndata 20000 -nepochs 600 -nevals 5 -atom_cutoff 8.5 -cg_cutoff 9.5 -nsplits 5 -beta 0.05 -activation swish -dec_nconv 5 -enc_nconv 4 -lr 0.00008 -n_basis 600 -n_rbf 8 --graph_eval -gamma 25.0 -eta 0.0 -kappa 0.0 -patience 15 -cg_method cgae -edgeorder 2
@@ -74,6 +74,17 @@ Feel free to change the desired CG resolution via `-n_cg`, it should work for a 
 
 Evaluation stats is generated with 5-fold cross-validation. Feel free to change hyperparameters, it should not be very sensitive to hyperparameter choice. Generated samples also dumped for visualization. 
 
+# 
+
+### Future Plans
+
+There are many things I want to do with this tool for CG modeling, but I might not have the time to do it. Here are a few things:
+
+- [] provide flexible user input options for handling different coordinates format and coarse-graining mapping 
+- [] create a web-service for generating backmapping models 
+- [] better code structures 
+
+This repo is a reference implementation, and it might need some more work to incorporate this into a pipeline. I will try to maintain it even though I am planning on leaving academia. It is very likely that this project will be better packaged in another project for community use, depending how this field develops. If you want to contribute, please get in touch!
 
 # 
 
