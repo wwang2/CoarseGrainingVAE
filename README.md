@@ -1,4 +1,11 @@
-# Coarse-Graining Variational Autoencoders
+# Coarse-Graining Variational Autoencoders(CGVAE)
+
+This is a repo accompanying our ICML 2022 paper "Generative Coarse-graining of Molecualr Conformations" ([arxiv link](https://arxiv.org/abs/2201.12176)). We propose a geometric generative model for backmmaping fine-grained coordinates from coarse-grained coordinates. 
+Highlights:
+* Our model works for arbitrary coarse-graining mapping protocols
+* Our model can backmap from very representations
+* Our model incoporates necessary geometric constraints 
+* Our model is generative 
 
 * ### Install packages 
 
@@ -36,3 +43,15 @@ cd data
 tar -xf chignolin_trajectories.tar.gz
 ```
 
+
+* ### citation info
+
+```
+@inproceedings{
+  wang2022generativecg,
+  title={Generative Coarse-Graining of Molecular Conformations},
+  author={Wang, Wujie and Xu, Minkai and Cai, Chen and Miller, Benjamin Kurt and Smidt, Tess and Wang, Yusu and Tang, Jian and G{\'o}mez-Bombarelli, Rafael},
+  booktitle={International Conference on Machine Learning},
+  year={2022}
+}
+```
