@@ -24,7 +24,7 @@ Download and install
 git clone https://github.com/wwang2/CoarseGrainingVAE.git
 cd CoarseGrainingVAE
 conda activate cgvae
-pip install -r requirement.txt # I have tested this, it should work 
+pip install -r requirements.txt # I have tested this, it should work 
 pip install -e . # -e is useful if you want to edit the source code
 ```
 #
@@ -50,15 +50,15 @@ tar -xf chignolin_trajectories.tar.gz
 
 ### Run experiments 
 
-Navigate to scripts directory
+Navigate to scripts directory. I assume you have access to a GPU.
 
-To run experiment for alanine dipeptide trajecotries: 
+To run experiment for alanine dipeptide trajecotries (approx. run time 2h for each fold): 
 
 ```
 python run_ala.py -logdir ./dipep_exp -dataset dipeptide -device 0 -n_cgs 3 -batch_size 32 -nsamples 20 -ndata 20000 -nepochs 600 -nevals 5 -atom_cutoff 8.5 -cg_cutoff 9.5 -nsplits 5 -beta 0.05 -activation swish -dec_nconv 5 -enc_nconv 4 -lr 0.00008 -n_basis 600 -n_rbf 8 --graph_eval -gamma 25.0 -eta 0.0 -kappa 0.0 -patience 15 -cg_method cgae -edgeorder 2
 ```
 
-to run experiment for chignolin trajectories:
+to run experiment for chignolin trajectoriesi (approx. run time 15h for each fold):
 
 ```
 python run_ala.py -logdir ./chig_exp  -dataset chignolin -device 0 -n_cgs 6 -batch_size 2 -nsamples 35 -ndata 5000 -nepochs 100 -atom_cutoff 12.0 -cg_cutoff 25.0 -nsplits 5 -beta 0.05 -gamma 50.0 -eta 0.0 -kappa 0.0 -activation swish -dec_nconv 9 -enc_nconv 2 -lr 0.0001 -n_basis 600 -n_rbf 10 -cg_method cgae --graph_eval -n_ensemble 8 -factor 0.3 -patience 14
@@ -77,7 +77,7 @@ A set of coarse-graining mapping is first determined before the model training. 
 
 Feel free to change the desired CG resolution via `-n_cg`, it should work for a minimal of 3-bead coarse-graining representations. (My dream is to be able to backmap any molecular geometries from representations of only 3-beads, 3 beads are all you need?) 
 
-Evaluation stats is generated with 5-fold cross-validation. Feel free to change hyperparameters, it should not be very sensitive to hyperparameter choice. Generated samples also dumped for visualization. 
+Evaluation stats is generated with 5-fold cross-validation. Feel free to change hyperparameters, it should not be very sensitive to hyperparameter choice. Generated samples are also dumped for visualization. 
 
 The model work for larger systems and proteins, I have tested it on a covid spike protein before, but the training might take a while. 
 
@@ -85,13 +85,13 @@ The model work for larger systems and proteins, I have tested it on a covid spik
 
 ### Future plans
 
-There are many things I want to do with this tool for CG modeling, but I might not have the time to do it. Here are a few things:
+There are many things I want to do with this tool for CG modeling, but I might not have the time to do all of them. Here are a few things:
 
 - [ ] provide flexible user input options for handling different coordinates format and coarse-graining mapping 
 - [ ] create a web-service for generating backmapping models 
 - [ ] better code structures 
 
-This repo is a reference implementation, and it might need some more work to incorporate this into a pipeline. I will try to maintain it even though I am planning on leaving academia. It is very likely that this project will be better packaged in another project for community use, depending how this field develops. If you want to contribute, please get in touch!
+This repo is a reference implementation, and it might need some more work to incorporate this into a pipeline. I will try to maintain the project as it goes. It is very likely that this project will be better packaged in another project for community use, depending how this field develops. If you want to contribute, please get in touch!
 
 # 
 
